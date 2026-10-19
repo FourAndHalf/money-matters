@@ -48,6 +48,8 @@ fun DashboardScreen(
     onNavigate: (DashboardDestination) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
+    onOpenAccounts: () -> Unit = { onNavigate(DashboardDestination.Accounts) },
+    onOpenAccount: (accountId: String) -> Unit = { onNavigate(DashboardDestination.Account) },
 ) {
     val margin = MoneyTheme.spacing.margin
     val gutter = MoneyTheme.spacing.gutter
@@ -66,8 +68,8 @@ fun DashboardScreen(
         padded(margin, "accounts") {
             AccountsSection(
                 state.accounts,
-                onViewAll = { onNavigate(DashboardDestination.Accounts) },
-                onAction = { onNavigate(DashboardDestination.Account) },
+                onViewAll = onOpenAccounts,
+                onAction = { account -> onOpenAccount(account.id) },
             )
         }
         padded(margin, "runway") { RunwayModule(state.runway) { onNavigate(DashboardDestination.Runway) } }

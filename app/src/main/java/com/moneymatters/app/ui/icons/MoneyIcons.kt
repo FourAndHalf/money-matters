@@ -45,6 +45,14 @@ object MoneyIcons {
     }
     val Alert by lazy { outline("Alert", "M12 6v8M12 18h.01", width = 2f) }
     val Lock by lazy { outline("Locked", "M7 11V8a5 5 0 0 1 10 0v3M5.5 11h13v9h-13z") }
+    val ArrowLeft by lazy { outline("Back", "M19 12H5M11 18l-6-6 6-6", width = 1.8f) }
+    val Bank by lazy {
+        outline(
+            "Bank",
+            "M4 10.5 12 5l8 5.5M5 10.5h14V20H5zM8 13.5V17M12 13.5V17M16 13.5V17M4 20h16",
+        )
+    }
+    val Percent by lazy { outline("Loan", "M6 18 18 6M7.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM16.5 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z", width = 1.8f) }
 
     private fun outline(name: String, path: String, width: Float = 1.6f): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

@@ -9,6 +9,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.moneymatters.app.feature.accounts.SampleAccounts
+import com.moneymatters.app.feature.accounts.SampleLedgers
 import com.moneymatters.app.ui.MoneyMattersApp
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import org.junit.Rule
@@ -30,7 +32,7 @@ class DashboardScreenTest {
     @get:Rule val compose = createComposeRule()
 
     private fun app(dark: Boolean = false) = compose.setContent {
-        MoneyMattersTheme(darkTheme = dark) { MoneyMattersApp(SampleDashboard.state) }
+        MoneyMattersTheme(darkTheme = dark) { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId) }
     }
 
     @Test fun `first screen shows leeway and allowance`() {
@@ -72,13 +74,13 @@ class DashboardFullPageTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun `full page light`() {
-        compose.setContent { MoneyMattersTheme(darkTheme = false) { MoneyMattersApp(SampleDashboard.state) } }
+        compose.setContent { MoneyMattersTheme(darkTheme = false) { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId) } }
         compose.onNodeWithText("Needs attention").assertExists()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/dashboard_full_light.png")
     }
 
     @Test fun `full page dark`() {
-        compose.setContent { MoneyMattersTheme(darkTheme = true) { MoneyMattersApp(SampleDashboard.state) } }
+        compose.setContent { MoneyMattersTheme(darkTheme = true) { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId) } }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/dashboard_full_dark.png")
     }
 }
