@@ -20,4 +20,5 @@ Money Matters: a personal, offline-first Android finance app (Kotlin + Jetpack C
 - Tax rates, limits and section numbers live in versioned per-tax-year data, never in code.
 - Any change to ledger, close or tax logic needs tests that prove these rules still hold.
 - UI follows `design/DESIGN.md`: JetBrains Mono throughout, semantic colors only for meaning.
+- Use the tokens in `ui/theme` (`MoneyTheme.colors/type/shapes/spacing`) and the components in `ui/components`; never hard-code colors or text styles in screens. Add a component there before copying UI between screens.
 - Keep changes small and focused; update `docs/plan.html` when a decision changes.
