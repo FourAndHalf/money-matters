@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.moneymatters.app.feature.accounts.SampleAccounts
 import com.moneymatters.app.feature.accounts.SampleLedgers
+import com.moneymatters.app.feature.transactions.SampleTransactions
 import com.moneymatters.app.feature.dashboard.SampleDashboard
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import org.junit.Rule
@@ -27,7 +28,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `View all on the dashboard switches to the Accounts tab`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId) }
+            MoneyMattersTheme { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) }
         }
         compose.onNodeWithText("View all").performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
@@ -35,7 +36,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `tapping an account opens its ledger and back returns to the tab bar`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId) }
+            MoneyMattersTheme { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) }
         }
         compose.onNodeWithText("View all").performClick()
         compose.onNodeWithText("HDFC Bank").performClick()

@@ -25,6 +25,10 @@ import com.moneymatters.app.feature.accounts.AccountsScreen
 import com.moneymatters.app.feature.accounts.AccountsState
 import com.moneymatters.app.feature.dashboard.DashboardScreen
 import com.moneymatters.app.feature.dashboard.DashboardState
+import com.moneymatters.app.feature.transactions.TransactionDetail
+import com.moneymatters.app.feature.transactions.TransactionDetailScreen
+import com.moneymatters.app.feature.transactions.TransactionsScreen
+import com.moneymatters.app.feature.transactions.TransactionsState
 import com.moneymatters.app.ui.components.MoneyBottomBar
 import com.moneymatters.app.ui.components.NavItem
 import com.moneymatters.app.ui.components.QuickAddFab
@@ -39,6 +43,7 @@ private val Tabs = listOf(
     NavItem("More", MoneyIcons.More),
 )
 
+private const val TXNS_TAB = 1
 private const val ACCOUNTS_TAB = 2
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
@@ -47,9 +52,12 @@ fun MoneyMattersApp(
     dashboard: DashboardState,
     accounts: AccountsState,
     ledgers: Map<String, AccountLedgerState>,
+    transactions: TransactionsState,
+    transactionDetails: Map<String, TransactionDetail>,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var openAccountId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
     val c = MoneyTheme.colors
     val canvas = if (c.isDark) Brush.verticalGradient(listOf(c.canvas, c.canvas)) else Brush.verticalGradient(0f to Color(0xFFF0F0F2), 0.45f to c.canvas)
 
@@ -60,47 +68,61 @@ fun MoneyMattersApp(
             .background(canvas),
     ) {
         val openLedger = openAccountId?.let { ledgers[it] }
-        if (openLedger != null) {
-            // Drilling into an account hides the tab bar, like Transaction/Holding detail will too.
-            BackHandler { openAccountId = null }
-            AccountLedgerScreen(openLedger, onBack = { openAccountId = null })
-        } else {
-            when (tab) {
-                0 -> DashboardScreen(
-                    dashboard,
-                    onNavigate = {},
-                    // Clears the floating bar and Quick Add.
-                    contentPadding = PaddingValues(bottom = 132.dp),
-                    onOpenAccounts = { tab = ACCOUNTS_TAB },
-                    onOpenAccount = { id -> openAccountId = id },
-                )
-                ACCOUNTS_TAB -> AccountsScreen(
-                    accounts,
-                    onOpenAccount = { id -> openAccountId = id },
-                    contentPadding = PaddingValues(bottom = 132.dp),
-                )
-                else -> Text(
-                    "${Tabs[tab].label} is not built yet",
-                    style = MoneyTheme.type.bodyMd,
-                    color = c.muted,
-                    modifier = Modifier.align(Alignment.Center),
+        val openTransaction = openTransactionId?.let { transactionDetails[it] }
+        when {
+            // Drilling into an account or a transaction hides the tab bar, like Holding detail will too.
+            openLedger != null -> {
+                BackHandler { openAccountId = null }
+                AccountLedgerScreen(openLedger, onBack = { openAccountId = null })
+            }
+            openTransaction != null -> {
+                BackHandler { openTransactionId = null }
+                TransactionDetailScreen(openTransaction, onBack = { openTransactionId = null })
+            }
+            else -> {
+                when (tab) {
+                    0 -> DashboardScreen(
+                        dashboard,
+                        onNavigate = {},
+                        // Clears the floating bar and Quick Add.
+                        contentPadding = PaddingValues(bottom = 132.dp),
+                        onOpenAccounts = { tab = ACCOUNTS_TAB },
+                        onOpenAccount = { id -> openAccountId = id },
+                        onOpenTransactions = { tab = TXNS_TAB },
+                    )
+                    TXNS_TAB -> TransactionsScreen(
+                        transactions,
+                        onOpenTransaction = { id -> openTransactionId = id },
+                        contentPadding = PaddingValues(bottom = 132.dp),
+                    )
+                    ACCOUNTS_TAB -> AccountsScreen(
+                        accounts,
+                        onOpenAccount = { id -> openAccountId = id },
+                        contentPadding = PaddingValues(bottom = 132.dp),
+                    )
+                    else -> Text(
+                        "${Tabs[tab].label} is not built yet",
+                        style = MoneyTheme.type.bodyMd,
+                        color = c.muted,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 10.dp, vertical = 14.dp),
+                ) {
+                    MoneyBottomBar(Tabs, tab, onSelect = { tab = it })
+                }
+                QuickAddFab(
+                    onClick = {},
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = 22.dp, bottom = 98.dp),
                 )
             }
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 14.dp),
-            ) {
-                MoneyBottomBar(Tabs, tab, onSelect = { tab = it })
-            }
-            QuickAddFab(
-                onClick = {},
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 22.dp, bottom = 98.dp),
-            )
         }
     }
 }
