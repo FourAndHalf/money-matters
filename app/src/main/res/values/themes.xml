@@ -4,4 +4,11 @@
     <style name="Theme.MoneyMatters" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/canvas</item>
     </style>
+
+    <!-- Cold-start splash only; installSplashScreen() swaps this for Theme.MoneyMatters before any UI shows. -->
+    <style name="Theme.MoneyMatters.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/charcoal</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MoneyMatters</item>
+    </style>
 </resources>

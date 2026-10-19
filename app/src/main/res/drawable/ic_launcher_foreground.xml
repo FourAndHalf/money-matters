@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ledger mark: two balanced columns over a rule, in pearl on charcoal. -->
+<!-- Wallet mark: stacked cards tucked behind a notched wallet with a clasp, in pearl on charcoal. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,5 +7,20 @@
     android:viewportHeight="108">
     <path
         android:fillColor="#F1F1F3"
-        android:pathData="M38,38h12v26h-12z M58,46h12v18h-12z M36,68h36v3h-36z" />
+        android:pathData="M41.58,33.47 L58.86,33.47 A2.16,2.16 0 0,1 61.02,35.63 L61.02,35.63 A2.16,2.16 0 0,1 58.86,37.79 L41.58,37.79 A2.16,2.16 0 0,1 39.41,35.63 L39.41,35.63 A2.16,2.16 0 0,1 41.58,33.47 Z" />
+    <path
+        android:fillColor="#F1F1F3"
+        android:pathData="M38.33,39.41 L62.1,39.41 A2.16,2.16 0 0,1 64.26,41.58 L64.26,41.58 A2.16,2.16 0 0,1 62.1,43.74 L38.33,43.74 A2.16,2.16 0 0,1 36.17,41.58 L36.17,41.58 A2.16,2.16 0 0,1 38.33,39.41 Z" />
+    <path
+        android:fillColor="#F1F1F3"
+        android:pathData="M35.09,45.36 L65.34,45.36 A2.16,2.16 0 0,1 67.51,47.52 L67.51,47.52 A2.16,2.16 0 0,1 65.34,49.68 L35.09,49.68 A2.16,2.16 0 0,1 32.93,47.52 L32.93,47.52 A2.16,2.16 0 0,1 35.09,45.36 Z" />
+    <path
+        android:fillColor="#F1F1F3"
+        android:pathData="M30.77,56.7 A5.4,5.4 0 0,1 36.17,51.3 L41.58,51.3 Q44.82,57.24 50.22,57.24 Q55.62,57.24 58.86,51.3 L64.26,51.3 A5.4,5.4 0 0,1 69.67,56.7 L69.67,69.13 A5.4,5.4 0 0,1 64.26,74.53 L36.17,74.53 A5.4,5.4 0 0,1 30.77,69.13 L30.77,56.7 Z" />
+    <path
+        android:fillColor="#F1F1F3"
+        android:pathData="M72.37,56.16 L73.45,56.16 A3.78,3.78 0 0,1 77.23,59.94 L77.23,59.94 A3.78,3.78 0 0,1 73.45,63.72 L72.37,63.72 A3.78,3.78 0 0,1 68.59,59.94 L68.59,59.94 A3.78,3.78 0 0,1 72.37,56.16 Z" />
+    <path
+        android:fillColor="#2A2A2D"
+        android:pathData="M70.75,59.94 A2.16,2.16 0 1,1 75.07,59.94 A2.16,2.16 0 1,1 70.75,59.94 Z" />
 </vector>
