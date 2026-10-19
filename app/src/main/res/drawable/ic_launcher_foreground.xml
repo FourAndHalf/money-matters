@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ledger mark: two balanced columns over a rule, in pearl on charcoal. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#F1F1F3"
+        android:pathData="M38,38h12v26h-12z M58,46h12v18h-12z M36,68h36v3h-36z" />
+</vector>
