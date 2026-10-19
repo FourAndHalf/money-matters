@@ -137,7 +137,7 @@
   <main>
     <header class="hero">
       <h1>Money Matters: product plan</h1>
-      <p>A personal Android app that keeps complete, double-entry books for every rupee and every money decision. It tracks stocks, mutual funds and FDs, projects leeway and runway, and points out spending patterns worth changing. Covers everything agreed so far; last updated 19 Oct 2026.</p>
+      <p>A personal Android app that keeps complete, double-entry books for every rupee and every money decision. It tracks stocks, mutual funds and FDs, projects leeway and runway, and points out spending patterns worth changing. Covers everything agreed so far; last updated 20 Oct 2026.</p>
     </header>
 
     <!-- ============================================================ -->
@@ -175,6 +175,8 @@
         <tr><td>Tax</td><td>Tracked, local to Indian law; estimates only, not filing or advice</td></tr>
         <tr><td>Insights</td><td>Rules engine plus AI weekly summary</td></tr>
         <tr><td>Data entry</td><td>Manual first → statement import → SMS parsing (sideloaded APK)</td></tr>
+        <tr><td>Onboarding</td><td>The wizard writes nothing until its last step, then commits once: accounts, opening balances against <code>Equity:Opening</code>, <code>Expenses:*</code> category and <code>Income:*</code> accounts in one ledger transaction, then the passcode, then the profile. Setup-complete is written last, and a re-run never re-posts opening balances.</td></tr>
+        <tr><td>Passcode</td><td>4–6 digits, stored only as a salted PBKDF2-SHA256 hash in Keystore-backed encrypted prefs; profile answers (DOB, payday, regime, take-home, essentials, goals) in a separate encrypted prefs file</td></tr>
       </table></div>
     </section>
 

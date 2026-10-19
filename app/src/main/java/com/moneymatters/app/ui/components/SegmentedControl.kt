@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -45,7 +46,7 @@ fun <T> SegmentedControl(
             Box(
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxHeight()
                     .clip(MoneyTheme.shapes.full)
                     .then(if (isSelected) Modifier.background(c.surfaceLowest).softShadow(MoneyTheme.shapes.full, strength = 0.5f) else Modifier)
                     .semantics { selected = isSelected }

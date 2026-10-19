@@ -21,6 +21,19 @@ value class Paise(val value: Long) : Comparable<Paise> {
 val Long.rupees get() = Paise.rupees(this)
 val Int.rupees get() = Paise.rupees(toLong())
 
+private val RUPEES_INPUT = Regex("""(\d{1,13})(?:\.(\d{1,2}))?""")
+
+/**
+ * Parses a typed, non-negative rupee amount ("1,23,456.7", "₹500") straight into integer paise,
+ * never via a float. Returns null for anything else, including more than two decimal places.
+ */
+fun parseRupees(text: String): Paise? {
+    val cleaned = text.trim().removePrefix("₹").replace(",", "").trim()
+    val match = RUPEES_INPUT.matchEntire(cleaned) ?: return null
+    val (whole, fraction) = match.destructured
+    return Paise(whole.toLong() * 100 + fraction.padEnd(2, '0').toLong())
+}
+
 private const val MINUS = '−'
 
 /** Groups digits the Indian way: last three, then pairs. 1234567 -> "12,34,567". */

@@ -13,6 +13,9 @@ interface LedgerDao {
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun getAccount(id: String): AccountEntity?
 
+    @Query("SELECT * FROM accounts WHERE name = :name LIMIT 1")
+    suspend fun findAccountByName(name: String): AccountEntity?
+
     @Query("SELECT * FROM accounts WHERE isArchived = 0 ORDER BY name")
     fun accounts(): Flow<List<AccountEntity>>
 

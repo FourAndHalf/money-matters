@@ -31,6 +31,15 @@ class LedgerRepository(
         return id
     }
 
+    suspend fun accountIdByName(name: String): String? = dao.findAccountByName(name)?.id
+
+    /** Looks an account up by name first; creates it only if missing. Used for shared accounts like `Equity:Opening`. */
+    suspend fun createAccountIfAbsent(name: String, type: AccountType, parentId: String? = null): String =
+        accountIdByName(name) ?: createAccount(name, type, parentId)
+
+    /** Runs several repository writes as one database transaction: all of them land, or none do. */
+    suspend fun <R> inTransaction(block: suspend () -> R): R = database.withTransaction(block)
+
     /** Net of every posting against this account: debit − credit. Sign meaning depends on [AccountType]. */
     suspend fun accountBalance(accountId: String): Paise =
         dao.getPostingsForAccount(accountId).fold(Paise.Zero) { acc, p ->
