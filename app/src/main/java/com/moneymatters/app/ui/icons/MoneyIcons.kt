@@ -53,6 +53,9 @@ object MoneyIcons {
         )
     }
     val Percent by lazy { outline("Loan", "M6 18 18 6M7.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM16.5 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z", width = 1.8f) }
+    val Search by lazy { outline("Search", "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3", width = 1.8f) }
+    val Close by lazy { outline("Clear", "M6 6l12 12M18 6 6 18", width = 1.8f) }
+    val Filter by lazy { outline("Filter", "M4 6h16M8 12h8M11 18h2", width = 1.8f) }
 
     private fun outline(name: String, path: String, width: Float = 1.6f): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

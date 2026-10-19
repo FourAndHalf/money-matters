@@ -50,6 +50,7 @@ fun DashboardScreen(
     contentPadding: PaddingValues = PaddingValues(),
     onOpenAccounts: () -> Unit = { onNavigate(DashboardDestination.Accounts) },
     onOpenAccount: (accountId: String) -> Unit = { onNavigate(DashboardDestination.Account) },
+    onOpenTransactions: () -> Unit = { onNavigate(DashboardDestination.Drafts) },
 ) {
     val margin = MoneyTheme.spacing.margin
     val gutter = MoneyTheme.spacing.gutter
@@ -88,16 +89,14 @@ fun DashboardScreen(
         }
         padded(margin, "attention") {
             AttentionModule(state.attention) { item ->
-                onNavigate(
-                    when (item.kind) {
-                        AttentionKind.CloseMonth -> DashboardDestination.CloseMonth
-                        AttentionKind.Drafts -> DashboardDestination.Drafts
-                        AttentionKind.Uncategorized -> DashboardDestination.Uncategorized
-                        AttentionKind.InTransit -> DashboardDestination.InTransit
-                        AttentionKind.WeeklyReview -> DashboardDestination.WeeklyReview
-                        AttentionKind.AdvanceTax -> DashboardDestination.Tax
-                    },
-                )
+                when (item.kind) {
+                    // Drafts and uncategorized entries both live in the Transactions list.
+                    AttentionKind.Drafts, AttentionKind.Uncategorized -> onOpenTransactions()
+                    AttentionKind.CloseMonth -> onNavigate(DashboardDestination.CloseMonth)
+                    AttentionKind.InTransit -> onNavigate(DashboardDestination.InTransit)
+                    AttentionKind.WeeklyReview -> onNavigate(DashboardDestination.WeeklyReview)
+                    AttentionKind.AdvanceTax -> onNavigate(DashboardDestination.Tax)
+                }
             }
         }
     }

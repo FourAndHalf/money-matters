@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyTheme
 
-enum class PillStyle { Secondary, Primary, OnDark }
+enum class PillStyle { Secondary, Primary, OnDark, Destructive }
 
 /**
  * Compact pill button used for module actions ("View all", "Close", "October ▾").
@@ -43,6 +43,8 @@ fun Pill(
         PillStyle.Secondary -> Triple(c.surfaceLowest, c.ink, c.outline)
         PillStyle.Primary -> Triple(c.anchor, c.onAnchor, c.anchor)
         PillStyle.OnDark -> Triple(androidx.compose.ui.graphics.Color.Transparent, c.onAnchor, c.onAnchor.copy(alpha = 0.3f))
+        // Irreversible actions (DESIGN.md → Buttons): white pill, red border and text, never one tap alone.
+        PillStyle.Destructive -> Triple(c.surfaceLowest, c.negative, c.negative)
     }
     val shape = MoneyTheme.shapes.full
     Row(
@@ -54,7 +56,9 @@ fun Pill(
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Centered, not just spaced: a compact pill is unaffected, but a fillMaxWidth() action
+        // button (Edit / Reverse / Post prior-period adjustment) would otherwise hug the left edge.
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         Text(text, style = MoneyTheme.type.labelRegular, color = fg, maxLines = 1)
         if (trailingIcon != null) Icon(trailingIcon, null, tint = fg, modifier = Modifier.size(10.dp))

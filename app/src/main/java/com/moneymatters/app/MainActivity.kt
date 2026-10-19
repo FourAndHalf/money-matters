@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import com.moneymatters.app.feature.accounts.SampleAccounts
 import com.moneymatters.app.feature.accounts.SampleLedgers
 import com.moneymatters.app.feature.dashboard.SampleDashboard
+import com.moneymatters.app.feature.transactions.SampleTransactions
 import com.moneymatters.app.ui.MoneyMattersApp
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 
@@ -17,7 +18,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             MoneyMattersTheme {
                 // Sample data until the ledger exists.
-                MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId)
+                MoneyMattersApp(
+                    SampleDashboard.state,
+                    SampleAccounts.state,
+                    SampleLedgers.byAccountId,
+                    SampleTransactions.state,
+                    SampleTransactions.byId,
+                )
             }
         }
     }
