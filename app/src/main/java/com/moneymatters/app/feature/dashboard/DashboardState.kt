@@ -53,6 +53,8 @@ enum class CardFinish { Pearl, Graphite, Silver, Champagne, Smoke }
 /** One card in the account stack, plus the facts its context panel shows. */
 @Immutable
 data class AccountCard(
+    /** Stable id, shared with the Accounts list (P08) and its ledger (P09). */
+    val id: String,
     val finish: CardFinish,
     val typeLabel: String,
     val name: String,

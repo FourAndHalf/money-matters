@@ -44,7 +44,7 @@ object SampleDashboard {
         ),
         accounts = listOf(
             AccountCard(
-                CardFinish.Pearl, "Savings · salary", "HDFC Bank", "Available balance", 1_84_250.rupees,
+                "hdfc-bank", CardFinish.Pearl, "Savings · salary", "HDFC Bank", "Available balance", 1_84_250.rupees,
                 "•••• 4821", "✓ Reconciled 15 Oct", glyph = null,
                 detail = AccountDetail.Bank(
                     "HDFC Bank · savings", "October so far", "Open ledger",
@@ -57,7 +57,7 @@ object SampleDashboard {
                 ),
             ),
             AccountCard(
-                CardFinish.Graphite, "Credit card", "ICICI Rewards", "Outstanding", 23_480.rupees,
+                "icici-credit", CardFinish.Graphite, "Credit card", "ICICI Rewards", "Outstanding", 23_480.rupees,
                 "•••• 1907", "Due 28 Oct", glyph = null,
                 detail = AccountDetail.CreditCard(
                     "ICICI Rewards · credit", "Statement closed 10 Oct", "Schedule payment",
@@ -66,7 +66,7 @@ object SampleDashboard {
                 ),
             ),
             AccountCard(
-                CardFinish.Silver, "Cash", "Wallet", "On hand", 3_200.rupees,
+                "cash", CardFinish.Silver, "Cash", "Wallet", "On hand", 3_200.rupees,
                 "Counted 17 Oct", "Count due", glyph = "₹",
                 detail = AccountDetail.Cash(
                     "Cash wallet", "Last counted 17 Oct", "Count & reconcile",
@@ -75,7 +75,7 @@ object SampleDashboard {
                 ),
             ),
             AccountCard(
-                CardFinish.Champagne, "Fixed deposits · 3", "Emergency ladder", "Principal", 3_00_000.rupees,
+                "fd-ladder", CardFinish.Champagne, "Fixed deposits · 3", "Emergency ladder", "Principal", 3_00_000.rupees,
                 "Next: 12 Jan 2027", "+₹3,600 accrued", glyph = "◈",
                 detail = AccountDetail.FdLadder(
                     "FD ladder · emergency", "Counts toward runway step 2", "Add FD",
@@ -88,7 +88,7 @@ object SampleDashboard {
                 ),
             ),
             AccountCard(
-                CardFinish.Smoke, "Investments · 7", "Stocks & MFs", "Market value", 60_900.rupees,
+                "investments", CardFinish.Smoke, "Investments · 7", "Stocks & MFs", "Market value", 60_900.rupees,
                 "Prices ✓ 16 Oct", "▲ 8.4%", glyph = "↗",
                 detail = AccountDetail.Investments(
                     "Stocks & mutual funds", "4 stocks · 3 funds", "Open portfolio",
