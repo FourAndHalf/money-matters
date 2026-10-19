@@ -158,4 +158,29 @@ class LedgerRepositoryTest {
             }
         }
     }
+
+    @Test fun `createAccountIfAbsent reuses an account with the same name`() = runBlocking {
+        val first = repo.createAccountIfAbsent("Equity:Opening", AccountType.Equity)
+        val second = repo.createAccountIfAbsent("Equity:Opening", AccountType.Equity)
+        assertEquals(first, second)
+        assertEquals(bank, repo.createAccountIfAbsent("HDFC Bank", AccountType.Asset))
+        assertEquals(3, repo.accounts().first().size)
+    }
+
+    @Test fun `a failure inside inTransaction rolls back every write in it`() {
+        assertThrows(UnbalancedTransactionException::class.java) {
+            runBlocking {
+                repo.inTransaction {
+                    repo.createAccount("Cash", AccountType.Asset)
+                    repo.postTransaction(LocalDate.of(2026, 10, 19), "Good", listOf(PostingLine(dining, debit = 1.rupees), PostingLine(bank, credit = 1.rupees)))
+                    repo.postTransaction(LocalDate.of(2026, 10, 19), "Bad", listOf(PostingLine(dining, debit = 1.rupees), PostingLine(bank, credit = 2.rupees)))
+                }
+            }
+        }
+        runBlocking {
+            assertEquals(null, repo.accountIdByName("Cash"))
+            assertEquals(Paise.Zero, repo.accountBalance(bank))
+            assertEquals(0, repo.transactions().first().size)
+        }
+    }
 }

@@ -50,4 +50,20 @@ class PaiseTest {
         assertEquals(Paise(-25), -total)
         assertEquals(Paise(150_00), 150.rupees)
     }
+
+    @Test fun `parses typed rupees straight into paise`() {
+        assertEquals(Paise(500_00), parseRupees("500"))
+        assertEquals(Paise(1_23_456_70), parseRupees("1,23,456.7"))
+        assertEquals(Paise(12_500_50), parseRupees(" ₹12,500.50 "))
+        assertEquals(Paise(5), parseRupees("0.05"))
+        assertEquals(Paise.Zero, parseRupees("0"))
+        // 0.1 + 0.2 style float drift can't happen: 19.99 is exactly 1999 paise.
+        assertEquals(Paise(1999), parseRupees("19.99"))
+    }
+
+    @Test fun `rejects anything that isn't a plain non-negative amount`() {
+        listOf("", " ", "abc", "-5", "1.234", "1.", ".5", "1e5", "12 34", "99999999999999").forEach {
+            assertEquals("\"$it\" should not parse", null, parseRupees(it))
+        }
+    }
 }
