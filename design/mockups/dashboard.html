@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas: #E8E8EA;
+    --s-lowest: #FFFFFF;
+    --s-low: #F1F1F3;
+    --s: #ECECEE;
+    --s-high: #E6E6E9;
+    --ink: #1C1C1E;
+    --muted: #626267;
+    --outline: #DADADD;
+    --outline-2: #E0E0E3;
+    --char: #2A2A2D;
+    --char-2: #3A3A3D;
+    --bar: #C9C9CD;
+    --pos: #23784A;  --pos-c: #DDF0E4;
+    --neg: #B33A35;  --neg-c: #F9DEDC;
+    --warn: #8A5A0F; --warn-c: #F6E7CC;
+    --info: #3F5F80; --info-c: #DFE8F1;
+    --champ: #7A6A47; --champ-c: #EDE6D6;
+    --shadow: 0 1px 2px rgba(20,20,25,.04), 0 8px 24px rgba(20,20,25,.06);
+    --ease: cubic-bezier(.2,.8,.2,1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% 0%, #F4F4F6 0%, #DCDCDF 100%);
+    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 16px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  svg { display: block; }
+
+  /* ---------- Device ---------- */
+  .phone {
+    width: 392px; height: 852px; flex: none;
+    border-radius: 54px; padding: 10px;
+    background: #19191B;
+    box-shadow: 0 40px 80px rgba(20,20,25,.28), inset 0 0 0 2px #3A3A3D;
+  }
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 44px; overflow: hidden;
+    background: linear-gradient(180deg, #F0F0F2 0%, var(--canvas) 45%);
+  }
+  .punch { position: absolute; top: 14px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #0B0B0C; z-index: 30; }
+  .scroll { position: absolute; inset: 0; overflow-y: auto; padding: 0 14px 132px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+  .statusbar { display: flex; justify-content: space-between; align-items: center; height: 42px; padding: 4px 14px 0 18px; font-size: 12px; font-weight: 600; }
+  .statusbar .sys { display: flex; gap: 6px; align-items: center; font-size: 11px; }
+  .caption { margin-top: 20px; font-size: 11px; color: var(--muted); text-align: center; max-width: 392px; line-height: 1.6; }
+  .caption b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Header ---------- */
+  .hdr { display: flex; justify-content: space-between; align-items: center; padding: 6px 2px 16px; }
+  .greet { font-size: 22px; font-weight: 500; letter-spacing: -.03em; line-height: 28px; }
+  .date { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .hdr-actions { display: flex; gap: 8px; align-items: center; }
+  .icon-btn {
+    position: relative; width: 44px; height: 44px; border-radius: 50%;
+    background: var(--s-lowest); border: 1px solid var(--outline);
+    display: grid; place-items: center; box-shadow: 0 1px 2px rgba(20,20,25,.06);
+  }
+  .icon-btn .dot { position: absolute; top: 10px; right: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--neg); border: 1.5px solid #fff; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(140deg, #E2D8C2, #A8997A); color: #fff; font-weight: 600; font-size: 15px; box-shadow: 0 1px 2px rgba(20,20,25,.1); }
+
+  /* ---------- Primitives ---------- */
+  .module {
+    background: var(--s-low); border-radius: 24px; padding: 16px;
+    border: 1px solid rgba(255,255,255,.75); box-shadow: var(--shadow);
+    margin-bottom: 10px;
+  }
+  .inner { background: var(--s); border-radius: 18px; padding: 14px; }
+  .mod-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 8px; }
+  .mod-title { font-size: 14px; font-weight: 600; letter-spacing: -.01em; line-height: 20px; }
+  .mod-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .section-label { display: flex; justify-content: space-between; align-items: center; margin: 18px 2px 10px; }
+  .pill {
+    height: 30px; padding: 0 12px; border-radius: 999px;
+    background: var(--s-lowest); border: 1px solid var(--outline);
+    font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .pill.dark { background: var(--char); color: #fff; border-color: var(--char); }
+  .round { width: 32px; height: 32px; border-radius: 50%; background: var(--s-lowest); border: 1px solid var(--outline); display: grid; place-items: center; flex: none; }
+  .badge { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .b-pos { background: var(--pos-c); color: var(--pos); }
+  .b-neg { background: var(--neg-c); color: var(--neg); }
+  .b-warn { background: var(--warn-c); color: var(--warn); }
+  .b-info { background: var(--info-c); color: var(--info); }
+  .b-champ { background: var(--champ-c); color: var(--champ); }
+  .b-dark { background: var(--char); color: #fff; }
+  .muted { color: var(--muted); }
+  .paise { color: var(--muted); }
+  .kv { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--outline-2); font-size: 12px; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-weight: 500; text-align: right; }
+  .track { position: relative; height: 6px; border-radius: 3px; background: var(--outline); overflow: visible; }
+  .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--char); }
+
+  /* ---------- Leeway hero ---------- */
+  .hero {
+    border-radius: 28px; padding: 18px 18px 14px; margin-bottom: 10px;
+    background: linear-gradient(150deg, #F9F8F4 0%, #ECE9E1 100%);
+    border: 1px solid rgba(255,255,255,.85); box-shadow: var(--shadow);
+  }
+  .hero-top { display: flex; justify-content: space-between; align-items: center; }
+  .hero-label { font-size: 12px; color: var(--muted); }
+  .hero-value { font-size: 34px; font-weight: 500; letter-spacing: -.045em; line-height: 40px; margin: 6px 0 10px; }
+  .hero-meta { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+  .hero-chart { margin: 14px 0 6px; }
+  .hero-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(26,26,30,.07); font-size: 11px; color: var(--muted); }
+
+  /* ---------- KPI strip ---------- */
+  .kpis { display: flex; gap: 10px; overflow-x: auto; margin: 0 -14px 0; padding: 2px 14px 10px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .kpis::-webkit-scrollbar { display: none; }
+  .kpi { flex: none; width: 172px; scroll-snap-align: start; margin-bottom: 0; padding: 14px; }
+  .kpi .lbl { font-size: 11px; color: var(--muted); }
+  .kpi .val { font-size: 18px; font-weight: 500; letter-spacing: -.03em; margin: 6px 0 8px; }
+  .kpi .krow { display: flex; justify-content: space-between; align-items: flex-end; }
+
+  /* ---------- Card stack ---------- */
+  .stack { position: relative; height: 230px; outline: none; touch-action: pan-y; }
+  .stack:focus-visible { outline: 2px solid var(--char); outline-offset: 6px; border-radius: 26px; }
+  .wcard {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 200px;
+    border-radius: 28px; padding: 18px 20px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    transform-origin: 50% 0%;
+    transition: transform .45s var(--ease), opacity .45s var(--ease), filter .45s var(--ease);
+    box-shadow: 0 12px 30px rgba(20,20,25,.16), inset 0 1px 0 rgba(255,255,255,.6);
+    user-select: none; -webkit-user-select: none; cursor: grab; overflow: hidden;
+  }
+  .wcard.dragging { transition: none; cursor: grabbing; }
+  .wcard::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 80% at 15% 0%, rgba(255,255,255,.55), transparent 55%); pointer-events: none; }
+  .wcard.graphite::after { background: radial-gradient(120% 80% at 15% 0%, rgba(255,255,255,.12), transparent 55%); }
+  .pearl { background: linear-gradient(140deg, #F8F7F3 0%, #E7E4DC 100%); }
+  .graphite { background: linear-gradient(140deg, #3A3A3E 0%, #1E1E20 100%); color: #F2F2F3; }
+  .silver { background: linear-gradient(140deg, #F0F0F3 0%, #D6D6DB 100%); }
+  .champagne { background: linear-gradient(140deg, #F2ECDF 0%, #D9CCAE 100%); }
+  .smoke { background: linear-gradient(140deg, #E4E4E8 0%, #C4C4CA 100%); }
+  .wc-top { display: flex; justify-content: space-between; align-items: flex-start; position: relative; z-index: 1; }
+  .wc-type { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .62; }
+  .wc-name { font-size: 14px; font-weight: 600; margin-top: 3px; letter-spacing: -.01em; }
+  .wc-mid { position: relative; z-index: 1; }
+  .wc-lbl { font-size: 11px; opacity: .62; }
+  .wc-amt { font-size: 24px; font-weight: 500; letter-spacing: -.04em; margin-top: 2px; }
+  .wc-bot { display: flex; justify-content: space-between; align-items: center; font-size: 11px; position: relative; z-index: 1; }
+  .wc-bot .mask { letter-spacing: .06em; opacity: .75; }
+  .wc-bot .tag { font-weight: 600; }
+  .stack-foot { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 14px 0 12px; }
+  .sdot { width: 6px; height: 6px; border-radius: 3px; background: var(--bar); transition: width .3s var(--ease), background .3s; padding: 0; }
+  .sdot.on { width: 18px; background: var(--char); }
+  .ctx { transition: opacity .25s; }
+  .ctx.fade { opacity: 0; }
+  .txn { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--outline-2); }
+  .txn:last-child { border-bottom: none; }
+  .chip { width: 34px; height: 34px; border-radius: 50%; background: var(--s-lowest); border: 1px solid var(--outline); display: grid; place-items: center; font-size: 11px; font-weight: 600; flex: none; }
+  .txn .t { flex: 1; min-width: 0; }
+  .txn .t1 { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .txn .t2 { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .txn .amt { font-size: 12px; font-weight: 500; text-align: right; }
+  .txn .amt small { display: block; margin-top: 3px; }
+
+  /* ---------- Runway ---------- */
+  .rung { display: grid; grid-template-columns: 76px 1fr 58px; align-items: center; gap: 10px; padding: 7px 0; font-size: 11px; }
+  .rung .lab { color: var(--muted); }
+  .rung .mo { text-align: right; font-weight: 600; font-size: 12px; }
+  .rbar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--outline); }
+  .seg-cash { background: var(--char); }
+  .seg-fd { background: #85858B; }
+  .seg-mkt { background: repeating-linear-gradient(135deg, #B4B4B9 0 2px, #D3D3D7 2px 4px); }
+  .axis { display: grid; grid-template-columns: 76px 1fr 58px; gap: 10px; font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .axis .ticks { display: flex; justify-content: space-between; }
+
+  /* ---------- Budgets ---------- */
+  .bud { padding: 10px 0; border-bottom: 1px solid var(--outline-2); }
+  .bud:last-child { border-bottom: none; padding-bottom: 2px; }
+  .bud-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 8px; }
+  .bud-top .amt { font-size: 11px; color: var(--muted); }
+  .bud-top .amt b { color: var(--ink); font-weight: 500; }
+  .pace { position: absolute; top: -4px; width: 2px; height: 14px; border-radius: 1px; background: var(--ink); opacity: .55; }
+  .fill.over { background: var(--neg); }
+
+  /* ---------- Categories ---------- */
+  .stackbar { position: relative; display: flex; height: 26px; border-radius: 8px; overflow: hidden; gap: 2px; margin: 34px 0 14px; }
+  .stackbar span { display: block; height: 100%; }
+  .callout { position: absolute; top: -30px; transform: translateX(-50%); }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+  .legend div { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .legend b { display: block; font-size: 13px; color: var(--ink); font-weight: 500; letter-spacing: -.02em; margin-top: 2px; }
+
+  /* ---------- Lists ---------- */
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--outline-2); }
+  .row:last-child { border-bottom: none; padding-bottom: 2px; }
+  .datechip { width: 40px; height: 40px; border-radius: 12px; background: var(--s-lowest); border: 1px solid var(--outline); display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; }
+  .datechip b { font-size: 13px; font-weight: 600; line-height: 1; }
+  .datechip span { font-size: 8px; color: var(--muted); letter-spacing: .08em; margin-top: 2px; }
+  .row .t { flex: 1; min-width: 0; }
+  .row .t1 { font-size: 12px; font-weight: 500; }
+  .row .t2 { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .row .r { text-align: right; font-size: 12px; font-weight: 500; }
+  .row .r .badge { margin-top: 4px; }
+
+  /* ---------- Goals ---------- */
+  .goal + .goal { margin-top: 10px; }
+  .goal-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .goal-name { font-size: 12px; font-weight: 600; }
+  .goal-big { font-size: 20px; font-weight: 500; letter-spacing: -.035em; margin-top: 4px; }
+  .dots { display: grid; grid-template-columns: repeat(20, 1fr); gap: 4px; margin: 6px 0 8px; }
+  .dots i { aspect-ratio: 1; border-radius: 50%; background: #D4D4D8; }
+  .dots i.on { background: var(--char); }
+  .goal-note { font-size: 10px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  /* ---------- Portfolio ---------- */
+  .pf-big { font-size: 24px; font-weight: 500; letter-spacing: -.04em; }
+  .pf-badges { display: flex; gap: 6px; margin: 8px 0 14px; flex-wrap: wrap; }
+  .alloc { position: relative; display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--outline); }
+  .alloc-target { position: absolute; top: -5px; width: 2px; height: 20px; background: var(--champ); border-radius: 1px; }
+  .alloc-lbl { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 6px; }
+  .src { display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 8px 0; border-bottom: 1px solid var(--outline); }
+  .src:last-child { border-bottom: none; padding-bottom: 0; }
+  .src .name { font-weight: 600; }
+
+  /* ---------- Insights ---------- */
+  .digest { background: var(--char); color: #F2F2F3; border-radius: 20px; padding: 16px; margin-bottom: 8px; }
+  .digest .d1 { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #A9A9AE; }
+  .digest p { font-size: 12px; line-height: 1.6; margin: 10px 0 12px; }
+  .digest .pill { background: transparent; color: #fff; border-color: #55555A; }
+  .ins { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--outline-2); }
+  .ins:last-child { border-bottom: none; padding-bottom: 2px; }
+  .ins .t1 { font-size: 12px; font-weight: 500; line-height: 1.45; }
+  .ins .t2 { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .ins .acts { display: flex; gap: 6px; margin-top: 8px; }
+  .ins .pill { height: 26px; font-size: 10px; }
+
+  /* ---------- Nav ---------- */
+  .nav {
+    position: absolute; left: 10px; right: 10px; bottom: 14px; height: 70px; z-index: 20;
+    border-radius: 28px; display: flex; justify-content: space-around; align-items: center; padding: 0 6px;
+    background: rgba(247,247,248,.8); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,.9); box-shadow: 0 10px 30px rgba(20,20,25,.12);
+  }
+  .nav button { width: 64px; height: 54px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 9px; font-weight: 500; color: var(--muted); }
+  .nav button.on { background: var(--char); color: #fff; }
+  .fab {
+    position: absolute; right: 22px; bottom: 98px; z-index: 21;
+    width: 56px; height: 56px; border-radius: 50%; background: var(--char); color: #fff;
+    display: grid; place-items: center; box-shadow: 0 10px 24px rgba(20,20,25,.3);
+  }
+  .gesture { position: absolute; bottom: 5px; left: 50%; width: 110px; height: 4px; margin-left: -55px; border-radius: 2px; background: rgba(28,28,30,.35); z-index: 22; }
+
+  @media (max-width: 430px) {
+    body { padding: 0; background: var(--canvas); }
+    .phone { width: 100%; height: 100vh; height: 100dvh; border-radius: 0; padding: 0; box-shadow: none; background: none; }
+    .screen { border-radius: 0; }
+    .punch, .gesture { display: none; }
+    .caption { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen">
+    <div class="punch"></div>
+    <div class="scroll" id="scroll">
+
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="sys">
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx=".8"/><rect x="4.3" y="5" width="3" height="6" rx=".8"/><rect x="8.6" y="2.5" width="3" height="8.5" rx=".8"/><rect x="12.9" y="0" width="3" height="11" rx=".8"/></svg>
+          5G
+          <svg width="24" height="12" viewBox="0 0 24 12" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="20" height="11" rx="3"/><rect x="2.5" y="2.5" width="13" height="7" rx="1.5" fill="currentColor" stroke="none"/><path d="M22.5 4v4" stroke-linecap="round"/></svg>
+        </span>
+      </div>
+
+      <!-- Header -->
+      <header class="hdr">
+        <div>
+          <div class="greet">Good morning</div>
+          <div class="date">Mon, 19 Oct 2026</div>
+        </div>
+        <div class="hdr-actions">
+          <button class="icon-btn" aria-label="Insights">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 13.8 9a2 2 0 0 0 1.2 1.2l5.5 1.8-5.5 1.8a2 2 0 0 0-1.2 1.2L12 20.5 10.2 15A2 2 0 0 0 9 13.8L3.5 12 9 10.2A2 2 0 0 0 10.2 9z"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Notifications">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 1 1 12 0v5l1.5 2.5h-15z"/><path d="M10 21.5h4"/></svg>
+            <span class="dot"></span>
+          </button>
+          <div class="avatar" aria-label="Profile">F</div>
+        </div>
+      </header>
+
+      <!-- Leeway hero -->
+      <section class="hero" aria-label="Leeway">
+        <div class="hero-top">
+          <span class="hero-label">Safe to spend</span>
+          <span class="badge b-champ">until payday · 1 Nov</span>
+        </div>
+        <div class="hero-value">₹18,420<span class="paise">.00</span></div>
+        <div class="hero-meta">
+          <span class="badge b-dark" style="height:24px;padding:0 10px;font-size:11px">₹1,417 / day</span>
+          <span>13 days left</span>
+          <span>·</span>
+          <span>62% used</span>
+        </div>
+        <div class="hero-chart" id="dailyChart"></div>
+        <div class="hero-foot">
+          <span>₹49,030 reserved for 4 dues before payday</span>
+          <button class="round" aria-label="Leeway breakdown">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- KPI strip -->
+      <div class="kpis" id="kpis"></div>
+
+      <!-- Accounts stack -->
+      <div class="section-label">
+        <div>
+          <div class="mod-title">Accounts</div>
+          <div class="mod-sub">Swipe the stack · <span id="stackCount">1 / 5</span></div>
+        </div>
+        <button class="pill">View all</button>
+      </div>
+      <div class="stack" id="stack" tabindex="0" aria-roledescription="carousel" aria-label="Account cards. Use left and right arrow keys to switch."></div>
+      <div class="stack-foot" id="stackDots"></div>
+      <section class="module ctx" id="ctx" aria-live="polite"></section>
+
+      <!-- Runway -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Runway</div>
+            <div class="mod-sub">On essential spend · ₹40,000 / mo</div>
+          </div>
+          <button class="round" aria-label="Runway details"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
+        </div>
+        <div class="rung"><span class="lab">Cash</span><div class="rbar"><span class="seg-cash" style="width:26.1%"></span></div><span class="mo">4.7 mo</span></div>
+        <div class="rung"><span class="lab">+ FDs</span><div class="rbar"><span class="seg-cash" style="width:26.1%"></span><span class="seg-fd" style="width:41.1%"></span></div><span class="mo">12.1 mo</span></div>
+        <div class="rung"><span class="lab">+ Markets</span><div class="rbar"><span class="seg-cash" style="width:26.1%"></span><span class="seg-fd" style="width:41.1%"></span><span class="seg-mkt" style="width:5.6%"></span></div><span class="mo">13.1 mo</span></div>
+        <div class="axis"><span></span><span class="ticks"><span>0</span><span>6</span><span>12</span><span>18 mo</span></span><span></span></div>
+        <div class="kv" style="margin-top:10px;border-top:1px solid var(--outline-2)">
+          <span class="k">Trajectory</span>
+          <span class="badge b-pos">▲ Net positive · never runs out</span>
+        </div>
+      </section>
+
+      <!-- Budgets -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Budgets</div>
+            <div class="mod-sub">Marker = where you should be today</div>
+          </div>
+          <button class="pill">October
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div id="budgets"></div>
+      </section>
+
+      <!-- Spending categories -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Where it went</div>
+            <div class="mod-sub">₹31,280 spent this month</div>
+          </div>
+          <button class="pill">View all</button>
+        </div>
+        <div class="stackbar" id="catBar"></div>
+        <div class="legend" id="catLegend"></div>
+        <div class="kv" style="margin-top:12px;border-top:1px solid var(--outline-2)">
+          <span class="k">Need / want</span>
+          <span class="v">61% / 39% · <span class="muted">12 unplanned</span></span>
+        </div>
+      </section>
+
+      <!-- Upcoming -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Next 14 days</div>
+            <div class="mod-sub">Bills, dues and SIPs</div>
+          </div>
+          <button class="pill">Calendar</button>
+        </div>
+        <div class="row"><div class="datechip"><b>25</b><span>OCT</span></div><div class="t"><div class="t1">SIP · Flexi Cap Fund</div><div class="t2">From HDFC · auto</div></div><div class="r">₹5,000<br><span class="badge b-info">Reserved</span></div></div>
+        <div class="row"><div class="datechip"><b>28</b><span>OCT</span></div><div class="t"><div class="t1">ICICI card bill</div><div class="t2">Statement 10 Oct</div></div><div class="r">₹23,480<br><span class="badge b-pos">✓ Covered</span></div></div>
+        <div class="row"><div class="datechip"><b>29</b><span>OCT</span></div><div class="t"><div class="t1">Electricity</div><div class="t2">Recurring · monthly</div></div><div class="r">₹1,800<br><span class="badge b-info">Reserved</span></div></div>
+        <div class="row"><div class="datechip"><b>30</b><span>OCT</span></div><div class="t"><div class="t1">Streaming subscription</div><div class="t2">Price up ₹150 since Aug</div></div><div class="r">₹649<br><span class="badge b-warn">▲ Price rise</span></div></div>
+        <div class="row"><div class="datechip"><b>01</b><span>NOV</span></div><div class="t"><div class="t1">Rent</div><div class="t2">After payday · not reserved</div></div><div class="r">₹18,000<br><span class="badge" style="background:var(--s-high);color:var(--muted)">Next cycle</span></div></div>
+      </section>
+
+      <!-- Goals -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Goals</div>
+            <div class="mod-sub">Emergency fund comes first</div>
+          </div>
+          <button class="round" aria-label="Goals"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
+        </div>
+        <div class="inner goal">
+          <div class="goal-top">
+            <div><div class="goal-name">Emergency fund</div><div class="goal-big">₹3,00,000 <span class="muted" style="font-size:12px;letter-spacing:0">/ ₹5,00,000</span></div></div>
+            <span class="badge b-champ">60%</span>
+          </div>
+          <div class="dots" id="efDots" aria-label="12 of 20 blocks of ₹25,000 funded"></div>
+          <div class="goal-note"><span>1 dot = ₹25,000</span><span>✓ Covers 9 × essential spend</span></div>
+        </div>
+        <div class="inner goal">
+          <div class="goal-top">
+            <div><div class="goal-name">₹1 Crore by 30</div><div class="goal-big">3y 1m <span class="muted" style="font-size:12px;letter-spacing:0">· 20 Nov 2029</span></div></div>
+            <span class="badge b-neg">▼ Behind</span>
+          </div>
+          <div id="goalChart"></div>
+          <div class="kv"><span class="k">Invested now</span><span class="v">₹60,900</span></div>
+          <div class="kv"><span class="k">Required SIP</span><span class="v">₹2,31,500 / mo</span></div>
+          <div class="kv"><span class="k">Your SIP</span><span class="v">₹5,000 / mo</span></div>
+          <div class="kv"><span class="k">Projected at 30</span><span class="v">₹2.96L <span class="muted">· ₹97.0L short</span></span></div>
+        </div>
+      </section>
+
+      <!-- Portfolio -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Portfolio</div>
+            <div class="mod-sub">Stocks & mutual funds · excl. emergency FDs</div>
+          </div>
+          <button class="pill">Invest</button>
+        </div>
+        <div class="pf-big">₹60,900<span class="paise">.00</span></div>
+        <div class="pf-badges">
+          <span class="badge b-pos">▲ ₹4,700 unrealized · 8.4%</span>
+          <span class="badge b-pos">▲ ₹1,240 this week</span>
+          <span class="badge" style="background:var(--s-high);color:var(--muted)">XIRR 11.2%</span>
+        </div>
+        <div class="alloc" aria-label="Allocation: 100% equity, target 50%">
+          <span style="width:100%;background:var(--char)"></span>
+          <span class="alloc-target" style="left:50%"></span>
+        </div>
+        <div class="alloc-lbl"><span>Equity 100%</span><span style="color:var(--warn)">Target 50 / 50 · drift +50%</span></div>
+        <div class="inner" style="margin-top:14px;padding:4px 12px 10px">
+          <div class="src"><span><span class="name">NSE</span> <span class="muted">· Fri 16 Oct</span></span><span class="badge b-pos">✓ Verified · 4/4</span></div>
+          <div class="src"><span><span class="name">AMFI</span> <span class="muted">· Fri 16 Oct</span></span><span class="badge b-pos">✓ Verified · 3/3</span></div>
+        </div>
+      </section>
+
+      <!-- Insights -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Insights</div>
+            <div class="mod-sub">Ranked by rupee impact</div>
+          </div>
+          <button class="pill">All</button>
+        </div>
+        <div class="digest">
+          <div class="d1"><span>WEEKLY SUMMARY</span><span>Sun 18 Oct</span></div>
+          <p>A steady week: you spent ₹1,180/day, under your ₹1,417 allowance. Dining is the exception. It's up 34% on your 3-month average, and most of it was unplanned.</p>
+          <button class="pill">Read summary</button>
+        </div>
+        <div class="ins">
+          <div class="chip" style="color:var(--neg)">!</div>
+          <div>
+            <div class="t1">Dining is 98% used with 13 days left</div>
+            <div class="t2">At this pace you'll overshoot by ~₹3,900 around 22 Oct.</div>
+            <div class="acts"><button class="pill">See dining</button><button class="pill">Dismiss</button></div>
+          </div>
+        </div>
+        <div class="ins">
+          <div class="chip">↻</div>
+          <div>
+            <div class="t1">3 subscriptions cost ₹14,988 a year</div>
+            <div class="t2">One raised its price by ₹150 in August.</div>
+            <div class="acts"><button class="pill">Review</button><button class="pill">Dismiss</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Needs attention -->
+      <section class="module">
+        <div class="mod-head">
+          <div>
+            <div class="mod-title">Needs attention</div>
+            <div class="mod-sub">Keep the books clean</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="chip" style="background:var(--champ-c);border-color:transparent;color:var(--champ)">✓</div>
+          <div class="t"><div class="t1">September is ready to close</div><div class="t2">7 of 9 checklist items done</div></div>
+          <button class="pill dark">Close</button>
+        </div>
+        <div class="row"><div class="chip">✎</div><div class="t"><div class="t1">Drafts</div><div class="t2">Unfinished entries</div></div><span class="badge b-warn">2</span></div>
+        <div class="row"><div class="chip">?</div><div class="t"><div class="t1">Uncategorized</div><div class="t2">Sitting in suspense</div></div><span class="badge b-warn">3</span></div>
+        <div class="row"><div class="chip">⇄</div><div class="t"><div class="t1">SIP in transit</div><div class="t2">Awaiting NAV allotment</div></div><span class="badge b-info">1</span></div>
+        <div class="row"><div class="chip">☑</div><div class="t"><div class="t1">Weekly review</div><div class="t2">Worth it or regret?</div></div><span class="badge b-info">6 spends</span></div>
+        <div class="row"><div class="chip">₹</div><div class="t"><div class="t1">Advance tax · 15 Dec</div><div class="t2">Tax year 2026-27 · est. on freelance income</div></div><div class="r">₹8,400<br><span class="badge b-warn">57 days</span></div></div>
+      </section>
+
+    </div>
+
+    <!-- Quick add + nav -->
+    <button class="fab" aria-label="Quick add">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <nav class="nav" aria-label="Main">
+      <button class="on" aria-current="page">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></svg>Home</button>
+      <button>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>Txns</button>
+      <button>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>Accounts</button>
+      <button>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg>Invest</button>
+      <button>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg>More</button>
+    </nav>
+    <div class="gesture"></div>
+  </div>
+</div>
+
+<p class="caption"><b>Dashboard · light</b><br>Drag or swipe the account stack left/right, tap a peeking card, click a dot, or focus the stack and use ←/→. The panel below follows the front card. Sample data only.</p>
+
+<script>
+const inr = n => '₹' + n.toLocaleString('en-IN');
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+/* ---------- Daily spend vs allowance (hero) ---------- */
+(function dailyChart() {
+  const spent = [820,1240,2890,640,1100,3720,450,980,1530,760,2210,1340,590,3100,880,1460,2140,4944,486];
+  const days = 31, today = 19, allowance = 1417, max = 5000;
+  const W = 330, H = 58, slot = W / days, bw = 4;
+  let s = `<svg viewBox="0 0 ${W} ${H + 14}" width="100%" height="${H + 14}" aria-label="Daily spending this period">`;
+  const ay = H - (allowance / max) * H;
+  s += `<line x1="0" x2="${W}" y1="${ay}" y2="${ay}" stroke="#2A2A2D" stroke-opacity=".35" stroke-dasharray="3 3"/>`;
+  for (let d = 1; d <= days; d++) {
+    const x = (d - 1) * slot + (slot - bw) / 2;
+    if (d <= today) {
+      const v = spent[d - 1], h = Math.max(2, (v / max) * H);
+      const fill = d === today ? '#2A2A2D' : (v > allowance ? '#8E8E93' : '#C2C2C7');
+      s += `<rect x="${x}" y="${H - h}" width="${bw}" height="${h}" rx="2" fill="${fill}"/>`;
+    } else {
+      s += `<circle cx="${x + bw / 2}" cy="${H - 2}" r="1.6" fill="#C9C9CD"/>`;
+    }
+  }
+  s += `<text x="0" y="${H + 12}" font-size="9" fill="#626267" font-family="JetBrains Mono">1 Oct</text>`;
+  s += `<text x="${(today - 1) * slot + slot / 2}" y="${H + 12}" font-size="9" fill="#1C1C1E" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Today</text>`;
+  s += `<text x="${W}" y="${H + 12}" font-size="9" fill="#626267" text-anchor="end" font-family="JetBrains Mono">31 Oct</text>`;
+  s += `<text x="${W}" y="${ay - 4}" font-size="9" fill="#626267" text-anchor="end" font-family="JetBrains Mono">₹1,417/day</text>`;
+  document.getElementById('dailyChart').innerHTML = s + '</svg>';
+})();
+
+/* ---------- KPI strip ---------- */
+function spark(data, w = 64, h = 24) {
+  const min = Math.min(...data), max = Math.max(...data), span = max - min || 1;
+  const pts = data.map((v, i) => `${(i / (data.length - 1) * w).toFixed(1)},${(h - 2 - (v - min) / span * (h - 4)).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.join(' ')}" fill="none" stroke="#2A2A2D" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+const kpis = [
+  { lbl: 'Net worth', val: '₹6,14,870', d: '▲ 2.1%', cls: 'b-pos', data: [5.71,5.74,5.80,5.78,5.86,5.92,5.95,6.01,5.98,6.06,6.11,6.15] },
+  { lbl: 'Runway · cash', val: '4.7 mo', d: '▼ 0.2', cls: 'b-neg', data: [5.2,5.1,5.3,5.0,4.9,5.1,4.9,4.8,4.9,4.8,4.7,4.7] },
+  { lbl: 'Spent this month', val: '₹31,280', d: '▲ 8.4%', cls: 'b-neg', data: [2,4,7,8,9,13,14,15,17,18,20,22,23,26,27,28,30,31] },
+  { lbl: 'Savings rate', val: '38%', d: '▲ 3 pts', cls: 'b-pos', data: [29,31,30,33,32,35,34,36,35,38] },
+];
+document.getElementById('kpis').innerHTML = kpis.map(k => `
+  <div class="module kpi">
+    <div class="lbl">${k.lbl}</div>
+    <div class="val">${k.val}</div>
+    <div class="krow"><span class="badge ${k.cls}">${k.d}</span>${spark(k.data)}</div>
+  </div>`).join('');
+
+/* ---------- Account card stack ---------- */
+const chipSvg = c => `<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="${c}" stroke-opacity=".55"><rect x=".5" y=".5" width="33" height="25" rx="6"/><path d="M.5 9h10M.5 17h10M23.5 9h10M23.5 17h10M10.5 .5v25M23.5 .5v25"/></svg>`;
+const glyph = (t, c) => `<span style="font-size:18px;font-weight:500;color:${c};opacity:.7">${t}</span>`;
+const accounts = [
+  { theme: 'pearl', type: 'Savings · salary', name: 'HDFC Bank', lbl: 'Available balance', amt: 184250, mask: '•••• 4821', tag: '✓ Reconciled 15 Oct', icon: chipSvg('#1C1C1E') },
+  { theme: 'graphite', type: 'Credit card', name: 'ICICI Rewards', lbl: 'Outstanding', amt: 23480, mask: '•••• 1907', tag: 'Due 28 Oct', icon: chipSvg('#F2F2F3') },
+  { theme: 'silver', type: 'Cash', name: 'Wallet', lbl: 'On hand', amt: 3200, mask: 'Counted 17 Oct', tag: 'Count due', icon: glyph('₹', '#1C1C1E') },
+  { theme: 'champagne', type: 'Fixed deposits · 3', name: 'Emergency ladder', lbl: 'Principal', amt: 300000, mask: 'Next: 12 Jan 2027', tag: '+₹3,600 accrued', icon: glyph('◈', '#4A3F28') },
+  { theme: 'smoke', type: 'Investments · 7', name: 'Stocks & MFs', lbl: 'Market value', amt: 60900, mask: 'Prices ✓ 16 Oct', tag: '▲ 8.4%', icon: glyph('↗', '#1C1C1E') },
+];
+
+function gauge(p, label, sub) {
+  const r = 46, c = 2 * Math.PI * r, arc = c * 0.75;
+  return `<svg width="132" height="112" viewBox="0 0 132 112" aria-label="${label}">
+    <g transform="rotate(135 66 62)">
+      <circle cx="66" cy="62" r="${r}" fill="none" stroke="#DADADD" stroke-width="10" stroke-linecap="round" stroke-dasharray="${arc} ${c}"/>
+      <circle cx="66" cy="62" r="${r}" fill="none" stroke="#2A2A2D" stroke-width="10" stroke-linecap="round" stroke-dasharray="${arc * p} ${c}"/>
+    </g>
+    <text x="66" y="62" text-anchor="middle" font-family="JetBrains Mono" font-size="20" font-weight="500" fill="#1C1C1E" letter-spacing="-0.8">${Math.round(p * 100)}%</text>
+    <text x="66" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#626267">${sub}</text>
+  </svg>`;
+}
+const txn = (chip, t1, t2, amt, extra = '') => `<div class="txn"><div class="chip">${chip}</div><div class="t"><div class="t1">${t1}</div><div class="t2">${t2}</div></div><div class="amt">${amt}${extra}</div></div>`;
+const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+const head = (title, sub, action) => `<div class="mod-head"><div><div class="mod-title">${title}</div><div class="mod-sub">${sub}</div></div><button class="pill">${action}</button></div>`;
+
+const contexts = [
+  () => head('HDFC Bank · savings', 'October so far', 'Open ledger') +
+    kv('Money in', '<span style="color:var(--pos)">▲</span> ₹72,000') +
+    kv('Money out', '<span style="color:var(--neg)">▼</span> ₹41,830') +
+    `<div style="margin-top:6px">` +
+    txn('S', 'Swiggy', 'Dining · UPI · today', '−₹486', '<small><span class="badge b-warn">Want</span></small>') +
+    txn('B', 'BigBasket', 'Groceries · UPI · Sat', '−₹2,140', '<small><span class="badge b-info">Draft</span></small>') +
+    txn('₹', 'Salary · Oct', 'Income · 1 Oct', '+₹72,000', '<small><span class="badge" style="background:var(--s-high);color:var(--muted)">🔒 Reconciled</span></small>') +
+    `</div>`,
+  () => head('ICICI Rewards · credit', 'Statement closed 10 Oct', 'Schedule payment') +
+    `<div style="display:flex;align-items:center;gap:8px">${gauge(0.28, 'Card utilisation 28%', 'of ₹1,00,000')}
+      <div style="flex:1">${kv('Statement', '₹23,480')}${kv('Unbilled', '₹4,920')}${kv('Due', '28 Oct · 9 days')}</div></div>` +
+    kv('Payment source', '<span class="badge b-pos">✓ Covered by HDFC</span>') +
+    kv('Interest risk', '<span class="badge b-pos">None</span>'),
+  () => head('Cash wallet', 'Last counted 17 Oct', 'Count & reconcile') +
+    kv('On hand (books)', '₹3,200') +
+    kv('Spent from cash · Oct', '₹1,800') +
+    kv('ATM withdrawals · Oct', '₹5,000') +
+    kv('Status', '<span class="badge b-warn">Count due before close</span>'),
+  () => head('FD ladder · emergency', 'Counts toward runway step 2', 'Add FD') +
+    txn('1', '₹1,00,000 · 7.10%', 'Matures 12 Jan 2027', '+₹1,420', '<small class="muted" style="font-size:10px">accrued</small>') +
+    txn('2', '₹1,00,000 · 7.25%', 'Matures 3 Jun 2027', '+₹1,210', '<small class="muted" style="font-size:10px">accrued</small>') +
+    txn('3', '₹1,00,000 · 7.40%', 'Matures 18 Nov 2027', '+₹970', '<small class="muted" style="font-size:10px">accrued</small>') +
+    kv('Break-today value', '₹2,95,500 <span class="muted">after penalty</span>'),
+  () => head('Stocks & mutual funds', '4 stocks · 3 funds', 'Open portfolio') +
+    kv('Cost', '₹56,200') +
+    kv('Unrealized', '<span class="badge b-pos">▲ ₹4,700 · 8.4%</span>') +
+    kv('XIRR', '11.2%') +
+    kv('LTCG exemption used', '₹0 <span class="muted">of ₹1,25,000</span>') +
+    kv('Prices', '<span class="badge b-pos">✓ Verified · Fri 16 Oct</span>'),
+];
+
+(function stack() {
+  const root = document.getElementById('stack');
+  const dotsEl = document.getElementById('stackDots');
+  const ctx = document.getElementById('ctx');
+  const count = document.getElementById('stackCount');
+  const N = accounts.length;
+  let order = accounts.map((_, i) => i);
+  let busy = false;
+
+  const els = accounts.map((a, i) => {
+    const el = document.createElement('div');
+    el.className = `wcard ${a.theme}`;
+    el.setAttribute('aria-label', `${a.name}, ${a.lbl} ${inr(a.amt)}`);
+    el.innerHTML = `
+      <div class="wc-top"><div><div class="wc-type">${a.type}</div><div class="wc-name">${a.name}</div></div>${a.icon}</div>
+      <div class="wc-mid"><div class="wc-lbl">${a.lbl}</div><div class="wc-amt">${inr(a.amt)}</div></div>
+      <div class="wc-bot"><span class="mask">${a.mask}</span><span class="tag">${a.tag}</span></div>`;
+    root.appendChild(el);
+    return el;
+  });
+
+  dotsEl.innerHTML = accounts.map((a, i) => `<button class="sdot" aria-label="Show ${a.name}" data-i="${i}"></button>`).join('');
+  dotsEl.addEventListener('click', e => {
+    const i = e.target.dataset.i;
+    if (i === undefined || busy) return;
+    order = accounts.map((_, k) => (Number(i) + k) % N);
+    render();
+  });
+
+  function render() {
+    order.forEach((ci, pos) => {
+      const el = els[ci];
+      el.style.zIndex = N - pos;
+      el.style.transform = pos === 0 ? 'translateY(0) scale(1)' : `translateY(${-pos * 14}px) scale(${1 - pos * 0.06})`;
+      el.style.opacity = pos > 2 ? 0 : 1;
+      el.style.filter = `brightness(${1 - pos * 0.035})`;
+      el.style.pointerEvents = pos <= 1 ? 'auto' : 'none';
+      el.setAttribute('aria-hidden', pos === 0 ? 'false' : 'true');
+    });
+    const front = order[0];
+    [...dotsEl.children].forEach((d, i) => d.classList.toggle('on', i === front));
+    count.textContent = `${front + 1} / ${N}`;
+    ctx.classList.add('fade');
+    setTimeout(() => { ctx.innerHTML = contexts[front](); ctx.classList.remove('fade'); }, 140);
+  }
+
+  function next() {
+    if (busy) return; busy = true;
+    const el = els[order[0]];
+    el.style.transform = 'translateX(-115%) rotate(-9deg)';
+    setTimeout(() => { order.push(order.shift()); render(); busy = false; }, 230);
+  }
+  function prev() {
+    if (busy) return; busy = true;
+    order.unshift(order.pop());
+    const el = els[order[0]];
+    el.classList.add('dragging');
+    el.style.zIndex = N + 1;
+    el.style.opacity = 1;
+    el.style.transform = 'translateX(115%) rotate(9deg)';
+    void el.offsetWidth;
+    el.classList.remove('dragging');
+    render();
+    setTimeout(() => { busy = false; }, 300);
+  }
+
+  let startX = 0, dx = 0, dragEl = null;
+  root.addEventListener('pointerdown', e => {
+    const card = e.target.closest('.wcard');
+    if (!card || busy) return;
+    const pos = order.indexOf(els.indexOf(card));
+    if (pos === 1) { next(); return; }
+    if (pos !== 0) return;
+    dragEl = card; startX = e.clientX; dx = 0;
+    card.classList.add('dragging');
+    card.setPointerCapture(e.pointerId);
+  });
+  root.addEventListener('pointermove', e => {
+    if (!dragEl) return;
+    dx = e.clientX - startX;
+    dragEl.style.transform = `translateX(${dx}px) rotate(${dx / 22}deg)`;
+  });
+  const end = () => {
+    if (!dragEl) return;
+    dragEl.classList.remove('dragging');
+    const d = dx; dragEl = null; dx = 0;
+    if (d < -70) next();
+    else if (d > 70) prev();
+    else render();
+  };
+  root.addEventListener('pointerup', end);
+  root.addEventListener('pointercancel', end);
+  root.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  });
+
+  render();
+})();
+
+/* ---------- Budgets ---------- */
+const pace = 18 / 31;
+const budgets = [
+  { name: 'Groceries', spent: 6240, cap: 9000 },
+  { name: 'Dining', spent: 4880, cap: 5000 },
+  { name: 'Shopping', spent: 7100, cap: 8000 },
+  { name: 'Transport', spent: 2150, cap: 4000 },
+];
+document.getElementById('budgets').innerHTML = budgets.map(b => {
+  const p = b.spent / b.cap;
+  const status = p > pace + 0.25 ? ['b-neg', 'Over pace'] : p > pace + 0.08 ? ['b-warn', 'Watch'] : ['b-pos', 'On pace'];
+  return `<div class="bud">
+    <div class="bud-top"><span>${b.name} <span class="badge ${status[0]}" style="margin-left:4px">${status[1]}</span></span><span class="amt"><b>${inr(b.spent)}</b> / ${inr(b.cap)}</span></div>
+    <div class="track"><span class="fill ${status[0] === 'b-neg' ? 'over' : ''}" style="width:${Math.min(100, p * 100).toFixed(1)}%"></span><span class="pace" style="left:${(pace * 100).toFixed(1)}%"></span></div>
+  </div>`;
+}).join('');
+
+/* ---------- Categories ---------- */
+const cats = [
+  { n: 'Shopping', v: 7100, c: '#2A2A2D' },
+  { n: 'Groceries', v: 6240, c: '#55555A' },
+  { n: 'Others', v: 5500, c: '#808086' },
+  { n: 'Dining', v: 4880, c: '#A6A6AB' },
+  { n: 'Bills', v: 3410, c: '#C6C6CA' },
+  { n: 'Transport', v: 2150, c: 'repeating-linear-gradient(135deg,#C9C9CD 0 2px,#E2E2E5 2px 4px)' },
+  { n: 'Health', v: 2000, c: 'repeating-linear-gradient(135deg,#D4D4D8 0 2px,#EAEAEC 2px 4px)' },
+];
+const total = cats.reduce((a, c) => a + c.v, 0);
+const bar = document.getElementById('catBar');
+bar.innerHTML = cats.map(c => `<span style="flex:${c.v};background:${c.c}" title="${c.n} ${inr(c.v)}"></span>`).join('') +
+  `<span class="callout badge b-dark" style="left:${(cats[0].v / total * 50).toFixed(1)}%;height:22px">${Math.round(cats[0].v / total * 100)}%</span>`;
+bar.style.overflow = 'visible';
+[...bar.querySelectorAll('span:not(.callout)')].forEach((s, i, arr) => {
+  if (i === 0) s.style.borderRadius = '8px 0 0 8px';
+  if (i === arr.length - 1) s.style.borderRadius = '0 8px 8px 0';
+});
+document.getElementById('catLegend').innerHTML = cats.slice(0, 6).map(c =>
+  `<div><i style="background:${c.c}"></i><span>${c.n}<b>${inr(c.v)}</b></span></div>`).join('');
+
+/* ---------- Emergency fund dots ---------- */
+document.getElementById('efDots').innerHTML = Array.from({ length: 20 }, (_, i) => `<i class="${i < 12 ? 'on' : ''}"></i>`).join('');
+
+/* ---------- ₹1Cr goal chart: required path vs projected ---------- */
+(function goalChart() {
+  const W = 300, H = 92, months = 37, target = 1e7;
+  const r = Math.pow(1.10, 1 / 12) - 1;
+  const req = 231500, sip = 5000, start = 60900;
+  const val = (m, p) => start * Math.pow(1 + r, m) + p * ((Math.pow(1 + r, m) - 1) / r);
+  const x = m => (m / months) * W, y = v => H - 4 - (v / target) * (H - 16);
+  const path = p => Array.from({ length: months + 1 }, (_, m) => `${m ? 'L' : 'M'}${x(m).toFixed(1)},${y(val(m, p)).toFixed(1)}`).join('');
+  document.getElementById('goalChart').innerHTML = `
+  <svg viewBox="0 0 ${W} ${H + 14}" width="100%" height="${H + 14}" aria-label="Required path versus projected path to ₹1 crore">
+    <line x1="0" x2="${W}" y1="${y(target)}" y2="${y(target)}" stroke="#7A6A47" stroke-dasharray="3 3"/>
+    <text x="0" y="${y(target) - 4}" font-size="9" fill="#7A6A47" font-family="JetBrains Mono">₹1Cr target</text>
+    <path d="${path(req)}" fill="none" stroke="#2A2A2D" stroke-width="1.5"/>
+    <text x="${W}" y="${y(target) + 12}" font-size="9" fill="#1C1C1E" text-anchor="end" font-family="JetBrains Mono">required</text>
+    <path d="${path(sip)}" fill="none" stroke="#626267" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="${W}" y="${y(val(months, sip)) - 5}" font-size="9" fill="#626267" text-anchor="end" font-family="JetBrains Mono">your pace · ₹2.96L</text>
+    <text x="0" y="${H + 12}" font-size="9" fill="#626267" font-family="JetBrains Mono">Oct 2026</text>
+    <text x="${W}" y="${H + 12}" font-size="9" fill="#626267" text-anchor="end" font-family="JetBrains Mono">Nov 2029</text>
+  </svg>`;
+})();
+</script>
+</body>
+</html>

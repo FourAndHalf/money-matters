@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Money Matters Plan</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0efeb;
+    --text: #1d1d1b;
+    --muted: #5f5e5a;
+    --border: #dcdad3;
+    --accent: #1f6f5c;
+    --accent-soft: #e2f0eb;
+    --warn: #9a5b00;
+    --warn-soft: #fbefdc;
+    --danger: #a3302a;
+    --code-bg: #f3f2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514;
+      --surface: #1e1e1c;
+      --surface-2: #262624;
+      --text: #ebe9e3;
+      --muted: #a3a19a;
+      --border: #3a3936;
+      --accent: #6cc4a8;
+      --accent-soft: #1d3a32;
+      --warn: #e8b05c;
+      --warn-soft: #3a2d17;
+      --danger: #e8837c;
+      --code-bg: #232321;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151514;
+    --surface: #1e1e1c;
+    --surface-2: #262624;
+    --text: #ebe9e3;
+    --muted: #a3a19a;
+    --border: #3a3936;
+    --accent: #6cc4a8;
+    --accent-soft: #1d3a32;
+    --warn: #e8b05c;
+    --warn-soft: #3a2d17;
+    --danger: #e8837c;
+    --code-bg: #232321;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); max-width: 1200px; margin: 0 auto; }
+  nav.toc {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    padding: 32px 16px; border-right: 1px solid var(--border); font-size: 14px;
+  }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: 6px; }
+  nav.toc a:hover { background: var(--surface-2); color: var(--text); }
+  nav.toc .group { margin: 16px 0 4px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  main { padding: 32px 40px 80px; min-width: 0; }
+  header.hero { margin-bottom: 40px; }
+  header.hero h1 { font-size: 32px; margin: 0 0 8px; }
+  header.hero p { color: var(--muted); margin: 0; max-width: 70ch; }
+  section { margin: 0 0 56px; scroll-margin-top: 16px; }
+  h2 { font-size: 24px; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  h4 { font-size: 15px; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  .muted { color: var(--muted); }
+  .table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .92em; }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card h4 { margin-top: 0; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 14px; }
+  .page {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; margin: 16px 0;
+  }
+  .page h3 { margin-top: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .page .id { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .page ul { padding-left: 20px; margin: 6px 0; }
+  .page li { font-size: 15px; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); font-weight: 500; }
+  .tag.p1 { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .flow { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  @media (max-width: 860px) {
+    .layout { display: block; }
+    nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+    main { padding: 24px 16px 64px; }
+    header.hero h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <div class="group">Foundation</div>
+    <a href="#overview">Overview</a>
+    <a href="#decisions">Decisions</a>
+    <a href="#stack">Tech stack</a>
+    <div class="group">Engine</div>
+    <a href="#ledger">Ledger model</a>
+    <a href="#lifecycle">Lifecycle &amp; close</a>
+    <a href="#leeway-runway">Leeway &amp; runway</a>
+    <a href="#accountability">Accountability</a>
+    <a href="#investments">Investments</a>
+    <a href="#prices">Prices</a>
+    <a href="#goals">Goals</a>
+    <a href="#tax">Tax</a>
+    <a href="#insights">Insights &amp; AI</a>
+    <div class="group">Application</div>
+    <a href="#navigation">Navigation</a>
+    <a href="#pages">Pages</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#open">Open items</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <h1>Money Matters: product plan</h1>
+      <p>A personal Android app that keeps complete, double-entry books for every rupee and every money decision. It tracks stocks, mutual funds and FDs, projects leeway and runway, and points out spending patterns worth changing. Covers everything agreed so far; last updated 19 Oct 2026.</p>
+    </header>
+
+    <!-- ============================================================ -->
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>The baseline is feature parity with Realbyte's Money Manager: accounts, categories, budgets, cards, recurring entries, stats, calendar, backup, passcode, multi-currency. On top of that the app adds:</p>
+      <div class="cards">
+        <div class="card"><h4>True double-entry</h4><ul><li>Every transaction balances (debits = credits)</li><li>Real balance sheet, income statement, cash flow, trial balance</li></ul></div>
+        <div class="card"><h4>Accountability</h4><ul><li>Lock on reconcile, explicit month-end close</li><li>Decision tags, impact prompt, weekly regret review</li></ul></div>
+        <div class="card"><h4>Leeway &amp; runway</h4><ul><li>Safe-to-spend and daily allowance until payday</li><li>Runway ladder: cash → +FDs → +markets (stress-tested)</li></ul></div>
+        <div class="card"><h4>Investments</h4><ul><li>Stocks, mutual funds, FDs with lots and FIFO</li><li>Weekly prices, explicit download-status flags</li></ul></div>
+        <div class="card"><h4>Indian tax</h4><ul><li>Income-tax Act 2025, tax year Apr–Mar</li><li>Rules stored as data per tax year</li></ul></div>
+        <div class="card"><h4>Insights</h4><ul><li>Rules engine computes on device</li><li>AI writes the weekly summary from aggregates only</li></ul></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="decisions">
+      <h2>Decisions</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Area</th><th>Decision</th></tr>
+        <tr><td>Market</td><td>India, INR, lakh/crore formatting (₹1,23,456.78 · ₹12.4L · ₹1.2Cr), tax year April–March</td></tr>
+        <tr><td>Platform</td><td>Android only, single user, offline-first, no backend</td></tr>
+        <tr><td>Accounting</td><td>True double-entry; five account types; amounts as integer paise</td></tr>
+        <tr><td>Impact prompt</td><td>Shown when a spend (or that day's spends combined) reaches ≥ 50% of remaining leeway</td></tr>
+        <tr><td>Locking</td><td>Entries lock once reconciled. Month-end close is explicit and permanent, with no reopen.</td></tr>
+        <tr><td>Journal visibility</td><td>Three layers: simple everyday view → per-transaction journal toggle → accountant mode</td></tr>
+        <tr><td>Income</td><td>Salary plus irregular income; optional income buffer that pays you a fixed amount monthly; conservative projections</td></tr>
+        <tr><td>Investments</td><td>Stocks, mutual funds and FDs only</td></tr>
+        <tr><td>Unrealized gains</td><td>Posted to <code>Equity:Unrealized Gains</code>, so they never touch the income statement</td></tr>
+        <tr><td>Prices</td><td>Weekly. AMFI (MF) and NSE (stocks) downloaded automatically; manual fallback; every price carries a status badge.</td></tr>
+        <tr><td>Runway stress drops</td><td>Equity MF 30%, stocks 40%, cash/FD 0% (editable)</td></tr>
+        <tr><td>Emergency fund</td><td>₹5,00,000, checked against 9 × essential monthly spend</td></tr>
+        <tr><td>Wealth goal</td><td>₹1 Crore invested by age 30 (20 Nov 2029)</td></tr>
+        <tr><td>Tax</td><td>Tracked, local to Indian law; estimates only, not filing or advice</td></tr>
+        <tr><td>Insights</td><td>Rules engine plus AI weekly summary</td></tr>
+        <tr><td>Data entry</td><td>Manual first → statement import → SMS parsing (sideloaded APK)</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="stack">
+      <h2>Tech stack</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Layer</th><th>Choice</th><th>Why</th></tr>
+        <tr><td>Language / UI</td><td>Kotlin + Jetpack Compose</td><td>Native; full access to SMS and notifications for later automation</td></tr>
+        <tr><td>Database</td><td>Room (SQLite) + SQLCipher</td><td>Encrypted, offline, relational; immutability enforced with SQL triggers</td></tr>
+        <tr><td>Background</td><td>WorkManager</td><td>Recurring entries, reminders, weekly price download, insight runs, auto-backup</td></tr>
+        <tr><td>Security</td><td>BiometricPrompt + Android Keystore</td><td>Fingerprint lock; keys stay in hardware</td></tr>
+        <tr><td>Backup</td><td>Encrypted export to file / Google Drive</td><td>No server required</td></tr>
+        <tr><td>Export</td><td>CSV, Excel, PDF reports, Beancount</td><td>Portable, future-proof books</td></tr>
+        <tr><td>AI</td><td>Claude API (small model), user's own key in Keystore</td><td>Weekly summary only; aggregates only</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="ledger">
+      <h2>Ledger model</h2>
+      <h3>Account types</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Type</th><th>Examples</th><th>Normal balance</th></tr>
+        <tr><td>Assets</td><td>Cash, savings/salary accounts, FDs, stocks, mutual funds, EPF, money owed to you, TDS receivable, In Transit</td><td>Debit</td></tr>
+        <tr><td>Liabilities</td><td>Credit cards, loans, BNPL, money you owe</td><td>Credit</td></tr>
+        <tr><td>Equity</td><td>Opening balances, retained net worth, unrealized gains</td><td>Credit</td></tr>
+        <tr><td>Income</td><td>Salary (gross), freelance, interest, dividends, capital gains, refunds</td><td>Credit</td></tr>
+        <tr><td>Expenses</td><td>Categories &amp; sub-categories, taxes (TDS, professional tax), interest, fees, Unaccounted</td><td>Debit</td></tr>
+      </table></div>
+
+      <h3>Core data model</h3>
+      <pre><code>account       (id, name, type, parent_id, commodity, liquidity_tier, goal_id, is_archived)
+transaction   (id, date, payee, narration, status, period_id, reason, need_want, planned,
+               payment_method, prior_period_ref, created_at)
+posting       (id, transaction_id, account_id, amount_paise, quantity, unit_price, lot_id)
+lot           (id, account_id, acquired_on, quantity, cost_paise, lock_until, fmv_2018)
+price         (commodity, date, price, source, status, fetched_at)
+period        (id, month, status, closed_at, hash, prev_hash)
+audit_log     (id, entity, entity_id, action, before_json, after_json, at)
+recurring_rule, budget, goal, tax_rule (versioned per tax year), insight, price_fetch_log</code></pre>
+      <p><strong>Invariant:</strong> for every transaction, the postings sum to zero in each currency. The database rejects any transaction that doesn't balance.</p>
+
+      <h3>Example entries</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Event</th><th>Debit</th><th>Credit</th></tr>
+        <tr><td>Groceries via UPI</td><td>Expenses:Groceries 500</td><td>Assets:HDFC 500</td></tr>
+        <tr><td>Dinner on credit card</td><td>Expenses:Dining 1,200</td><td>Liabilities:Card 1,200</td></tr>
+        <tr><td>Card bill payment</td><td>Liabilities:Card 1,200</td><td>Assets:HDFC 1,200</td></tr>
+        <tr><td>Loan EMI</td><td>Liabilities:Loan 8,000 + Expenses:Interest 2,000</td><td>Assets:HDFC 10,000</td></tr>
+        <tr><td>ATM withdrawal</td><td>Assets:Cash 5,000</td><td>Assets:HDFC 5,000</td></tr>
+        <tr><td>Lent to a friend</td><td>Assets:Receivable:Ravi 2,000</td><td>Assets:HDFC 2,000</td></tr>
+        <tr><td>Split bill (paid 3,000, share 1,000)</td><td>Expenses:Dining 1,000 + Assets:Receivable:Friends 2,000</td><td>Liabilities:Card 3,000</td></tr>
+        <tr><td>Refund</td><td>Assets:HDFC 700</td><td>Expenses:Shopping 700</td></tr>
+        <tr><td>Opening balance</td><td>Assets:HDFC 50,000</td><td>Equity:Opening 50,000</td></tr>
+      </table></div>
+      <h4>Salary split</h4>
+      <pre><code>Dr  Assets:HDFC Salary        72,000   (net credited)
+Dr  Assets:EPF                 3,600
+Dr  Expenses:Tax:TDS           8,000
+Dr  Expenses:Tax:Prof Tax        200
+    Cr  Income:Salary:Gross             83,800</code></pre>
+      <h4>Freelance receipt with TDS</h4>
+      <pre><code>Dr  Assets:HDFC                     90,000
+Dr  Assets:Tax:TDS Receivable       10,000
+    Cr  Assets:Receivable:Client          1,00,000</code></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="lifecycle">
+      <h2>Transaction lifecycle &amp; month-end close</h2>
+      <pre class="flow"><code>Draft  →  Posted  →  Reconciled (locked)  →  Month closed (locked, permanent)</code></pre>
+      <ul>
+        <li><strong>Draft / Posted:</strong> editable. Every edit goes to the audit log.</li>
+        <li><strong>Reconciled:</strong> locked. Corrections are a reversal plus a new entry.</li>
+        <li><strong>Month closed:</strong> no create, edit or delete for anything dated in that month, enforced by SQLite triggers. No reopen.</li>
+        <li><strong>Months close in order.</strong> A later month can't be closed before an earlier one.</li>
+        <li><strong>Late discoveries</strong> are posted in the current open month as <em>prior-period adjustments</em> linked to the closed month.</li>
+        <li><strong>Tamper evidence:</strong> each closed month stores a hash of its entries chained to the previous month's hash, verified at app start.</li>
+        <li><strong>Year end (31 Mar):</strong> closing entries move net income to <code>Equity:Retained Net Worth</code>.</li>
+      </ul>
+      <h3>Close checklist (all required)</h3>
+      <ol>
+        <li>No drafts in the month</li>
+        <li>Suspense / uncategorized account is empty</li>
+        <li>All recurring entries for the month are posted</li>
+        <li>Each account's closing balance is confirmed against the bank app, statement or wallet; any difference is resolved or posted to <code>Expenses:Unaccounted</code> with a note</li>
+        <li>Card statements and EMIs are matched</li>
+        <li>In Transit is clear (no stale SIP allotments)</li>
+        <li>Holding units confirmed against the CAS / broker holdings</li>
+        <li>Price snapshot confirmed: every holding is ✅ Verified or ✍️ Manual-confirmed</li>
+        <li>FD accrued interest and revaluation entries posted</li>
+      </ol>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="leeway-runway">
+      <h2>Leeway &amp; runway</h2>
+      <h3>Leeway: how much can I spend right now?</h3>
+      <pre><code>Safe to spend   = liquid balance
+                − bills, EMIs, card dues and SIPs due before next payday
+                − this period's savings / sinking-fund target
+                − buffer
+Daily allowance = Safe to spend ÷ days until next payday</code></pre>
+      <p>The month starts on payday (custom start day). For irregular income, the optional <code>Assets:Income Buffer</code> pays you a fixed monthly amount, and leeway is calculated from that steady amount.</p>
+
+      <h3>Runway ladder: how long can I last?</h3>
+      <p>Measured against <strong>essential</strong> (need-tagged) monthly spend. Each holding counts at its liquidation value, not its market value:</p>
+      <pre><code>Liquidation value = Market value × (1 − stress drop) − exit costs − tax if sold</code></pre>
+      <div class="table-wrap"><table>
+        <tr><th>Step</th><th>Includes</th><th>Stress drop</th><th>Exit costs &amp; tax</th></tr>
+        <tr><td>1. Cash</td><td>Savings, wallet</td><td>0%</td><td>None</td></tr>
+        <tr><td>2. + FDs</td><td>Fixed deposits</td><td>0%</td><td>Premature-break penalty calculated per FD (none within 30 days of maturity)</td></tr>
+        <tr><td>3. + Markets</td><td>Equity MFs / stocks</td><td>30% / 40%</td><td>Exit load, charges, capital-gains tax calculated per lot</td></tr>
+      </table></div>
+      <p>The dashboard shows all three, e.g. <em>"5 mo cash · 12 mo with FDs · 24 mo worst case"</em>, plus a separate <strong>trajectory runway</strong> that projects income, recurring bills and average spend forward. Irregular income counts at its 25th-percentile month.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="accountability">
+      <h2>Accountability</h2>
+      <ul>
+        <li><strong>Decision tags</strong> on each expense: need / want / investment and planned / unplanned. Defaults are learned per category.</li>
+        <li><strong>Impact prompt</strong> when one spend, or that day's spends combined, reaches ≥ 50% of remaining leeway. Transfers, card payments, reserved bills and sinking-fund moves don't count. When leeway is ≤ 0, every discretionary spend triggers it.
+          <br>It shows leeway before and after, the new daily allowance, the runway change in days, and the budget hit. Options: <em>Confirm with reason</em> · <em>Save as draft</em> · <em>Cancel</em>.</li>
+        <li><strong>Budget overspend</strong> must be acknowledged with its source (another category, savings, or "overspent") and is recorded as a budget transfer.</li>
+        <li><strong>Weekly review</strong> of unplanned and want spends, each marked worth it or regret. Regret rate per category.</li>
+        <li><strong>Investment reasons</strong> on every buy and sell (goal, thesis, holding period), with a reminder to revisit later.</li>
+        <li><strong>Missed SIPs</strong> are flagged with their effect on the goal date.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="investments">
+      <h2>Investments: stocks, mutual funds, FDs</h2>
+      <ul>
+        <li><strong>Holdings are asset accounts with a commodity</strong> (units). Postings carry the quantity, unit price and rupee amount.</li>
+        <li><strong>Every purchase is a lot</strong> (date, units, cost including stamp duty and brokerage, lock-in date, 31 Jan 2018 value for grandfathering). Sales use lots FIFO.</li>
+        <li><strong>Book value</strong> (cost) lives in the ledger. <strong>Market value</strong> comes from weekly prices. The official revaluation entry is posted once a month at close.</li>
+        <li><strong>Investing is not spending.</strong> Savings rate and investment rate are reported separately.</li>
+      </ul>
+      <div class="table-wrap"><table>
+        <tr><th>Instrument</th><th>Tracked</th></tr>
+        <tr><td>Stocks</td><td>Lots, broker/demat account, dividends (with TDS), bonus &amp; split adjustments, short-term vs long-term per lot</td></tr>
+        <tr><td>Mutual funds</td><td>Units, lots, In Transit for SIPs (NAV allotted T+1), equity/debt/hybrid type, ELSS 3-year lock per instalment, exit-load window; debt funds bought after 1 Apr 2023 always taxed at slab rate</td></tr>
+        <tr><td>FDs</td><td>Principal, rate, compounding, start/maturity date, monthly accrued interest, TDS, break penalty, auto-renewal</td></tr>
+      </table></div>
+      <h4>SIP via In Transit</h4>
+      <pre><code>Day 0   Dr  Assets:Investments:In Transit          10,000
+            Cr  Assets:HDFC                              10,000
+Day 1   Dr  Assets:MF:PPFAS Flexi  (123.456 u @ ₹81.00)   10,000
+            Cr  Assets:Investments:In Transit            10,000</code></pre>
+      <h4>Sale (lots used FIFO)</h4>
+      <pre><code>Dr  Assets:HDFC                                   15,000
+    Cr  Assets:MF:PPFAS Flexi (cost of oldest lots)        11,200
+    Cr  Income:Capital Gains:LTCG:Equity                     3,800</code></pre>
+      <h4>Month-end revaluation</h4>
+      <pre><code>Dr  Assets:MF:PPFAS Flexi:Revaluation        4,500
+    Cr  Equity:Unrealized Gains                    4,500</code></pre>
+      <h3>Portfolio features</h3>
+      <ul>
+        <li>XIRR per holding, per goal and for the portfolio, from the ledger's own cash flows</li>
+        <li>Actual vs target allocation (equity / debt), drift alert at ±5%. Rebalance with new money first; selling comes with a tax estimate.</li>
+        <li>Concentration limit: no single stock above 10% of equity (editable); overlapping funds flagged</li>
+        <li>Insights: idle cash above the emergency target, FDs maturing soon, lock-ins ending</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="prices">
+      <h2>Prices</h2>
+      <ul>
+        <li><strong>Mutual funds:</strong> AMFI's public daily NAV file (semicolon-separated: scheme code, ISINs, name, NAV, date). Wound-up schemes sit in the file frozen at their last NAV, so the <em>row date</em> is always checked.</li>
+        <li><strong>Stocks:</strong> NSE's public end-of-day price file (UDiFF format). One file covers every stock, so it's one download a week. NSE has moved this file before (July 2024) and is changing distribution again in 2026, so the source URL is a <strong>setting</strong>. Downloads use browser-like headers, retries with backoff, and rate limiting.</li>
+        <li><strong>FDs:</strong> no price needed. Value is calculated from the rate and compounding.</li>
+        <li><strong>Matching by ISIN</strong>, never by name.</li>
+        <li><strong>Schedule:</strong> Saturday morning, for the last trading day (NSE holiday calendar aware).</li>
+      </ul>
+      <h3>Price status badges</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Status</th><th>Meaning</th><th>Allowed at close?</th></tr>
+        <tr><td>✅ Verified</td><td>Downloaded, ISIN matched, date = expected trading day</td><td>Yes</td></tr>
+        <tr><td>✍️ Manual</td><td>Entered by you, with source and date</td><td>Yes, after you confirm it</td></tr>
+        <tr><td>⚠️ Mismatch</td><td>Manual price differs from a later download by more than 1%</td><td>No, until you pick one</td></tr>
+        <tr><td>🟡 Stale</td><td>Newest available price is older than the expected date (frozen NAV, suspended stock)</td><td>No, until you confirm or override</td></tr>
+        <tr><td>🔴 Download failed</td><td>Plain-language reason: 404 file moved, 403 blocked, format changed, ISIN missing</td><td>No. Enter manually.</td></tr>
+        <tr><td>🟣 Suspicious</td><td>Moved more than 20% in a week, zero or negative; possibly an unrecorded split or bonus</td><td>No, until confirmed or the corporate action is recorded</td></tr>
+      </table></div>
+      <div class="callout warn">A status bar at the top of the Prices screen always shows the health of each source, e.g. <em>"NSE: 🔴 failing since 12 Oct · last success 5 Oct · reason: file not found (404)"</em>. A failure is never hidden behind an old price.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="goals">
+      <h2>Goals</h2>
+      <h3>Emergency fund: ₹5,00,000</h3>
+      <ul>
+        <li>Separate from the wealth goal; held in savings and FDs.</li>
+        <li>Checked against 9 × essential monthly spend. Warns if essential spend rises above ~₹55,500/month.</li>
+        <li>Suggested FD ladder (e.g. 5 × ₹1L), so an emergency only breaks what's needed.</li>
+        <li>Until it's funded, surplus goes here first by default (can be turned off).</li>
+      </ul>
+      <h3>₹1 Crore invested by age 30</h3>
+      <ul>
+        <li><strong>Deadline:</strong> 20 Nov 2029, about 37 months from 19 Oct 2026.</li>
+        <li><strong>Measured on:</strong> market value of stocks, MFs and FDs, excluding the emergency fund.</li>
+        <li><strong>Starting point:</strong> minimal current exposure, treated as about ₹0 until holdings are entered.</li>
+        <li><strong>Monthly investable amount:</strong> <em>X</em>, not yet known. The app works it out from 2–3 months of actual data (income − essentials − wants − sinking funds − emergency-fund top-up).</li>
+      </ul>
+      <div class="table-wrap"><table>
+        <tr><th>Assumed annual return</th><th class="num">Monthly SIP needed from ₹0 (37 months)</th></tr>
+        <tr><td>7% (debt-heavy)</td><td class="num">≈ ₹2,44,000</td></tr>
+        <tr><td>10% (balanced)</td><td class="num">≈ ₹2,33,000</td></tr>
+      </table></div>
+      <div class="callout warn">The required amount depends far more on how much you invest than on returns. Over about 3 years, changing the return assumption barely moves the number. The goal screen shows required SIP vs <em>X</em>, the projected value on 20 Nov 2029, the shortfall, and a "markets fall 30% that year" line. With about 3 years left, the horizon rule suggests starting balanced and gliding toward debt as the date approaches.</div>
+      <h3>Allocation from goals (bottom-up)</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Horizon</th><th>Suggested mix</th></tr>
+        <tr><td>Emergency fund</td><td>100% FD / liquid</td></tr>
+        <tr><td>Under 3 years</td><td>Mostly or fully debt</td></tr>
+        <tr><td>3–7 years</td><td>Balanced (40–60% equity)</td></tr>
+        <tr><td>7+ years</td><td>Mostly equity (70–85%)</td></tr>
+      </table></div>
+      <p class="muted">The overall target is the sum of each goal's allocation. The app suggests a glide path as deadlines approach, and you set the final percentages.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="tax">
+      <h2>Tax (India)</h2>
+      <div class="callout">The <strong>Income-tax Act, 2025</strong> took effect on 1 April 2026, replacing the 1961 Act. Sections are renumbered (e.g. old 80C is now Section 123, with the ₹1.5L limit kept in substance), and "previous year / assessment year" is now a single <strong>Tax Year</strong>. Rules are keyed by <em>concept</em> with both old and new section labels, and stored in versioned per-tax-year tables. Every figure is verified against the official Act text at build time.</div>
+      <ul>
+        <li><strong>Regime comparison:</strong> new (default) vs old, estimated monthly. New regime: ₹12L rebate, ₹75K standard deduction for salaried people.</li>
+        <li><strong>Salary:</strong> gross pay, standard deduction, TDS per payslip, EPF.</li>
+        <li><strong>Freelance:</strong> gross receipts, presumptive taxation (old 44ADA, 50% deemed profit) vs actual expenses, and TDS deducted by clients as a receivable.</li>
+        <li><strong>Advance tax:</strong> required once liability after TDS exceeds ₹10,000. Reminders on 15 Jun, 15 Sep, 15 Dec and 15 Mar (15 / 45 / 75 / 100%).</li>
+        <li><strong>Deductions:</strong> progress against limits, flagged by whether each counts under your chosen regime.</li>
+        <li><strong>Capital gains:</strong> per lot. Short- vs long-term by holding period (12 months listed equity, 24 others), ₹1.25L equity LTCG exemption tracker, gains-harvesting nudge in Feb/Mar, losses carried forward up to 8 years.</li>
+        <li><strong>FD interest:</strong> taxed on accrual, with TDS credit.</li>
+        <li><strong>GST alert</strong> as freelance receipts approach ₹20L.</li>
+        <li><strong>Year-end pack</strong> to cross-check against Form 16, AIS and 26AS.</li>
+      </ul>
+      <p class="muted">Estimates and records for your own planning and for sharing with a CA. The app doesn't file returns or give tax advice.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="insights">
+      <h2>Insights &amp; AI</h2>
+      <pre class="flow"><code>Ledger → Rules engine (on device, deterministic) → Facts JSON → AI → Weekly summary</code></pre>
+      <ul>
+        <li><strong>Rules:</strong> subscription detection and price rises, category creep vs 3-month average, budget pacing, small-spend leaks, duplicates and unusual charges, card-interest risk, runway change, regret rate, allocation drift, goal shortfall.</li>
+        <li><strong>AI</strong> receives only computed aggregates, never the raw ledger or account numbers, and writes the narrative. It never does the math.</li>
+        <li><strong>Payload preview:</strong> a screen shows exactly what would be sent. Opt-in; the rules-only summary works without AI.</li>
+        <li><strong>Frequency:</strong> one weekly summary, plus immediate alerts only for urgent items. Dismissing a type of alert repeatedly mutes it.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="navigation">
+      <h2>Navigation</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Bottom tab</th><th>Contains</th></tr>
+        <tr><td>Home</td><td>Dashboard</td></tr>
+        <tr><td>Transactions</td><td>List, calendar, monthly views, search</td></tr>
+        <tr><td>Accounts</td><td>Account tree, cards, loans, reconciliation</td></tr>
+        <tr><td>Invest</td><td>Portfolio, holdings, prices</td></tr>
+        <tr><td>More</td><td>Budgets, goals, reports, close, insights, tax, recurring, settings</td></tr>
+      </table></div>
+      <p>A floating <strong>+</strong> button on every tab opens Quick Add.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="pages">
+      <h2>Pages &amp; functionality</h2>
+      <p class="muted">The tag shows which roadmap phase delivers the page.</p>
+
+      <div class="page">
+        <h3>Onboarding &amp; setup <span class="id">P01</span> <span class="tag p1">Phase 1</span></h3>
+        <ul>
+          <li>Set passcode and biometric unlock</li>
+          <li>Profile: date of birth (for the age-30 goal), month start day (payday), tax regime</li>
+          <li>Account setup wizard: banks, cash, cards (statement and due day), loans, FDs, holdings, with opening balances posted to <code>Equity:Opening</code></li>
+          <li>Income profile: salary payslip split, plus whether you have freelance income</li>
+          <li>Default category tree; mark categories as essential</li>
+          <li>Goals: emergency fund ₹5L, ₹1Cr by 30</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Lock screen <span class="id">P02</span> <span class="tag p1">Phase 1</span></h3>
+        <ul>
+          <li>Biometric or passcode, with configurable timeout</li>
+          <li>Integrity check on unlock (hash chain); warns if closed months were changed</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Home / Dashboard <span class="id">P03</span> <span class="tag">Phase 3</span></h3>
+        <ul>
+          <li><strong>Leeway card:</strong> safe to spend, daily allowance, days to payday</li>
+          <li><strong>Runway ladder:</strong> cash / +FDs / +markets, plus trajectory runway</li>
+          <li>Net worth (market) with month-to-date change</li>
+          <li>Month so far: income, expenses, savings rate, investment rate</li>
+          <li>Budget pacing bars</li>
+          <li>Upcoming bills, EMIs, card dues and SIPs (next 14 days)</li>
+          <li>Goal progress: emergency fund and ₹1Cr</li>
+          <li>Insight and alert cards; status of the last price download</li>
+          <li>Reminders: month waiting to be closed, items in suspense, drafts</li>
+        </ul>
+        <p class="muted">A simple version (balances and month totals) ships in Phase 1.</p>
+      </div>
+
+      <div class="page">
+        <h3>Quick Add / transaction entry <span class="id">P04</span> <span class="tag p1">Phase 1</span></h3>
+        <ul>
+          <li>Types: expense, income, transfer, card payment, investment buy/sell, dividend</li>
+          <li>Amount pad with built-in calculator</li>
+          <li>Payee memory: typing "Swiggy" fills in category, account, payment method and need/want</li>
+          <li>Fields: date (closed months blocked), account, category, payment method (UPI, card, net banking, cash), need/want/investment, planned/unplanned, note</li>
+          <li>Templates for frequent entries</li>
+          <li>Split / multi-posting editor (salary, EMI, split bills)</li>
+          <li>Save as draft or post; live "✓ Balanced" check</li>
+          <li>Journal preview toggle (shown automatically the first few times for each new entry type)</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Impact prompt (modal) <span class="id">P05</span> <span class="tag">Phase 3</span></h3>
+        <ul>
+          <li>Opens when one spend, or the day's spends combined, reaches ≥ 50% of remaining leeway, or for any discretionary spend when leeway ≤ 0</li>
+          <li>Shows leeway before → after, the new daily allowance, the runway change in days, and the budget hit</li>
+          <li>Confirm with reason · Save as draft · Cancel</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Transactions <span class="id">P06</span> <span class="tag p1">Phase 1–2</span></h3>
+        <ul>
+          <li>Views: daily list, calendar (daily totals), weekly, monthly, summary</li>
+          <li>Search and filters (account, category, payee, tag, status, amount, date)</li>
+          <li>Status badges: draft / posted / reconciled / locked / prior-period adjustment</li>
+          <li>Suspense inbox: categorize uncategorized entries in bulk</li>
+          <li>Accountant mode: Dr/Cr columns</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Transaction detail <span class="id">P07</span> <span class="tag p1">Phase 1</span></h3>
+        <ul>
+          <li>All fields, decision tags and reason</li>
+          <li>Journal view (postings, balanced badge)</li>
+          <li>Audit history (every change with before and after values)</li>
+          <li>Actions depend on status: edit (draft/posted), reverse (reconciled), prior-period adjustment (closed month)</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Accounts <span class="id">P08</span> <span class="tag p1">Phase 1–2</span></h3>
+        <ul>
+          <li>Account tree grouped by type, with balances and a net worth total</li>
+          <li>Credit cards: outstanding, statement date, due date, available limit, interest-risk flag</li>
+          <li>Loans: outstanding principal, EMI schedule, interest paid</li>
+          <li>Earmarks / sinking funds (emergency, Diwali, insurance…)</li>
+          <li>Add, edit, archive accounts; set liquidity tier and goal link</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Account ledger <span class="id">P09</span> <span class="tag p1">Phase 1</span></h3>
+        <ul>
+          <li>Entries with running balance, filterable by period</li>
+          <li>Reconciled / unreconciled markers; Reconcile button</li>
+          <li>For cards: statement-cycle grouping</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Reconciliation <span class="id">P10</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li>Enter the actual balance from your bank, statement or wallet</li>
+          <li>Tick off matching entries; the difference is shown live</li>
+          <li>Resolve the difference: add a missing entry, or post to <code>Expenses:Unaccounted</code> with a note</li>
+          <li>Finish, which locks the ticked entries</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Recurring &amp; templates <span class="id">P11</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li>Rules: salary, rent, EMIs, SIPs, subscriptions, card payments, sinking-fund moves</li>
+          <li>Frequency, next date, auto-post or post as draft</li>
+          <li>Upcoming schedule; these feed into leeway and trajectory runway</li>
+          <li>Template library for quick entry</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Budgets <span class="id">P12</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li>Budget per category / sub-category: weekly, monthly or annual</li>
+          <li>Spent vs budget, pace projection ("over by the 22nd")</li>
+          <li>Overspend acknowledgement and budget transfer between categories</li>
+          <li>Copy last period's budgets</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Investments: portfolio <span class="id">P13</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li>Market value, cost, unrealized gain/loss (₹ and %), XIRR</li>
+          <li>Allocation actual vs target (equity / debt) with drift warning</li>
+          <li>Holdings grouped as stocks / MFs / FDs, each with a price status badge</li>
+          <li>Concentration and overlap warnings</li>
+          <li>Buttons: buy, sell, SIP, dividend, corporate action, new FD</li>
+          <li>In Transit list (SIPs waiting for allotment)</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Holding detail <span class="id">P14</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li><strong>Stock / MF:</strong> units, average cost, lots table (date, units, cost, holding period, short/long-term, lock-in, exit-load end), price history chart, transactions, XIRR, tax if sold today, linked goal, investment reasons</li>
+          <li><strong>FD:</strong> principal, rate, compounding, maturity date and value, interest accrued so far, break-today value (after penalty), TDS, auto-renew</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Prices <span class="id">P15</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li>Status bar per source (NSE, AMFI): health, last success, failure reason, Retry, Change source URL</li>
+          <li>Weekly snapshot table: holding, ISIN, price, date, source, status badge</li>
+          <li>Manual price entry and confirmation; resolve mismatch / stale / suspicious</li>
+          <li>Download log (every attempt, HTTP status, rows matched)</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Goals <span class="id">P16</span> <span class="tag">Phase 3</span></h3>
+        <ul>
+          <li><strong>Emergency fund:</strong> progress to ₹5L, 9-month check, FD ladder view</li>
+          <li><strong>₹1Cr by 30:</strong> countdown to 20 Nov 2029, current value, required SIP vs <em>X</em>, projected value, shortfall, crash scenario, allocation and glide path</li>
+          <li>Sinking funds with monthly contribution and due date</li>
+          <li>Holdings linked to each goal; goal-level XIRR</li>
+          <li>Add / edit goals; allocation suggested from horizon</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Month-end close <span class="id">P17</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li>Close checklist with live ✓ / ✗ per item and a link to fix each</li>
+          <li>Balance confirmation per account</li>
+          <li>Holdings: confirm units and price snapshot; post accrued interest and revaluations</li>
+          <li>Preview of the month-end report</li>
+          <li>Close month: type the month name to confirm (irreversible), which computes and chains the hash</li>
+          <li>History of closed months and their hashes</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Reports <span class="id">P18</span> <span class="tag">Phase 2</span></h3>
+        <ul>
+          <li><strong>Month-end report:</strong> income statement vs budget / last month / 3-month average; balance sheet start → end; cash flow; savings and investment rate; runway and leeway change; decision breakdown (need/want, planned/unplanned, regret rate, impact prompts and reasons); subscriptions; reconciliation summary; prior-period adjustments; tax snapshot; AI narrative</li>
+          <li><strong>Statements:</strong> balance sheet, income statement, cash flow, trial balance, general ledger, journal register</li>
+          <li><strong>Stats:</strong> category pie, trends over time, by payee, by payment method</li>
+          <li>Period picker (month, tax year, custom); export to PDF / CSV / Excel / Beancount</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Insights &amp; weekly review <span class="id">P19</span> <span class="tag">Phase 4</span></h3>
+        <ul>
+          <li>Weekly summary (rules plus AI narrative)</li>
+          <li>Review: last week's unplanned and want spends, marked worth it or regret</li>
+          <li>Insight feed with dismiss / mute; alert history</li>
+          <li>Subscriptions list with yearly cost and price-rise flags</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Tax <span class="id">P20</span> <span class="tag">Phase 3</span></h3>
+        <ul>
+          <li>Tax year overview: estimated liability, TDS paid, advance tax paid, balance due</li>
+          <li>Regime comparison (new vs old)</li>
+          <li>Income heads: salary, freelance (presumptive vs actual), interest, dividends, capital gains</li>
+          <li>Advance tax schedule with due dates and amounts; record a payment</li>
+          <li>Deductions progress, flagged by regime</li>
+          <li>Capital gains: realized short/long-term, LTCG exemption used, harvesting suggestions, carried-forward losses</li>
+          <li>Year-end pack export; disclaimer</li>
+        </ul>
+      </div>
+
+      <div class="page">
+        <h3>Settings <span class="id">P21</span> <span class="tag p1">Phase 1+</span></h3>
+        <ul>
+          <li>Profile, month start day, tax regime</li>
+          <li>Security: passcode, biometric, timeout</li>
+          <li>Category and account tree editor; essential flags</li>
+          <li>Display: accountant mode, number format</li>
+          <li>Accountability: impact threshold (50%), decision-tag prompts, review day</li>
+          <li>Runway: stress drops, liquidity tiers</li>
+          <li>Prices: sources and URLs, schedule</li>
+          <li>AI: on/off, API key, payload preview</li>
+          <li>Notifications</li>
+          <li>Backup / restore (encrypted), export</li>
+          <li>Audit log viewer, integrity check</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="roadmap">
+      <h2>Roadmap</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Phase</th><th>Scope</th><th>Pages</th></tr>
+        <tr><td>1. Ledger core</td><td>Account tree, balanced journal, lifecycle, audit log, quick entry, payee memory, biometric lock, encrypted backup</td><td>P01, P02, P04, P06, P07, P08, P09, P21, simple P03</td></tr>
+        <tr><td>2. Parity + investments</td><td>Cards, EMIs, recurring, budgets, calendar, stats, reconciliation, month-end close &amp; reports, stocks/MFs/FDs, weekly prices</td><td>P10–P15, P17, P18</td></tr>
+        <tr><td>3. Your additions</td><td>Leeway, runway ladder, impact prompt, goals, sinking funds, income buffer, tax</td><td>P03 (full), P05, P16, P20</td></tr>
+        <tr><td>4. Intelligence</td><td>Rules engine, alerts, AI weekly summary, weekly review</td><td>P19</td></tr>
+        <tr><td>5. Automation</td><td>Statement and CAS import, then SMS / notification parsing</td><td>Import flows</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="open">
+      <h2>Open items</h2>
+      <ul>
+        <li><strong>Monthly investable amount <em>X</em>:</strong> to be measured from 2–3 months of tracked data.</li>
+        <li><strong>Trading:</strong> intraday / F&amp;O is out of scope for now (it's taxed as business income, which needs separate handling). Delivery-based stocks only.</li>
+        <li><strong>Tax figures:</strong> verify every rate, limit and section mapping against the official Income-tax Act 2025 text before building Phase 3.</li>
+        <li><strong>NSE source:</strong> confirm the current UDiFF file path at build time; NSE distribution changes are ongoing in 2026.</li>
+        <li><strong>App visual design:</strong> next step, built from this page list.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+</body>
+</html>
