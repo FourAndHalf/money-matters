@@ -20,15 +20,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.feature.accounts.AccountLedgerScreen
-import com.moneymatters.app.feature.accounts.AccountLedgerState
 import com.moneymatters.app.feature.accounts.AccountsScreen
-import com.moneymatters.app.feature.accounts.AccountsState
-import com.moneymatters.app.feature.dashboard.DashboardScreen
-import com.moneymatters.app.feature.dashboard.DashboardState
-import com.moneymatters.app.feature.transactions.TransactionDetail
+import com.moneymatters.app.feature.dashboard.HomeScreen
+import com.moneymatters.app.feature.books.BooksState
 import com.moneymatters.app.feature.transactions.TransactionDetailScreen
 import com.moneymatters.app.feature.transactions.TransactionsScreen
-import com.moneymatters.app.feature.transactions.TransactionsState
 import com.moneymatters.app.ui.components.MoneyBottomBar
 import com.moneymatters.app.ui.components.NavItem
 import com.moneymatters.app.ui.components.QuickAddFab
@@ -48,13 +44,11 @@ private const val ACCOUNTS_TAB = 2
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(
-    dashboard: DashboardState,
-    accounts: AccountsState,
-    ledgers: Map<String, AccountLedgerState>,
-    transactions: TransactionsState,
-    transactionDetails: Map<String, TransactionDetail>,
-) {
+fun MoneyMattersApp(books: BooksState) {
+    val accounts = books.accounts
+    val ledgers = books.ledgers
+    val transactions = books.transactions
+    val transactionDetails = books.details
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var openAccountId by rememberSaveable { mutableStateOf<String?>(null) }
     var openTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -81,14 +75,14 @@ fun MoneyMattersApp(
             }
             else -> {
                 when (tab) {
-                    0 -> DashboardScreen(
-                        dashboard,
-                        onNavigate = {},
-                        // Clears the floating bar and Quick Add.
-                        contentPadding = PaddingValues(bottom = 132.dp),
+                    0 -> HomeScreen(
+                        books.home,
                         onOpenAccounts = { tab = ACCOUNTS_TAB },
                         onOpenAccount = { id -> openAccountId = id },
                         onOpenTransactions = { tab = TXNS_TAB },
+                        onOpenTransaction = { id -> openTransactionId = id },
+                        // Clears the floating bar and Quick Add.
+                        contentPadding = PaddingValues(bottom = 132.dp),
                     )
                     TXNS_TAB -> TransactionsScreen(
                         transactions,

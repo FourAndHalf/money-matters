@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,15 +25,12 @@ import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.profile.ProfileStore
 import com.moneymatters.app.core.security.BiometricUnlock
 import com.moneymatters.app.core.security.PasscodeStore
-import com.moneymatters.app.feature.accounts.SampleAccounts
-import com.moneymatters.app.feature.accounts.SampleLedgers
-import com.moneymatters.app.feature.dashboard.SampleDashboard
+import com.moneymatters.app.feature.books.BooksViewModel
 import com.moneymatters.app.feature.lock.AppLock
 import com.moneymatters.app.feature.lock.LockScreen
 import com.moneymatters.app.feature.onboarding.OnboardingSaver
 import com.moneymatters.app.feature.onboarding.OnboardingScreen
 import com.moneymatters.app.feature.onboarding.OnboardingWizard
-import com.moneymatters.app.feature.transactions.SampleTransactions
 import com.moneymatters.app.ui.MoneyMattersApp
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +43,13 @@ class MainActivity : ComponentActivity() {
     private val onboarding: OnboardingWizard by viewModels()
     private val profiles by lazy { ProfileStore.encrypted(applicationContext) }
     private val passcodes by lazy { PasscodeStore.encrypted(applicationContext) }
+    private val booksModel: BooksViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                BooksViewModel(LedgerRepository(LedgerDatabaseProvider.get(applicationContext)), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 })
+            }
+        }
+    }
     private val appLock: AppLock by viewModels {
         viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet()) } }
     }
@@ -104,14 +109,8 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     saveableState.SaveableStateProvider("app") {
-                        // Sample data until the screens read the ledger.
-                        MoneyMattersApp(
-                            SampleDashboard.state,
-                            SampleAccounts.state,
-                            SampleLedgers.byAccountId,
-                            SampleTransactions.state,
-                            SampleTransactions.byId,
-                        )
+                        // Null only for the moment before the first ledger read lands.
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it) }
                     }
                 }
             }

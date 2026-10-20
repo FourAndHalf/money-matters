@@ -37,8 +37,25 @@ interface LedgerDao {
     @Query("SELECT * FROM postings WHERE transactionId = :transactionId")
     suspend fun getPostingsForTransaction(transactionId: String): List<PostingEntity>
 
-    @Query("SELECT * FROM postings WHERE accountId = :accountId")
-    suspend fun getPostingsForAccount(accountId: String): List<PostingEntity>
+    /** Drafts aren't booked yet, so they never count toward a balance. */
+    @Query(
+        "SELECT p.* FROM postings p JOIN transactions t ON t.id = p.transactionId " +
+            "WHERE p.accountId = :accountId AND t.status != 'Draft'",
+    )
+    suspend fun getBookedPostingsForAccount(accountId: String): List<PostingEntity>
+
+    // Whole-ledger reads for LedgerRepository.snapshot(), which runs them inside one transaction.
+    @Query("SELECT * FROM accounts")
+    suspend fun getAllAccounts(): List<AccountEntity>
+
+    @Query("SELECT * FROM transactions")
+    suspend fun getAllTransactions(): List<TransactionEntity>
+
+    @Query("SELECT * FROM postings")
+    suspend fun getAllPostings(): List<PostingEntity>
+
+    @Query("SELECT * FROM audit_log ORDER BY whenMillis, id")
+    suspend fun getAllAuditLog(): List<AuditLogEntity>
 
     @Insert suspend fun insertAuditLog(entry: AuditLogEntity)
 

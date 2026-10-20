@@ -9,10 +9,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.moneymatters.app.feature.accounts.SampleAccounts
-import com.moneymatters.app.feature.accounts.SampleLedgers
-import com.moneymatters.app.feature.transactions.SampleTransactions
-import com.moneymatters.app.ui.MoneyMattersApp
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import org.junit.Rule
 import org.junit.Test
@@ -33,7 +29,7 @@ class DashboardScreenTest {
     @get:Rule val compose = createComposeRule()
 
     private fun app(dark: Boolean = false) = compose.setContent {
-        MoneyMattersTheme(darkTheme = dark) { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) }
+        MoneyMattersTheme(darkTheme = dark) { DashboardScreen(SampleDashboard.state, onNavigate = {}) }
     }
 
     @Test fun `first screen shows leeway and allowance`() {
@@ -75,13 +71,13 @@ class DashboardFullPageTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun `full page light`() {
-        compose.setContent { MoneyMattersTheme(darkTheme = false) { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) } }
+        compose.setContent { MoneyMattersTheme(darkTheme = false) { DashboardScreen(SampleDashboard.state, onNavigate = {}) } }
         compose.onNodeWithText("Needs attention").assertExists()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/dashboard_full_light.png")
     }
 
     @Test fun `full page dark`() {
-        compose.setContent { MoneyMattersTheme(darkTheme = true) { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) } }
+        compose.setContent { MoneyMattersTheme(darkTheme = true) { DashboardScreen(SampleDashboard.state, onNavigate = {}) } }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/dashboard_full_dark.png")
     }
 }

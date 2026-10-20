@@ -1,6 +1,5 @@
 package com.moneymatters.app.feature.transactions
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,6 +40,7 @@ import com.moneymatters.app.ui.components.SearchField
 import com.moneymatters.app.ui.components.SegmentedControl
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
+import com.moneymatters.app.ui.components.TransactionRow
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -111,7 +110,7 @@ fun TransactionsScreen(
         if (visibleGroups.isEmpty()) {
             item("empty") {
                 Text(
-                    "No transactions match.", style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.muted,
+                    if (state.groups.isEmpty()) "No transactions yet. Tap + to add one." else "No transactions match.", style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.muted,
                     modifier = Modifier.padding(horizontal = margin, vertical = 24.dp),
                 )
             }
@@ -187,31 +186,28 @@ private fun DayModule(group: DayGroup, mode: JournalMode, onOpenTransaction: (St
         }
         when (mode) {
             JournalMode.Everyday -> group.items.forEachIndexed { i, txn ->
-                ListRow(
-                    title = txn.payee,
-                    subtitle = buildString {
-                        append(txn.category); append(" · "); append(txn.accountName)
-                        txn.decision?.let { append(" · "); append(it.name.lowercase().replaceFirstChar(Char::uppercase)) }
-                    },
-                    divider = i < group.items.lastIndex,
-                    modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open ${txn.payee}") { onOpenTransaction(txn.id) },
-                    leading = { GlyphChip(text = txn.chip) },
-                    trailing = { EverydayTrailing(txn) },
-                )
+                SummaryRow(txn, onOpenTransaction, divider = i < group.items.lastIndex)
             }
             JournalMode.Accountant -> AccountantPanel(group)
         }
     }
 }
 
+/** One transaction as an everyday row; shared with Home's recent list. */
 @Composable
-private fun EverydayTrailing(txn: TransactionSummary) {
-    Column(horizontalAlignment = Alignment.End) {
-        Text(txn.amount.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, textAlign = TextAlign.End)
-        txn.status.look()?.let { (text, tone, icon) ->
-            StatusBadge(text, tone, icon = icon, modifier = Modifier.padding(top = 4.dp))
-        }
-    }
+internal fun SummaryRow(txn: TransactionSummary, onOpenTransaction: (String) -> Unit, divider: Boolean = true) {
+    TransactionRow(
+        payee = txn.payee,
+        subtitle = buildString {
+            append(txn.category); append(" · "); append(txn.accountName)
+            txn.decision?.let { append(" · "); append(it.name.lowercase().replaceFirstChar(Char::uppercase)) }
+        },
+        chip = txn.chip,
+        amount = txn.amount,
+        onClick = { onOpenTransaction(txn.id) },
+        divider = divider,
+        badge = txn.status.look()?.let { (text, tone, icon) -> { StatusBadge(text, tone, icon = icon) } },
+    )
 }
 
 /** DESIGN.md → Application notes: journal views use ledger-mono in an inner panel, Dr/Cr columns, a Balanced badge. */

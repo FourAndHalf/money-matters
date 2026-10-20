@@ -198,4 +198,11 @@ class LedgerRepositoryTest {
         assertEquals(DecisionKind.Need, edited.decision)
         assertEquals(null, edited.paymentMethod)
     }
+
+    @Test fun `drafts don't count toward a balance until posted`() = runBlocking {
+        spend(amount = 100.rupees, status = TransactionStatus.Draft)
+        assertEquals(Paise.Zero, repo.accountBalance(bank))
+        spend(amount = 50.rupees)
+        assertEquals((-50).rupees, repo.accountBalance(bank))
+    }
 }
