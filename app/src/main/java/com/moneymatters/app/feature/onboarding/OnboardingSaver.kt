@@ -26,7 +26,7 @@ class OnboardingSaver(
         val date = today()
         val profile = form.toUserProfile(date)
         postSetupToLedger(ledger, form, date)
-        passcodes.save(form.passcode, form.biometricEnabled)
+        passcodes.save(form.passcode, form.biometricEnabled, form.lockTimeout)
         profiles.completeSetup(profile)
     }
 }

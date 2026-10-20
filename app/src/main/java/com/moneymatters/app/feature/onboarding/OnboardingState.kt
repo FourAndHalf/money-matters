@@ -6,6 +6,7 @@ import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.parseRupees
 import com.moneymatters.app.core.profile.TaxRegime
 import com.moneymatters.app.core.profile.UserProfile
+import com.moneymatters.app.core.security.LockTimeout
 import com.moneymatters.app.feature.accounts.AccountKind
 import java.time.DateTimeException
 import java.time.LocalDate
@@ -66,6 +67,7 @@ data class OnboardingForm(
     val passcode: String = "",
     val passcodeConfirm: String = "",
     val biometricEnabled: Boolean = true,
+    val lockTimeout: LockTimeout = LockTimeout.OneMinute,
     val accounts: List<NewAccountDraft> = listOf(NewAccountDraft()),
     val income: IncomeProfile = IncomeProfile(),
     val categories: List<CategoryChoice> = DefaultCategories,
