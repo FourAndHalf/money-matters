@@ -3,13 +3,11 @@ package com.moneymatters.app.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.moneymatters.app.feature.accounts.SampleAccounts
-import com.moneymatters.app.feature.accounts.SampleLedgers
-import com.moneymatters.app.feature.transactions.SampleTransactions
-import com.moneymatters.app.feature.dashboard.SampleDashboard
+import com.moneymatters.app.feature.books.SampleBooks
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import org.junit.Rule
 import org.junit.Test
@@ -26,19 +24,19 @@ class MoneyMattersAppNavigationTest {
 
     @get:Rule val compose = createComposeRule()
 
-    @Test fun `View all on the dashboard switches to the Accounts tab`() {
+    @Test fun `View all on Home switches to the Accounts tab`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state) }
         }
-        compose.onNodeWithText("View all").performClick()
+        compose.onAllNodesWithText("View all")[0].performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
     }
 
     @Test fun `tapping an account opens its ledger and back returns to the tab bar`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleDashboard.state, SampleAccounts.state, SampleLedgers.byAccountId, SampleTransactions.state, SampleTransactions.byId) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state) }
         }
-        compose.onNodeWithText("View all").performClick()
+        compose.onAllNodesWithText("View all")[0].performClick()
         compose.onNodeWithText("HDFC Bank").performClick()
 
         compose.onNodeWithText("Current balance").assertIsDisplayed()

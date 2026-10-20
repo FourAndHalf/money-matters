@@ -5,6 +5,15 @@ import com.moneymatters.app.core.money.Paise
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+/** Every row of the ledger at one moment, for read-only screens. Includes archived accounts so old postings still resolve. */
+data class LedgerSnapshot(
+    val accounts: List<AccountEntity>,
+    val transactions: List<TransactionEntity>,
+    val postings: List<PostingEntity>,
+    val audit: List<AuditLogEntity>,
+)
 
 /** The optional P04 tags on a transaction; none affect balances. */
 data class TransactionTags(val decision: DecisionKind? = null, val plan: PlanKind? = null, val paymentMethod: PaymentMethod? = null)
@@ -28,6 +37,17 @@ class LedgerRepository(
     fun transactions(): Flow<List<TransactionEntity>> = dao.transactions()
     fun auditLogFor(transactionId: String): Flow<List<AuditLogEntity>> = dao.auditLogForTransaction(transactionId)
 
+    /**
+     * The whole ledger, re-read after every write. All four tables are read in one transaction, so
+     * a snapshot never holds a transaction without its postings. Fine at personal scale; page it if it ever isn't.
+     */
+    fun snapshot(): Flow<LedgerSnapshot> =
+        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log").map {
+            database.withTransaction {
+                LedgerSnapshot(dao.getAllAccounts(), dao.getAllTransactions(), dao.getAllPostings(), dao.getAllAuditLog())
+            }
+        }
+
     suspend fun createAccount(name: String, type: AccountType, parentId: String? = null, kind: AccountKind? = null): String {
         val id = newId()
         dao.insertAccount(AccountEntity(id, name, type, parentId, kind = kind))
@@ -43,9 +63,9 @@ class LedgerRepository(
     /** Runs several repository writes as one database transaction: all of them land, or none do. */
     suspend fun <R> inTransaction(block: suspend () -> R): R = database.withTransaction(block)
 
-    /** Net of every posting against this account: debit − credit. Sign meaning depends on [AccountType]. */
+    /** Net of every booked (non-draft) posting against this account: debit − credit. Sign meaning depends on [AccountType]. */
     suspend fun accountBalance(accountId: String): Paise =
-        dao.getPostingsForAccount(accountId).fold(Paise.Zero) { acc, p ->
+        dao.getBookedPostingsForAccount(accountId).fold(Paise.Zero) { acc, p ->
             acc + Paise(p.debitPaise ?: 0L) - Paise(p.creditPaise ?: 0L)
         }
 
