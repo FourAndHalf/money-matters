@@ -23,6 +23,9 @@ import com.moneymatters.app.feature.accounts.AccountLedgerScreen
 import com.moneymatters.app.feature.accounts.AccountsScreen
 import com.moneymatters.app.feature.dashboard.HomeScreen
 import com.moneymatters.app.feature.books.BooksState
+import com.moneymatters.app.feature.quickadd.QuickAddPrefs
+import com.moneymatters.app.feature.quickadd.QuickAddScreen
+import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.transactions.TransactionDetailScreen
 import com.moneymatters.app.feature.transactions.TransactionsScreen
 import com.moneymatters.app.ui.components.MoneyBottomBar
@@ -44,7 +47,7 @@ private const val ACCOUNTS_TAB = 2
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -52,6 +55,7 @@ fun MoneyMattersApp(books: BooksState) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var openAccountId by rememberSaveable { mutableStateOf<String?>(null) }
     var openTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     val c = MoneyTheme.colors
     val canvas = if (c.isDark) Brush.verticalGradient(listOf(c.canvas, c.canvas)) else Brush.verticalGradient(0f to Color(0xFFF0F0F2), 0.45f to c.canvas)
 
@@ -64,7 +68,7 @@ fun MoneyMattersApp(books: BooksState) {
         val openLedger = openAccountId?.let { ledgers[it] }
         val openTransaction = openTransactionId?.let { transactionDetails[it] }
         when {
-            // Drilling into an account or a transaction hides the tab bar, like Holding detail will too.
+            // Drilling into an account, a transaction or Quick Add hides the tab bar.
             openLedger != null -> {
                 BackHandler { openAccountId = null }
                 AccountLedgerScreen(openLedger, onBack = { openAccountId = null })
@@ -72,6 +76,10 @@ fun MoneyMattersApp(books: BooksState) {
             openTransaction != null -> {
                 BackHandler { openTransactionId = null }
                 TransactionDetailScreen(openTransaction, onBack = { openTransactionId = null })
+            }
+            showQuickAdd -> {
+                BackHandler { showQuickAdd = false }
+                QuickAddScreen(quickAdd, quickAddPrefs, onClose = { quickAdd.reset(); showQuickAdd = false })
             }
             else -> {
                 when (tab) {
@@ -110,7 +118,7 @@ fun MoneyMattersApp(books: BooksState) {
                     MoneyBottomBar(Tabs, tab, onSelect = { tab = it })
                 }
                 QuickAddFab(
-                    onClick = {},
+                    onClick = { showQuickAdd = true },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
