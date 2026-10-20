@@ -43,7 +43,7 @@ internal suspend fun postSetupToLedger(repo: LedgerRepository, form: OnboardingF
     for (draft in form.accounts) {
         if (draft.name.isBlank()) continue
         val type = draft.kind.toLedgerType()
-        val accountId = repo.createAccountIfAbsent(draft.name.trim(), type)
+        val accountId = repo.createAccountIfAbsent(draft.name.trim(), type, kind = draft.kind)
         val amount = draft.openingPaise() ?: continue
         val postings = if (type == AccountType.Liability) {
             listOf(PostingLine(accountId, credit = amount), PostingLine(equityId, debit = amount))

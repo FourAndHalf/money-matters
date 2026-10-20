@@ -15,7 +15,8 @@ data class AccountsState(
     val earmarks: List<Earmark>,
 )
 
-enum class AccountKind { Bank, Cash, CreditCard, Loan, FixedDeposit, Investment }
+/** Lives in the ledger now (it's stored per account); aliased so screens keep their short name. */
+typealias AccountKind = com.moneymatters.app.core.ledger.AccountKind
 
 /** One row in the account tree. [balance] is unsigned; [isLiability] decides the sign shown. */
 @Immutable

@@ -10,9 +10,9 @@ import com.moneymatters.app.core.money.Paise
  */
 enum class TxnStatus { Draft, Posted, Reconciled, Locked, PriorPeriodAdjustment }
 
-/** Why the money moved: an accountability tag, not a judgement (design/DESIGN.md keeps these neutral). */
-enum class DecisionKind { Need, Want, Investment }
-enum class PlanKind { Planned, Unplanned }
+/** Stored on each ledger transaction; aliased so screens keep their short names. */
+typealias DecisionKind = com.moneymatters.app.core.ledger.DecisionKind
+typealias PlanKind = com.moneymatters.app.core.ledger.PlanKind
 
 /** One leg of a journal entry. Exactly one of [debit]/[credit] is set. */
 @Immutable

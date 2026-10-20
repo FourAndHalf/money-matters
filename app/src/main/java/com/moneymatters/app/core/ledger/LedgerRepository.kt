@@ -6,6 +6,9 @@ import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 
+/** The optional P04 tags on a transaction; none affect balances. */
+data class TransactionTags(val decision: DecisionKind? = null, val plan: PlanKind? = null, val paymentMethod: PaymentMethod? = null)
+
 /** One leg of a transaction as given by a caller, before it has an id. */
 data class PostingLine(val accountId: String, val debit: Paise? = null, val credit: Paise? = null)
 
@@ -25,17 +28,17 @@ class LedgerRepository(
     fun transactions(): Flow<List<TransactionEntity>> = dao.transactions()
     fun auditLogFor(transactionId: String): Flow<List<AuditLogEntity>> = dao.auditLogForTransaction(transactionId)
 
-    suspend fun createAccount(name: String, type: AccountType, parentId: String? = null): String {
+    suspend fun createAccount(name: String, type: AccountType, parentId: String? = null, kind: AccountKind? = null): String {
         val id = newId()
-        dao.insertAccount(AccountEntity(id, name, type, parentId))
+        dao.insertAccount(AccountEntity(id, name, type, parentId, kind = kind))
         return id
     }
 
     suspend fun accountIdByName(name: String): String? = dao.findAccountByName(name)?.id
 
     /** Looks an account up by name first; creates it only if missing. Used for shared accounts like `Equity:Opening`. */
-    suspend fun createAccountIfAbsent(name: String, type: AccountType, parentId: String? = null): String =
-        accountIdByName(name) ?: createAccount(name, type, parentId)
+    suspend fun createAccountIfAbsent(name: String, type: AccountType, parentId: String? = null, kind: AccountKind? = null): String =
+        accountIdByName(name) ?: createAccount(name, type, parentId, kind)
 
     /** Runs several repository writes as one database transaction: all of them land, or none do. */
     suspend fun <R> inTransaction(block: suspend () -> R): R = database.withTransaction(block)
@@ -53,6 +56,7 @@ class LedgerRepository(
         postings: List<PostingLine>,
         memo: String? = null,
         status: TransactionStatus = TransactionStatus.Posted,
+        tags: TransactionTags = TransactionTags(),
     ): String {
         require(status == TransactionStatus.Draft || status == TransactionStatus.Posted) {
             "A new transaction must start Draft or Posted, not $status"
@@ -60,7 +64,7 @@ class LedgerRepository(
         validateBalanced(postings)
         val id = newId()
         database.withTransaction {
-            dao.insertTransaction(TransactionEntity(id, date.toString(), payee, memo, status))
+            dao.insertTransaction(TransactionEntity(id, date.toString(), payee, memo, status, tags.decision, tags.plan, tags.paymentMethod))
             dao.insertPostings(postings.toEntities(id))
             audit(id, "Created", "$payee (${status.name}), ${postings.size} postings")
         }
@@ -74,6 +78,7 @@ class LedgerRepository(
         payee: String,
         postings: List<PostingLine>,
         memo: String? = null,
+        tags: TransactionTags = TransactionTags(),
     ) {
         val existing = requireTransaction(transactionId)
         if (existing.status != TransactionStatus.Draft && existing.status != TransactionStatus.Posted) {
@@ -81,7 +86,12 @@ class LedgerRepository(
         }
         validateBalanced(postings)
         database.withTransaction {
-            dao.updateTransaction(existing.copy(date = date.toString(), payee = payee, memo = memo))
+            dao.updateTransaction(
+                existing.copy(
+                    date = date.toString(), payee = payee, memo = memo,
+                    decision = tags.decision, plan = tags.plan, paymentMethod = tags.paymentMethod,
+                ),
+            )
             dao.deletePostingsForTransaction(transactionId)
             dao.insertPostings(postings.toEntities(transactionId))
             audit(transactionId, "Edited", payee, before = existing.payee, after = payee)

@@ -183,4 +183,19 @@ class LedgerRepositoryTest {
             assertEquals(0, repo.transactions().first().size)
         }
     }
+
+    @Test fun `stores account kind and transaction tags, and edits replace the tags`() = runBlocking {
+        val card = repo.createAccount("HDFC Regalia", AccountType.Liability, kind = AccountKind.CreditCard)
+        assertEquals(AccountKind.CreditCard, db.ledgerDao().getAccount(card)!!.kind)
+
+        val tags = TransactionTags(DecisionKind.Want, PlanKind.Unplanned, PaymentMethod.Card)
+        val id = repo.postTransaction(LocalDate.of(2026, 10, 19), "Swiggy", listOf(PostingLine(dining, debit = 486.rupees), PostingLine(card, credit = 486.rupees)), tags = tags)
+        val saved = db.ledgerDao().getTransaction(id)!!
+        assertEquals(tags, TransactionTags(saved.decision, saved.plan, saved.paymentMethod))
+
+        repo.edit(id, LocalDate.of(2026, 10, 19), "Swiggy", listOf(PostingLine(dining, debit = 486.rupees), PostingLine(card, credit = 486.rupees)), tags = TransactionTags(DecisionKind.Need))
+        val edited = db.ledgerDao().getTransaction(id)!!
+        assertEquals(DecisionKind.Need, edited.decision)
+        assertEquals(null, edited.paymentMethod)
+    }
 }
