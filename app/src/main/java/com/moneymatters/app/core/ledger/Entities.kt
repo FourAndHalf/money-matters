@@ -8,6 +8,12 @@ import androidx.room.PrimaryKey
 /** The five double-entry account types; debit/credit meaning is fixed by this, never by UI choice. */
 enum class AccountType { Asset, Liability, Equity, Income, Expense }
 
+/**
+ * What kind of real-world account an Asset or Liability is, for grouping and display. The
+ * ledger's debit/credit rules come from [AccountType] alone; this never changes them.
+ */
+enum class AccountKind { Bank, Cash, CreditCard, Loan, FixedDeposit, Investment }
+
 @Entity(tableName = "accounts")
 data class AccountEntity(
     @PrimaryKey val id: String,
@@ -15,10 +21,19 @@ data class AccountEntity(
     val type: AccountType,
     val parentId: String? = null,
     val isArchived: Boolean = false,
+    /** Null for Income, Expense and Equity accounts, which have no real-world kind. */
+    val kind: AccountKind? = null,
 )
 
 /** Mirrors `TxnAction`'s lifecycle in feature/transactions, one level down (DB, not UI). */
 enum class TransactionStatus { Draft, Posted, Reconciled, Locked, PriorPeriodAdjustment }
+
+/** Why the money moved: an accountability tag, not a judgement (design/DESIGN.md keeps these neutral). */
+enum class DecisionKind { Need, Want, Investment }
+enum class PlanKind { Planned, Unplanned }
+
+/** How a payment was made (plan.html → P04). */
+enum class PaymentMethod { Upi, Card, NetBanking, Cash }
 
 @Entity(tableName = "transactions")
 data class TransactionEntity(
@@ -28,6 +43,9 @@ data class TransactionEntity(
     val payee: String,
     val memo: String? = null,
     val status: TransactionStatus,
+    val decision: DecisionKind? = null,
+    val plan: PlanKind? = null,
+    val paymentMethod: PaymentMethod? = null,
 )
 
 /**

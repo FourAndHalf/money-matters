@@ -95,6 +95,9 @@ class OnboardingSaverTest {
         val accounts = repo.accounts().first().associateBy { it.name }
         assertEquals(AccountType.Asset, accounts["HDFC Bank"]!!.type)
         assertEquals(AccountType.Liability, accounts["HDFC Regalia"]!!.type)
+        assertEquals(AccountKind.CreditCard, accounts["HDFC Regalia"]!!.kind)
+        assertEquals(AccountKind.Loan, accounts["Car loan"]!!.kind)
+        assertNull(accounts[OPENING_EQUITY_ACCOUNT]!!.kind)
         assertEquals(AccountType.Equity, accounts[OPENING_EQUITY_ACCOUNT]!!.type)
         DefaultCategories.forEach { assertEquals(AccountType.Expense, accounts["Expenses:${it.name}"]!!.type) }
         assertEquals(AccountType.Income, accounts["Income:Salary"]!!.type)
