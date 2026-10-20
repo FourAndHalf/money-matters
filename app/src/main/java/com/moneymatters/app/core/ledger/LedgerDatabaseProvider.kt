@@ -2,6 +2,7 @@ package com.moneymatters.app.core.ledger
 
 import android.content.Context
 import androidx.room.Room
+import java.io.File
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.SecureRandom
@@ -24,6 +25,9 @@ object LedgerDatabaseProvider {
         instance ?: synchronized(this) {
             instance ?: build(context.applicationContext).also { instance = it }
         }
+
+    /** The on-disk file backing [get] (Settings → Backup/Restore). */
+    fun databaseFile(context: Context): File = context.getDatabasePath(DB_NAME)
 
     private fun build(context: Context): MoneyMattersDatabase {
         val factory = SupportOpenHelperFactory(passphrase(context))

@@ -4,8 +4,10 @@ import androidx.room.withTransaction
 import com.moneymatters.app.core.money.Paise
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /** Every row of the ledger at one moment, for read-only screens. Includes archived accounts so old postings still resolve. */
 data class LedgerSnapshot(
@@ -56,12 +58,28 @@ class LedgerRepository(
 
     suspend fun accountIdByName(name: String): String? = dao.findAccountByName(name)?.id
 
+    /** Hides an account from pickers and the Accounts page without touching its history (Settings → account editor). */
+    suspend fun archiveAccount(id: String) {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        dao.updateAccount(account.copy(isArchived = true))
+    }
+
+    suspend fun unarchiveAccount(id: String) {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        dao.updateAccount(account.copy(isArchived = false))
+    }
+
     /** Looks an account up by name first; creates it only if missing. Used for shared accounts like `Equity:Opening`. */
     suspend fun createAccountIfAbsent(name: String, type: AccountType, parentId: String? = null, kind: AccountKind? = null): String =
         accountIdByName(name) ?: createAccount(name, type, parentId, kind)
 
     /** Runs several repository writes as one database transaction: all of them land, or none do. */
     suspend fun <R> inTransaction(block: suspend () -> R): R = database.withTransaction(block)
+
+    /** Flushes the write-ahead log into the main database file, so a raw file copy (Settings → Backup) is complete. */
+    suspend fun checkpoint() = withContext(Dispatchers.IO) {
+        database.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
+    }
 
     /** Net of every booked (non-draft) posting against this account: debit − credit. Sign meaning depends on [AccountType]. */
     suspend fun accountBalance(accountId: String): Paise =

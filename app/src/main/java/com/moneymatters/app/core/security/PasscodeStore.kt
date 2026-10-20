@@ -53,6 +53,11 @@ class PasscodeStore(private val prefs: SharedPreferences) {
 
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)
 
+    /** Toggles biometric unlock without touching the passcode hash (Settings → Security). */
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
     /** Digits in the saved passcode, so the keypad can submit on the last one. */
     fun passcodeLength(): Int = prefs.getInt(KEY_PASSCODE_LENGTH, 0)
 

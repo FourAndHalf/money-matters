@@ -33,6 +33,9 @@ import com.moneymatters.app.feature.onboarding.OnboardingScreen
 import com.moneymatters.app.feature.onboarding.OnboardingWizard
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
+import com.moneymatters.app.feature.settings.AiSettingsStore
+import com.moneymatters.app.feature.settings.SettingsPrefs
+import com.moneymatters.app.feature.settings.SettingsViewModel
 import com.moneymatters.app.ui.MoneyMattersApp
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +61,19 @@ class MainActivity : ComponentActivity() {
     private val quickAddPrefs by lazy { QuickAddPrefs(applicationContext) }
     private val quickAddModel: QuickAddViewModel by viewModels {
         viewModelFactory { initializer { QuickAddViewModel(LedgerRepository(LedgerDatabaseProvider.get(applicationContext))) } }
+    }
+    private val settingsModel: SettingsViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                SettingsViewModel(
+                    LedgerRepository(LedgerDatabaseProvider.get(applicationContext)),
+                    profiles,
+                    passcodes,
+                    SettingsPrefs(applicationContext),
+                    AiSettingsStore.encrypted(applicationContext),
+                )
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -116,7 +132,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel) }
                     }
                 }
             }

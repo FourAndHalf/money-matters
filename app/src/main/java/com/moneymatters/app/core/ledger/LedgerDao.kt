@@ -19,6 +19,8 @@ interface LedgerDao {
     @Query("SELECT * FROM accounts WHERE isArchived = 0 ORDER BY name")
     fun accounts(): Flow<List<AccountEntity>>
 
+    @Update suspend fun updateAccount(account: AccountEntity)
+
     @Insert suspend fun insertTransaction(transaction: TransactionEntity)
 
     @Update suspend fun updateTransaction(transaction: TransactionEntity)

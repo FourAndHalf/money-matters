@@ -1,0 +1,125 @@
+package com.moneymatters.app.feature.settings
+
+import android.content.Context
+import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.moneymatters.app.core.ledger.AccountKind
+import com.moneymatters.app.core.ledger.AccountType
+import com.moneymatters.app.core.ledger.LedgerRepository
+import com.moneymatters.app.core.ledger.LedgerSnapshot
+import com.moneymatters.app.core.profile.ProfileStore
+import com.moneymatters.app.core.profile.UserProfile
+import com.moneymatters.app.core.security.LockTimeout
+import com.moneymatters.app.core.security.PasscodeStore
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** Edits already-saved profile, security, account/category and preference data (plan.html → P21). */
+class SettingsViewModel(
+    private val repo: LedgerRepository,
+    private val profiles: ProfileStore,
+    private val passcodes: PasscodeStore,
+    val prefs: SettingsPrefs,
+    val ai: AiSettingsStore,
+    private val hashing: CoroutineDispatcher = Dispatchers.Default,
+) : ViewModel() {
+
+    var profileForm by mutableStateOf(requireNotNull(profiles.profile()) { "Settings is only reachable after setup" })
+    var isSavingProfile by mutableStateOf(false)
+        private set
+    var profileSaveFailed by mutableStateOf(false)
+        private set
+
+    var biometricEnabled by mutableStateOf(passcodes.isBiometricEnabled())
+        private set
+    var lockTimeout by mutableStateOf(passcodes.lockTimeout())
+        private set
+
+    var currentPasscode by mutableStateOf("")
+    var newPasscode by mutableStateOf("")
+    var confirmPasscode by mutableStateOf("")
+    var passcodeChangeFailed by mutableStateOf(false)
+        private set
+    var passcodeChanged by mutableStateOf(false)
+        private set
+
+    val snapshot: StateFlow<LedgerSnapshot?> =
+        repo.snapshot().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun saveProfile() {
+        viewModelScope.launch {
+            isSavingProfile = true
+            profileSaveFailed = false
+            try {
+                profiles.save(profileForm)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                profileSaveFailed = true
+            } finally {
+                isSavingProfile = false
+            }
+        }
+    }
+
+    fun updateBiometricEnabled(enabled: Boolean) {
+        passcodes.setBiometricEnabled(enabled)
+        biometricEnabled = enabled
+    }
+
+    fun updateLockTimeout(timeout: LockTimeout) {
+        passcodes.setLockTimeout(timeout)
+        lockTimeout = timeout
+    }
+
+    /** Verifies [currentPasscode] before replacing it, keeping the existing biometric and timeout settings. Hashing is slow, so this runs off the main thread. */
+    fun changePasscode() {
+        viewModelScope.launch {
+            passcodeChangeFailed = false
+            passcodeChanged = false
+            val valid = newPasscode.length >= 4 && newPasscode == confirmPasscode &&
+                withContext(hashing) { passcodes.verify(currentPasscode) }
+            if (!valid) {
+                passcodeChangeFailed = true
+                return@launch
+            }
+            withContext(hashing) { passcodes.save(newPasscode, biometricEnabled, lockTimeout) }
+            currentPasscode = ""
+            newPasscode = ""
+            confirmPasscode = ""
+            passcodeChanged = true
+        }
+    }
+
+    fun addAccount(name: String, type: AccountType, kind: AccountKind? = null) {
+        viewModelScope.launch { repo.createAccount(name, type, kind = kind) }
+    }
+
+    fun archiveAccount(id: String) {
+        viewModelScope.launch { repo.archiveAccount(id) }
+    }
+
+    fun unarchiveAccount(id: String) {
+        viewModelScope.launch { repo.unarchiveAccount(id) }
+    }
+
+    fun toggleEssential(category: String) {
+        val current = profileForm.essentialCategories
+        profileForm = profileForm.copy(essentialCategories = if (category in current) current - category else current + category)
+        profiles.save(profileForm)
+    }
+
+    suspend fun backup(context: Context, destination: Uri) = backupDatabase(context, repo, destination)
+
+    suspend fun exportCsv(): String = exportCsv(repo)
+}

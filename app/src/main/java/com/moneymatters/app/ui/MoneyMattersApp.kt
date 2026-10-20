@@ -26,6 +26,8 @@ import com.moneymatters.app.feature.books.BooksState
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddScreen
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
+import com.moneymatters.app.feature.settings.SettingsScreen
+import com.moneymatters.app.feature.settings.SettingsViewModel
 import com.moneymatters.app.feature.transactions.TransactionDetailScreen
 import com.moneymatters.app.feature.transactions.TransactionsScreen
 import com.moneymatters.app.ui.components.MoneyBottomBar
@@ -44,10 +46,11 @@ private val Tabs = listOf(
 
 private const val TXNS_TAB = 1
 private const val ACCOUNTS_TAB = 2
+private const val MORE_TAB = 4
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -56,6 +59,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var openAccountId by rememberSaveable { mutableStateOf<String?>(null) }
     var openTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     val c = MoneyTheme.colors
     val canvas = if (c.isDark) Brush.verticalGradient(listOf(c.canvas, c.canvas)) else Brush.verticalGradient(0f to Color(0xFFF0F0F2), 0.45f to c.canvas)
 
@@ -80,6 +84,10 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             showQuickAdd -> {
                 BackHandler { showQuickAdd = false }
                 QuickAddScreen(quickAdd, quickAddPrefs, onClose = { quickAdd.reset(); showQuickAdd = false })
+            }
+            showSettings -> {
+                BackHandler { showSettings = false }
+                SettingsScreen(settings, onClose = { showSettings = false })
             }
             else -> {
                 when (tab) {
@@ -115,7 +123,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         .navigationBarsPadding()
                         .padding(horizontal = 10.dp, vertical = 14.dp),
                 ) {
-                    MoneyBottomBar(Tabs, tab, onSelect = { tab = it })
+                    MoneyBottomBar(Tabs, tab, onSelect = { if (it == MORE_TAB) showSettings = true else tab = it })
                 }
                 QuickAddFab(
                     onClick = { showQuickAdd = true },
