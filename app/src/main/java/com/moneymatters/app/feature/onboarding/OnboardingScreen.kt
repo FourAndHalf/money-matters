@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.profile.TaxRegime
+import com.moneymatters.app.core.security.LockTimeout
 import com.moneymatters.app.feature.accounts.AccountKind
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.InnerPanel
@@ -67,10 +68,11 @@ fun OnboardingScreen(
                 OnboardingStep.Welcome -> WelcomeStep()
                 OnboardingStep.Profile -> ProfileStep(form.profile, today()) { wizard.form = form.copy(profile = it) }
                 OnboardingStep.Passcode -> PasscodeStep(
-                    form.passcode, form.passcodeConfirm, form.biometricEnabled,
+                    form.passcode, form.passcodeConfirm, form.biometricEnabled, form.lockTimeout,
                     { wizard.form = form.copy(passcode = it) },
                     { wizard.form = form.copy(passcodeConfirm = it) },
-                ) { wizard.form = form.copy(biometricEnabled = it) }
+                    { wizard.form = form.copy(biometricEnabled = it) },
+                ) { wizard.form = form.copy(lockTimeout = it) }
                 OnboardingStep.Accounts -> AccountsStep(form.accounts) { wizard.form = form.copy(accounts = it) }
                 OnboardingStep.Income -> IncomeStep(form.income) { wizard.form = form.copy(income = it) }
                 OnboardingStep.Categories -> CategoriesStep(form.categories) { wizard.form = form.copy(categories = it) }
@@ -217,9 +219,11 @@ private fun PasscodeStep(
     passcode: String,
     confirm: String,
     biometricEnabled: Boolean,
+    lockTimeout: LockTimeout,
     onPasscodeChange: (String) -> Unit,
     onConfirmChange: (String) -> Unit,
     onBiometricChange: (Boolean) -> Unit,
+    onLockTimeoutChange: (LockTimeout) -> Unit,
 ) {
     Column(Modifier.verticalScroll(rememberScrollState())) {
         StepTitle("Set a passcode", "4 to 6 digits. You'll use this (or biometrics) every time you open the app.")
@@ -241,7 +245,17 @@ private fun PasscodeStep(
             }
             Toggle(biometricEnabled, onBiometricChange)
         }
+        Spacer(Modifier.height(MoneyTheme.spacing.md))
+        Text("Lock after leaving the app", style = MoneyTheme.type.labelRegular, color = MoneyTheme.colors.muted)
+        Spacer(Modifier.height(6.dp))
+        SegmentedControl(LockTimeout.entries, lockTimeout, onLockTimeoutChange, { it.label() })
     }
+}
+
+private fun LockTimeout.label() = when (this) {
+    LockTimeout.Immediately -> "Immediately"
+    LockTimeout.OneMinute -> "1 min"
+    LockTimeout.FiveMinutes -> "5 min"
 }
 
 @Composable

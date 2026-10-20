@@ -56,6 +56,10 @@ object MoneyIcons {
     val Search by lazy { outline("Search", "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3", width = 1.8f) }
     val Close by lazy { outline("Clear", "M6 6l12 12M18 6 6 18", width = 1.8f) }
     val Filter by lazy { outline("Filter", "M4 6h16M8 12h8M11 18h2", width = 1.8f) }
+    val Backspace by lazy { outline("Delete", "M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7zM12 9.5l5 5M17 9.5l-5 5") }
+    val Fingerprint by lazy {
+        outline("Use biometrics", "M6.5 7.5a7 7 0 0 1 11 0M5 12a7 7 0 0 1 .6-2.8M19 12c0 3-.6 5.3-1.6 7M8.5 19.5c-.9-1.9-1.4-4.4-1.4-7.5a4.9 4.9 0 0 1 9.8 0c0 1.2-.1 2.3-.2 3.3M12 12c0 3.3.5 6 1.5 8M10.5 21c-.6-1-1-2.2-1.2-3.5")
+    }
 
     private fun outline(name: String, path: String, width: Float = 1.6f): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

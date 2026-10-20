@@ -9,6 +9,7 @@ import com.moneymatters.app.core.ledger.MoneyMattersDatabase
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.rupees
 import com.moneymatters.app.core.profile.ProfileStore
+import com.moneymatters.app.core.security.LockTimeout
 import com.moneymatters.app.core.security.PasscodeStore
 import com.moneymatters.app.feature.accounts.AccountKind
 import java.time.LocalDate
@@ -131,5 +132,11 @@ class OnboardingSaverTest {
         saver.save(form.copy(accounts = listOf(NewAccountDraft("Cash"))))
         assertNotNull(repo.accountIdByName("Cash"))
         assertEquals(0, repo.transactions().first().size)
+    }
+
+    @Test fun `saves the chosen lock timeout and passcode length`() = runBlocking {
+        saver.save(form.copy(lockTimeout = LockTimeout.FiveMinutes))
+        assertEquals(LockTimeout.FiveMinutes, passcodes.lockTimeout())
+        assertEquals(6, passcodes.passcodeLength())
     }
 }
