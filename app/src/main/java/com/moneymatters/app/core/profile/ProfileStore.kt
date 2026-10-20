@@ -35,6 +35,9 @@ class ProfileStore(private val prefs: SharedPreferences) {
     /** True once onboarding has finished; the app shows the wizard until then. */
     fun isSetupComplete(): Boolean = prefs.getBoolean(KEY_SETUP_COMPLETE, false)
 
+    /** Re-saves an already-complete profile from Settings. Setup is complete either way, so this is just [completeSetup] under a name that fits editing, not onboarding. */
+    fun save(profile: UserProfile) = completeSetup(profile)
+
     /** Saves [profile] and marks setup complete in one write. */
     fun completeSetup(profile: UserProfile) {
         val editor = prefs.edit()
