@@ -17,6 +17,8 @@ import com.moneymatters.app.core.money.rupees
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import java.time.LocalDate
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -157,5 +159,34 @@ class InvestScreensTest {
         compose.setContent { MoneyMattersTheme { PriceContent("Infosys (INFY)", PriceForm("h1", LocalDate.of(2026, 10, 20), "1512.35"), null, {}, {}, {}) } }
         compose.onNodeWithText("Update price").assertIsDisplayed()
         compose.onNodeWithText("Save price").assertIsDisplayed()
+    }
+
+    @Test fun `the dividend and corporate action forms render`() {
+        compose.setContent {
+            MoneyMattersTheme {
+                DividendContent("Infosys (INFY)", DividendForm("h1", LocalDate.of(2026, 10, 20), "1,800", "200", "bank"), emptyList(), null, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Received in your account (₹)").assertIsDisplayed()
+        compose.onNodeWithText("Save dividend").assertIsDisplayed()
+    }
+
+    @Test fun `the corporate action form words its ratio for a split and for a bonus`() {
+        var form by androidx.compose.runtime.mutableStateOf(ActionForm("h1", com.moneymatters.app.core.invest.RestateKind.Split, LocalDate.of(2026, 10, 20), "5"))
+        compose.setContent { MoneyMattersTheme { ActionContent("Infosys (INFY)", form, null, { form = it }, {}, {}) } }
+        compose.onNodeWithText("New units for each unit held").assertIsDisplayed()
+        compose.onNodeWithText("Bonus").performClick()
+        compose.onNodeWithText("Bonus units for each unit held").assertIsDisplayed()
+    }
+
+    @Test fun `holding detail lists dividends and actions`() {
+        val withActions = detail.copy(
+            actions = listOf(ActionRow("1 Jun 2026", "Dividend", 2_000.rupees), ActionRow("1 Jan 2026", "Split ×5", null)),
+            dividendTotal = 2_000.rupees,
+        )
+        compose.setContent { MoneyMattersTheme { HoldingDetailScreen(withActions, onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {}) } }
+        compose.onNodeWithText("Dividends & actions").assertIsDisplayed()
+        compose.onNodeWithText("Split ×5").assertIsDisplayed()
+        compose.onNodeWithText("₹2,000 received so far").assertIsDisplayed()
     }
 }

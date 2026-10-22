@@ -1,5 +1,6 @@
 package com.moneymatters.app.feature.invest
 
+import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.UnitPrice
@@ -41,4 +42,28 @@ data class TradeForm(
 data class PriceForm(val holdingId: String, val date: LocalDate, val priceText: String = "") {
     val price: UnitPrice? get() = parseUnitPrice(priceText)?.takeIf { it.tenThousandths > 0 }
     val canSave: Boolean get() = price != null
+}
+
+/** A dividend received: [netText] is what reached the account, [tdsText] the tax withheld (optional). */
+data class DividendForm(
+    val holdingId: String,
+    val date: LocalDate,
+    val netText: String = "",
+    val tdsText: String = "",
+    val accountId: String? = null,
+) {
+    val net: Paise? get() = parseRupees(netText)?.takeIf { it.value > 0 }
+    val tds: Paise? get() = if (tdsText.isBlank()) Paise.Zero else parseRupees(tdsText)
+    val canSave: Boolean get() = net != null && tds != null && accountId != null
+}
+
+/** A split or bonus: [ratioText] is new units per old for a split (5 for a 1:5 split), bonus units per unit held for a bonus (0.5 for 1:2). */
+data class ActionForm(
+    val holdingId: String,
+    val kind: RestateKind,
+    val date: LocalDate,
+    val ratioText: String = "",
+) {
+    val ratio: Units? get() = parseUnits(ratioText)?.takeIf { it.micro > 0 }
+    val canSave: Boolean get() = ratio != null
 }

@@ -131,7 +131,10 @@ data class CorporateActionEntity(
     val holdingId: String,
     val kind: CorporateActionKind,
     val date: String,
-    val ratioNum: Int? = null,
-    val ratioDen: Int? = null,
+    /** For a split or bonus: new (or bonus) units per unit held, in micro-units (a 1:5 split is 5,000,000). */
+    val ratioMicro: Long? = null,
+    /** For a dividend: the gross amount, before TDS. */
     val amountPaise: Long? = null,
+    /** The ledger entry this action wrote, so reversing that entry also withdraws the action. */
+    val transactionId: String? = null,
 )

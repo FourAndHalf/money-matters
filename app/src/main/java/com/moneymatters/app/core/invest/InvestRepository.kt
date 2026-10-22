@@ -30,9 +30,9 @@ class InvestRepository(
 
     /** Every holding, lot, sale and price at one moment, re-read after any investment write. */
     fun snapshot(): Flow<InvestSnapshot> =
-        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices").map {
+        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions").map {
             database.withTransaction {
-                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices())
+                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions())
             }
         }
 
@@ -56,10 +56,16 @@ class InvestRepository(
     suspend fun importTrades(rows: List<TradeRow>, settlementAccountId: String, rules: CapitalGainsRules): Int = ledger.inTransaction {
         for (row in rows.inLedgerOrder()) {
             val holdingId = findOrCreateStock(row.symbol, row.isin, row.name)
+            when (row.side) {
+                TradeSide.Split -> { applyCorporateAction(holdingId, RestateKind.Split, row.units, row.date); continue }
+                TradeSide.Bonus -> { applyCorporateAction(holdingId, RestateKind.Bonus, row.units, row.date); continue }
+                else -> Unit
+            }
             val price = impliedPrice(row.units, row.amount)
             when (row.side) {
                 TradeSide.Buy -> buy(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Buy ${row.symbol}")
                 TradeSide.Sell -> sell(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Sell ${row.symbol}", rules.listedEquity(row.date))
+                TradeSide.Split, TradeSide.Bonus -> Unit
             }
         }
         rows.size
@@ -82,7 +88,70 @@ class InvestRepository(
     /** (symbol, holding id) for every holding that has a symbol. */
     suspend fun holdingSymbols(): List<Pair<String, String>> = dao.getAllHoldings().mapNotNull { h -> h.symbol?.let { it to h.id } }
 
-    /** Lots with what is still unsold, oldest first. */
+    /**
+     * Records a dividend: the net [amount] lands in [toAccountId], any [tds] withheld becomes a
+     * receivable to claim at tax time, and the gross is income. Counts towards the holding's return.
+     */
+    suspend fun recordDividend(
+        holdingId: String,
+        date: LocalDate,
+        amount: Paise,
+        tds: Paise,
+        toAccountId: String,
+        payee: String,
+    ): String {
+        require(amount.value > 0) { "A dividend's net amount must be positive" }
+        require(tds.value >= 0) { "TDS can't be negative" }
+        requireHolding(holdingId)
+        return ledger.inTransaction {
+            val income = ledger.createAccountIfAbsent("Income:Dividends", AccountType.Income)
+            val postings = mutableListOf(PostingLine(toAccountId, debit = amount), PostingLine(income, credit = amount + tds))
+            if (tds.value > 0) postings += PostingLine(ledger.createAccountIfAbsent(TDS_RECEIVABLE, AccountType.Asset), debit = tds)
+            val id = ledger.postTransaction(date, payee, postings)
+            dao.insertCorporateAction(CorporateActionEntity(newId(), holdingId, CorporateActionKind.Dividend, date.toString(), amountPaise = (amount + tds).value, transactionId = id))
+            id
+        }
+    }
+
+    /**
+     * Records a split or bonus as a balanced entry that moves no money (the holding's cost is debited
+     * and credited together) but carries the unit change, with the lots restated beside it. See [restate].
+     * Trades dated before it can no longer be entered, since their units would be in the wrong terms.
+     */
+    suspend fun applyCorporateAction(holdingId: String, kind: RestateKind, ratio: Units, date: LocalDate): String {
+        val holding = requireHolding(holdingId)
+        return ledger.inTransaction {
+            val plan = restate(openLots(holdingId), kind, ratio, date)
+            val held = openLots(holdingId).filter { !it.acquiredOn.isAfter(date) && it.remainingUnits.micro > 0 }
+            val cost = Paise(held.sumOf { it.remainingCost.value })
+            check(cost.value > 0) { "Can't restate a holding with no cost" }
+            val unitsAfter = Units(plan.created.sumOf { it.units.micro } + if (kind == RestateKind.Bonus) held.sumOf { it.remainingUnits.micro } else 0)
+            val unitsBefore = Units(held.sumOf { it.remainingUnits.micro })
+            val symbol = holding.symbol ?: "holding"
+            val label = if (kind == RestateKind.Split) "Split $symbol ×${formatUnits(ratio)}" else "Bonus $symbol +${formatUnits(ratio)} per unit"
+            val id = ledger.postTransaction(
+                date, label,
+                listOf(
+                    PostingLine(holding.accountId, debit = cost, units = unitsAfter),
+                    PostingLine(holding.accountId, credit = cost, units = unitsBefore),
+                ),
+            )
+            dao.insertConsumptions(plan.consumed.map { LotConsumptionEntity(lotId = it.lotId, saleTransactionId = id, units = it.units.micro, costPaise = it.cost.value) })
+            plan.created.forEach { dao.insertLot(LotEntity(newId(), holdingId, it.acquiredOn.toString(), it.units.micro, it.cost.value, sourceTransactionId = id)) }
+            dao.insertCorporateAction(
+                CorporateActionEntity(newId(), holdingId, if (kind == RestateKind.Split) CorporateActionKind.Split else CorporateActionKind.Bonus, date.toString(), ratioMicro = ratio.micro, transactionId = id),
+            )
+            id
+        }
+    }
+
+    private suspend fun requireNoLaterRestatement(holdingId: String, date: LocalDate) {
+        require(dao.restatementsAfter(holdingId, date.toString()) == 0) {
+            "A split or bonus is recorded after $date; reverse it first, or enter the trade in post-action units"
+        }
+    }
+
+    /** Lots that still have units unsold, oldest first, with what is left of each. */
     suspend fun openLots(holdingId: String): List<OpenLot> {
         val used = dao.consumptionsForHolding(holdingId).groupBy { it.lotId }
         return dao.lotsForHolding(holdingId).map { lot ->
@@ -93,7 +162,7 @@ class InvestRepository(
                 remainingUnits = Units(lot.units - consumed.sumOf { it.units }),
                 remainingCost = Paise(lot.costPaise - consumed.sumOf { it.costPaise }),
             )
-        }
+        }.filter { it.remainingUnits.micro > 0 }
     }
 
     suspend fun unitsHeld(holdingId: String): Units = openLots(holdingId).fold(Units.Zero) { acc, lot -> acc + lot.remainingUnits }
@@ -113,6 +182,7 @@ class InvestRepository(
     ): String {
         require(units.micro > 0) { "Units bought must be positive" }
         val holding = requireHolding(holdingId)
+        requireNoLaterRestatement(holdingId, date)
         return ledger.inTransaction {
             val id = ledger.postTransaction(
                 date, payee,
@@ -146,6 +216,7 @@ class InvestRepository(
     ): String {
         require(proceeds.value > 0) { "Sale proceeds must be positive" }
         val holding = requireHolding(holdingId)
+        requireNoLaterRestatement(holdingId, date)
         return ledger.inTransaction {
             val eligible = openLots(holdingId).filter { !it.acquiredOn.isAfter(date) }
             val consumed = allocateFifo(eligible, units)
@@ -188,6 +259,10 @@ data class InvestSnapshot(
     val lots: List<LotEntity>,
     val consumptions: List<LotConsumptionEntity>,
     val prices: List<PriceEntity>,
+    val corporateActions: List<CorporateActionEntity> = emptyList(),
 ) {
     companion object { val Empty = InvestSnapshot(emptyList(), emptyList(), emptyList(), emptyList()) }
 }
+
+/** Where tax withheld at source waits until it is claimed (plan.html: TDS receivable). */
+const val TDS_RECEIVABLE = "Assets:TDS Receivable"

@@ -38,6 +38,8 @@ fun HoldingDetailScreen(
     onSell: () -> Unit,
     onUpdatePrice: () -> Unit,
     modifier: Modifier = Modifier,
+    onDividend: () -> Unit = {},
+    onCorporateAction: () -> Unit = {},
 ) {
     val row = detail.row
     val margin = MoneyTheme.spacing.margin
@@ -59,6 +61,10 @@ fun HoldingDetailScreen(
                         Pill("Buy more", onBuy, style = PillStyle.Primary)
                         if (row.hasUnits) Pill("Sell", onSell)
                         Pill("Update price", onUpdatePrice)
+                    }
+                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Pill("Dividend", onDividend)
+                        Pill("Split / bonus", onCorporateAction)
                     }
                 }
             }
@@ -89,6 +95,21 @@ fun HoldingDetailScreen(
                                         Text(lot.cost.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink)
                                     }
                                 },
+                            )
+                        }
+                    }
+                }
+            }
+            if (detail.actions.isNotEmpty()) {
+                item("actions") {
+                    Module {
+                        ModuleHeader("Dividends & actions", subtitle = if (detail.dividendTotal.value > 0) "${detail.dividendTotal.formatInr()} received so far" else null)
+                        detail.actions.forEachIndexed { i, a ->
+                            ListRow(
+                                title = a.label,
+                                subtitle = a.dateLabel,
+                                divider = i < detail.actions.lastIndex,
+                                trailing = { a.amount?.let { Text(it.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink) } },
                             )
                         }
                     }

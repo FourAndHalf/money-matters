@@ -166,4 +166,21 @@ class InvestStateTest {
         assertEquals("+8.40%", formatPercent(0.084))
         assertEquals("-2.50%", formatPercent(-0.025))
     }
+
+    @Test fun `dividends and corporate actions are listed and dividends lift the return`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000)
+        price(100)
+        val withoutDividend = state().xirr
+        runBlocking {
+            invest.recordDividend(holding, LocalDate.of(2026, 6, 1), 160.rupees, 40.rupees, bank, "Dividend INFY")
+            invest.applyCorporateAction(holding, com.moneymatters.app.core.invest.RestateKind.Bonus, Units.whole(1), LocalDate.of(2026, 7, 1))
+        }
+        val s = state()
+        val detail = s.details.getValue(holding)
+        assertEquals(200.rupees, detail.dividendTotal)
+        assertEquals(listOf("Bonus 1 per unit", "Dividend"), detail.actions.map { it.label })
+        assertEquals(200.rupees, detail.actions.last().amount)
+        assertTrue("a 20% dividend should raise a flat-price return", detail.xirr!! > (withoutDividend ?: 0.0))
+        assertEquals("20", s.holdings.single().unitsLabel)
+    }
 }
