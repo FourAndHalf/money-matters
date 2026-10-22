@@ -2,6 +2,7 @@ package com.moneymatters.app.feature.books
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.moneymatters.app.core.invest.InvestRepository
 import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
@@ -26,7 +27,7 @@ class BooksViewModelTest {
     @Test fun `screens rebuild after every ledger write`() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), MoneyMattersDatabase::class.java).build()
         val repo = LedgerRepository(db)
-        val books = BooksViewModel(repo, monthStartDay = { 1 }, today = { LocalDate.of(2026, 10, 20) }).books
+        val books = BooksViewModel(repo, InvestRepository(db, repo), monthStartDay = { 1 }, today = { LocalDate.of(2026, 10, 20) }).books
 
         withTimeout(10_000) {
             assertEquals(0, books.filterNotNull().first().accounts.groups.size)

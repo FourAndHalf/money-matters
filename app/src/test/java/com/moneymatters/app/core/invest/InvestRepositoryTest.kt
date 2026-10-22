@@ -152,4 +152,71 @@ class InvestRepositoryTest {
         assertNull(runBlocking { db.investDao().getFixedDeposit(bank) })
         assertNotNull(db.investDao().holdingForAccount(stockAccount))
     }
+
+    private val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
+
+    private fun trades(vararg lines: String) = parseTrades("date,symbol,type,units,amount\n" + lines.joinToString("\n")).rows
+
+    @Test fun `an import creates holdings, lots and sales against opening equity without touching the bank`() = runBlocking {
+        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
+        val count = invest.importTrades(
+            trades("2025-01-10,TCS,buy,10,40000", "2025-06-01,TCS,buy,5,21000", "2026-03-01,TCS,sell,12,60000", "2025-02-01,WIPRO,buy,100,25000"),
+            equity, rules,
+        )
+        assertEquals(4, count)
+        assertEquals(Paise.Zero, ledger.accountBalance(bank))
+        val tcs = db.investDao().holdingBySymbol("tcs")!!
+        assertEquals(Units.whole(3), invest.unitsHeld(tcs.id))
+        // 12 sold FIFO: 10 from the first lot (₹40,000) and 2 from the second (₹8,400): cost left on 3 units is ₹12,600.
+        assertEquals(12_600.rupees, ledger.accountBalance(tcs.accountId))
+        assertEquals(Units.whole(100), invest.unitsHeld(db.investDao().holdingBySymbol("WIPRO")!!.id))
+        val snapshot = ledger.snapshot().first()
+        snapshot.postings.groupBy { it.transactionId }.values.forEach { legs ->
+            assertEquals(legs.sumOf { it.debitPaise ?: 0 }, legs.sumOf { it.creditPaise ?: 0 })
+        }
+    }
+
+    @Test fun `importing again by ISIN or symbol reuses the holding instead of creating another`() = runBlocking {
+        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
+        invest.importTrades(trades("2025-01-10,TCS,buy,10,40000"), equity, rules)
+        invest.importTrades(trades("2025-02-10,tcs,buy,5,21000"), equity, rules)
+        assertEquals(1, db.investDao().getAllHoldings().count { it.symbol == "TCS" })
+        assertEquals(Units.whole(15), invest.unitsHeld(db.investDao().holdingBySymbol("TCS")!!.id))
+    }
+
+    @Test fun `an import with an impossible sale changes nothing at all`() = runBlocking {
+        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
+        val accountsBefore = ledger.snapshot().first().accounts.size
+        assertThrows(InsufficientUnitsException::class.java) {
+            runBlocking { invest.importTrades(trades("2025-01-10,TCS,buy,10,40000", "2025-03-01,TCS,sell,11,50000"), equity, rules) }
+        }
+        val after = ledger.snapshot().first()
+        assertEquals(accountsBefore, after.accounts.size)
+        assertEquals(0, after.transactions.size)
+        assertEquals(0, db.investDao().getAllLots().size)
+        assertNull(db.investDao().holdingBySymbol("TCS"))
+    }
+
+    @Test fun `a posting on a holding account without units is refused, so Quick Add cannot desync lots`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                ledger.postTransaction(
+                    LocalDate.of(2025, 1, 10), "Plain transfer",
+                    listOf(PostingLine(stockAccount, debit = 500.rupees), PostingLine(bank, credit = 500.rupees)),
+                )
+            }
+        }
+        assertEquals(Paise.Zero, runBlocking { ledger.accountBalance(stockAccount) })
+    }
+
+    @Test fun `the snapshot lists holding accounts so pickers can leave them out`() = runBlocking {
+        assertEquals(setOf(stockAccount), ledger.snapshot().first().holdingAccountIds)
+    }
+
+    @Test fun `an account can be taken out of net worth and put back`() = runBlocking {
+        ledger.setInNetWorth(bank, false)
+        assertEquals(false, db.ledgerDao().getAccount(bank)!!.inNetWorth)
+        ledger.setInNetWorth(bank, true)
+        assertEquals(true, db.ledgerDao().getAccount(bank)!!.inNetWorth)
+    }
 }

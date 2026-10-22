@@ -94,12 +94,21 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
 private fun AccountRow(account: AccountEntity, isEssential: Boolean, viewModel: SettingsViewModel, divider: Boolean) {
     ListRow(
         title = account.displayName(),
-        subtitle = account.type.name + if (account.isArchived) " · archived" else "",
+        subtitle = account.type.name + (if (account.isArchived) " · archived" else "") + (if (!account.inNetWorth) " · not in net worth" else ""),
         divider = divider,
         trailing = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (account.type == AccountType.Expense) {
                     Toggle(isEssential, onCheckedChange = { viewModel.toggleEssential(account.displayName()) })
+                }
+                if (account.type == AccountType.Asset) {
+                    // e.g. EPF: tracked, but kept out of net worth, the wealth goal and runway.
+                    Pill(
+                        if (account.inNetWorth) "In net worth" else "Excluded",
+                        onClick = { viewModel.setInNetWorth(account.id, !account.inNetWorth) },
+                        style = if (account.inNetWorth) PillStyle.Secondary else PillStyle.Primary,
+                        height = 28.dp,
+                    )
                 }
                 Pill(
                     if (account.isArchived) "Unarchive" else "Archive",

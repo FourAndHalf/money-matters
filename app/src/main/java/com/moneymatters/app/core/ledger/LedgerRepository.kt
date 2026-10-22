@@ -17,6 +17,8 @@ data class LedgerSnapshot(
     val transactions: List<TransactionEntity>,
     val postings: List<PostingEntity>,
     val audit: List<AuditLogEntity>,
+    /** Accounts that are stock/fund holdings; their postings must carry units, so Quick Add keeps them out of its pickers. */
+    val holdingAccountIds: Set<String> = emptySet(),
 )
 
 /** The optional P04 tags on a transaction; none affect balances. */
@@ -55,9 +57,12 @@ class LedgerRepository(
      * a snapshot never holds a transaction without its postings. Fine at personal scale; page it if it ever isn't.
      */
     fun snapshot(): Flow<LedgerSnapshot> =
-        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log").map {
+        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log", "holdings").map {
             database.withTransaction {
-                LedgerSnapshot(dao.getAllAccounts(), dao.getAllTransactions(), dao.getAllPostings(), dao.getAllAuditLog())
+                LedgerSnapshot(
+                    dao.getAllAccounts(), dao.getAllTransactions(), dao.getAllPostings(), dao.getAllAuditLog(),
+                    database.investDao().getAllHoldings().map { it.accountId }.toSet(),
+                )
             }
         }
 
@@ -73,6 +78,12 @@ class LedgerRepository(
     suspend fun archiveAccount(id: String) {
         val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
         dao.updateAccount(account.copy(isArchived = true))
+    }
+
+    /** Counts an account in (or leaves it out of) net worth, e.g. EPF (Settings → account editor). */
+    suspend fun setInNetWorth(id: String, inNetWorth: Boolean) {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        dao.updateAccount(account.copy(inNetWorth = inNetWorth))
     }
 
     suspend fun unarchiveAccount(id: String) {
@@ -111,6 +122,7 @@ class LedgerRepository(
             "A new transaction must start Draft or Posted, not $status"
         }
         validateBalanced(postings)
+        requireUnitsOnHoldingLegs(postings)
         val id = newId()
         database.withTransaction {
             dao.insertTransaction(TransactionEntity(id, date.toString(), payee, memo, status, tags.decision, tags.plan, tags.paymentMethod))
@@ -137,6 +149,7 @@ class LedgerRepository(
             throw IllegalLifecycleTransitionException("An investment entry's units and lots can't be edited in place; reverse it and enter it again")
         }
         validateBalanced(postings)
+        requireUnitsOnHoldingLegs(postings)
         database.withTransaction {
             dao.updateTransaction(
                 existing.copy(
@@ -208,6 +221,7 @@ class LedgerRepository(
             )
         }
         validateBalanced(postings)
+        requireUnitsOnHoldingLegs(postings)
         val id = newId()
         database.withTransaction {
             dao.insertTransaction(TransactionEntity(id, date.toString(), payee, memo, TransactionStatus.PriorPeriodAdjustment))
@@ -235,6 +249,15 @@ class LedgerRepository(
 
     private suspend fun requireTransaction(id: String) =
         dao.getTransaction(id) ?: throw NoSuchElementException("No transaction with id $id")
+
+    /** A stock or fund holding's postings must carry units, or its lots and its ledger balance would drift apart. */
+    private suspend fun requireUnitsOnHoldingLegs(postings: List<PostingLine>) {
+        for (p in postings) {
+            require(p.units != null || database.investDao().holdingForAccount(p.accountId) == null) {
+                "Posting on holding account ${p.accountId} needs units; use the Invest tab to buy or sell"
+            }
+        }
+    }
 
     private fun validateBalanced(postings: List<PostingLine>) {
         require(postings.size >= 2) { "A transaction needs at least two postings, got ${postings.size}" }

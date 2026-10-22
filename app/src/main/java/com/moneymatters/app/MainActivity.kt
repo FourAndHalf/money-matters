@@ -20,12 +20,15 @@ import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.moneymatters.app.core.invest.CapitalGainsRules
+import com.moneymatters.app.core.invest.InvestRepository
 import com.moneymatters.app.core.ledger.LedgerDatabaseProvider
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.profile.ProfileStore
 import com.moneymatters.app.core.security.BiometricUnlock
 import com.moneymatters.app.core.security.PasscodeStore
 import com.moneymatters.app.feature.books.BooksViewModel
+import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.lock.AppLock
 import com.moneymatters.app.feature.lock.LockScreen
 import com.moneymatters.app.feature.onboarding.OnboardingSaver
@@ -48,12 +51,15 @@ class MainActivity : ComponentActivity() {
     private val onboarding: OnboardingWizard by viewModels()
     private val profiles by lazy { ProfileStore.encrypted(applicationContext) }
     private val passcodes by lazy { PasscodeStore.encrypted(applicationContext) }
+    private val ledgerRepo by lazy { LedgerRepository(LedgerDatabaseProvider.get(applicationContext)) }
+    private val investRepo by lazy { InvestRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo) }
     private val booksModel: BooksViewModel by viewModels {
         viewModelFactory {
-            initializer {
-                BooksViewModel(LedgerRepository(LedgerDatabaseProvider.get(applicationContext)), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 })
-            }
+            initializer { BooksViewModel(ledgerRepo, investRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) }
         }
+    }
+    private val investModel: InvestViewModel by viewModels {
+        viewModelFactory { initializer { InvestViewModel(ledgerRepo, investRepo, CapitalGainsRules.load(applicationContext)) } }
     }
     private val appLock: AppLock by viewModels {
         viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet()) } }
@@ -132,7 +138,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel) }
                     }
                 }
             }
