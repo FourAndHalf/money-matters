@@ -3,6 +3,7 @@ package com.moneymatters.app.feature.invest
 import androidx.compose.runtime.Immutable
 import com.moneymatters.app.core.invest.CapitalGainsRules
 import com.moneymatters.app.core.invest.CashFlow
+import com.moneymatters.app.core.invest.CorporateActionKind
 import com.moneymatters.app.core.invest.GainTerm
 import com.moneymatters.app.core.invest.HoldingValuation
 import com.moneymatters.app.core.invest.InvestSnapshot
@@ -55,6 +56,10 @@ data class HoldingTxn(val id: String, val dateLabel: String, val isBuy: Boolean,
 @Immutable
 data class PricePoint(val dateLabel: String, val priceLabel: String, val source: String, val tag: PriceTag)
 
+/** A dividend, split or bonus on a holding; [amount] is the gross dividend, null for a split or bonus. */
+@Immutable
+data class ActionRow(val dateLabel: String, val label: String, val amount: Paise?)
+
 @Immutable
 data class HoldingDetail(
     val row: HoldingRow,
@@ -62,6 +67,8 @@ data class HoldingDetail(
     val transactions: List<HoldingTxn>,
     val prices: List<PricePoint>,
     val xirr: Double?,
+    val actions: List<ActionRow> = emptyList(),
+    val dividendTotal: Paise = Paise.Zero,
 )
 
 /** Everything the Invest tab (P13) and holding detail (P14) render, built from the same snapshots as the rest of the app. */
@@ -110,8 +117,9 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
     val flows = mutableListOf<CashFlow>()
     val details = valued.associate { v ->
         val own = holdingFlows(ledger, v.holding.accountId)
-        flows += own.map { it.second }
-        v.holding.id to detailFor(v, rowsById.getValue(v.holding.id), own, ledger, invest, today, rules)
+        val dividends = dividendFlows(invest, v.holding.id)
+        flows += own.map { it.second } + dividends
+        v.holding.id to detailFor(v, rowsById.getValue(v.holding.id), own, dividends, ledger, invest, today, rules)
     }
 
     val held = valued.filter { it.units.micro > 0 }
@@ -155,6 +163,7 @@ private fun detailFor(
     v: HoldingValuation,
     row: HoldingRow,
     flows: List<Pair<String, CashFlow>>,
+    dividends: List<CashFlow>,
     ledger: LedgerSnapshot,
     invest: InvestSnapshot,
     today: LocalDate,
@@ -191,11 +200,25 @@ private fun detailFor(
         PricePoint(LocalDate.parse(it.date).format(DayMonthYear), formatUnitPrice(it.price), it.source, it.status.tag())
     }
     // A holding still held needs a price for today's value; one fully sold is measured on its flows alone.
-    val allFlows = flows.map { it.second }
+    val allFlows = flows.map { it.second } + dividends
     val xirr = when {
         v.units.micro == 0L -> xirr(allFlows)
         v.marketValue != null -> xirr(allFlows + CashFlow(today, v.marketValue))
         else -> null
     }
-    return HoldingDetail(row, lots, txns, prices, xirr)
+    val actions = invest.corporateActions.filter { it.holdingId == v.holding.id }.sortedByDescending { it.date }.map {
+        val date = LocalDate.parse(it.date).format(DayMonthYear)
+        when (it.kind) {
+            CorporateActionKind.Dividend -> ActionRow(date, "Dividend", Paise(it.amountPaise ?: 0))
+            CorporateActionKind.Split -> ActionRow(date, "Split ×${formatUnits(Units(it.ratioMicro ?: 0))}", null)
+            CorporateActionKind.Bonus -> ActionRow(date, "Bonus ${formatUnits(Units(it.ratioMicro ?: 0))} per unit", null)
+        }
+    }
+    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }))
 }
+
+/** A dividend is money the holding paid out, so it counts as an inflow on its date (gross: net received plus TDS to be claimed). */
+private fun dividendFlows(invest: InvestSnapshot, holdingId: String): List<CashFlow> =
+    invest.corporateActions
+        .filter { it.holdingId == holdingId && it.kind == CorporateActionKind.Dividend }
+        .map { CashFlow(LocalDate.parse(it.date), Paise(it.amountPaise ?: 0)) }

@@ -23,8 +23,11 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.feature.accounts.AccountLedgerScreen
 import com.moneymatters.app.feature.accounts.AccountsScreen
 import com.moneymatters.app.feature.dashboard.HomeScreen
+import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.feature.books.BooksState
+import com.moneymatters.app.feature.invest.ActionScreen
+import com.moneymatters.app.feature.invest.DividendScreen
 import com.moneymatters.app.feature.invest.HoldingDetailScreen
 import com.moneymatters.app.feature.invest.ImportScreen
 import com.moneymatters.app.feature.invest.InvestScreen
@@ -57,7 +60,7 @@ private const val ACCOUNTS_TAB = 2
 private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
 
-private enum class InvestOverlay { Trade, Price, Import }
+private enum class InvestOverlay { Trade, Price, Import, Dividend, Action }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
@@ -99,6 +102,14 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 BackHandler { investOverlay = null; invest.resetImport() }
                 ImportScreen(invest, onClose = { investOverlay = null; invest.resetImport() })
             }
+            investOverlay == InvestOverlay.Dividend -> {
+                BackHandler { investOverlay = null; invest.dividendForm = null }
+                DividendScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), symbol = openHolding?.row?.symbol.orEmpty(), onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.Action -> {
+                BackHandler { investOverlay = null; invest.actionForm = null }
+                ActionScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+            }
             openHolding != null -> {
                 BackHandler { openHoldingId = null }
                 HoldingDetailScreen(
@@ -107,6 +118,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     onBuy = { invest.startTrade(TradeSide.Buy, openHolding.row.id); investOverlay = InvestOverlay.Trade },
                     onSell = { invest.startTrade(TradeSide.Sell, openHolding.row.id); investOverlay = InvestOverlay.Trade },
                     onUpdatePrice = { invest.startPrice(openHolding.row.id); investOverlay = InvestOverlay.Price },
+                    onDividend = { invest.startDividend(openHolding.row.id); investOverlay = InvestOverlay.Dividend },
+                    onCorporateAction = { invest.startAction(openHolding.row.id, RestateKind.Split); investOverlay = InvestOverlay.Action },
                 )
             }
             // Drilling into an account, a transaction or Quick Add hides the tab bar.

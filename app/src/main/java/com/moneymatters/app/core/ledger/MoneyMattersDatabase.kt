@@ -1,6 +1,8 @@
 package com.moneymatters.app.core.ledger
 
 import androidx.room.AutoMigration
+import androidx.room.DeleteColumn
+import androidx.room.migration.AutoMigrationSpec
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
@@ -54,18 +56,24 @@ class LedgerConverters {
     @TypeConverter fun toCorporateActionKind(value: String) = CorporateActionKind.valueOf(value)
 }
 
+@DeleteColumn(tableName = "corporate_actions", columnName = "ratioNum")
+@DeleteColumn(tableName = "corporate_actions", columnName = "ratioDen")
+class CorporateActionsV4 : AutoMigrationSpec
+
 @Database(
     entities = [
         AccountEntity::class, TransactionEntity::class, PostingEntity::class, AuditLogEntity::class,
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class,
     ],
-    version = 3,
+    version = 4,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
         // v3: investments (holdings, lots, prices, FDs, SIP plans, corporate actions), units on postings, accounts' inNetWorth.
         AutoMigration(from = 2, to = 3),
+        // v4: corporate actions carry a ratio and their ledger entry instead of a num/den pair.
+        AutoMigration(from = 3, to = 4, spec = CorporateActionsV4::class),
     ],
 )
 @TypeConverters(LedgerConverters::class)

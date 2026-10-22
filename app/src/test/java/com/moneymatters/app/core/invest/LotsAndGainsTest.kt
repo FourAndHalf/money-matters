@@ -70,4 +70,31 @@ class LotsAndGainsTest {
         )
         assertEquals(Paise(100), splitGain(Paise(100), three, LocalDate.of(2026, 6, 1), rule).single().gain)
     }
+
+    @Test fun `a split multiplies each lot's units, keeping its cost and purchase date`() {
+        val plan = restate(listOf(a, b), RestateKind.Split, Units.whole(5), LocalDate.of(2026, 1, 1))
+        assertEquals(listOf(Consumption("a", Units.whole(10), 1_000.rupees), Consumption("b", Units.whole(10), 1_200.rupees)), plan.consumed)
+        assertEquals(
+            listOf(NewLot(a.acquiredOn, Units.whole(50), 1_000.rupees), NewLot(b.acquiredOn, Units.whole(50), 1_200.rupees)),
+            plan.created,
+        )
+    }
+
+    @Test fun `a bonus adds one zero-cost lot dated at allotment and leaves the others`() {
+        val plan = restate(listOf(a, b), RestateKind.Bonus, Units(500_000), LocalDate.of(2026, 1, 1))
+        assertEquals(emptyList<Consumption>(), plan.consumed)
+        assertEquals(listOf(NewLot(LocalDate.of(2026, 1, 1), Units.whole(10), Paise.Zero)), plan.created)
+    }
+
+    @Test fun `a corporate action only touches lots bought on or before its date, and needs something held`() {
+        val plan = restate(listOf(a, b), RestateKind.Split, Units.whole(2), LocalDate.of(2025, 3, 1))
+        assertEquals(listOf("a"), plan.consumed.map { it.lotId })
+        assertThrows(IllegalArgumentException::class.java) { restate(listOf(a), RestateKind.Split, Units.whole(2), LocalDate.of(2024, 1, 1)) }
+        assertThrows(IllegalArgumentException::class.java) { restate(listOf(a), RestateKind.Split, Units.Zero, LocalDate.of(2026, 1, 1)) }
+    }
+
+    @Test fun `scaling units rounds half up`() {
+        assertEquals(Units(1_500_000), scaleUnits(Units(1_000_000), Units(1_500_000)))
+        assertEquals(Units(2), scaleUnits(Units(3), Units(500_000))) // 1.5 micro-units → 2
+    }
 }

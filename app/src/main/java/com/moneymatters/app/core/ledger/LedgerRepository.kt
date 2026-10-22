@@ -199,6 +199,7 @@ class LedgerRepository(
             // A reversed sale gives its lots their units back; a reversed purchase takes its (unused) lots away.
             invest.deleteConsumptionsForSale(transactionId)
             createdLots.forEach { invest.deleteLot(it.id) }
+            invest.deleteCorporateActionsForTransaction(transactionId)
             audit(reversalId, "Reversal", "Reverses $transactionId: $reason")
             audit(transactionId, "Reversed", "Reversed by $reversalId: $reason")
         }

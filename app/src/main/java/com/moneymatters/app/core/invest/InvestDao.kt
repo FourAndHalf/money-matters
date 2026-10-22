@@ -71,4 +71,13 @@ interface InvestDao {
     @Insert suspend fun insertSipPlan(plan: SipPlanEntity)
 
     @Insert suspend fun insertCorporateAction(action: CorporateActionEntity)
+
+    @Query("SELECT * FROM corporate_actions ORDER BY date, id")
+    suspend fun getAllCorporateActions(): List<CorporateActionEntity>
+
+    @Query("DELETE FROM corporate_actions WHERE transactionId = :transactionId")
+    suspend fun deleteCorporateActionsForTransaction(transactionId: String)
+
+    @Query("SELECT COUNT(*) FROM corporate_actions WHERE holdingId = :holdingId AND kind IN ('Split', 'Bonus') AND date > :date")
+    suspend fun restatementsAfter(holdingId: String, date: String): Int
 }

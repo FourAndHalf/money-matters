@@ -98,4 +98,36 @@ class TradeImportTest {
         assertEquals("12.5", formatUnits(Units(12_500_000)))
         assertEquals("0.000001", formatUnits(Units(1)))
     }
+
+    @Test fun `split and bonus rows need a ratio but no amount`() {
+        val parsed = parseTrades("$header\n2025-01-10,INFY,buy,10,1000\n2025-06-01,INFY,split,5,\n2025-07-01,INFY,bonus,0.5,")
+        assertEquals(emptyList<RowError>(), parsed.errors)
+        assertEquals(listOf(TradeSide.Buy, TradeSide.Split, TradeSide.Bonus), parsed.rows.map { it.side })
+        assertEquals(Paise.Zero, parsed.rows[1].amount)
+        assertEquals(Units(500_000), parsed.rows[2].units)
+        assertEquals(1, parseTrades("$header\n2025-06-01,INFY,split,0,").errors.size)
+    }
+
+    @Test fun `preview carries a split and a bonus through the lots so a later sale is checked in new units`() {
+        val rows = parseTrades(
+            """
+            $header
+            2025-01-10,INFY,buy,10,1000
+            2025-06-01,INFY,split,5,
+            2025-07-01,INFY,bonus,1,
+            2026-03-01,INFY,sell,95,9000
+            """.trimIndent(),
+        ).rows
+        val preview = previewTrades(rows)
+        assertEquals(emptyList<RowError>(), preview.errors)
+        // 10 → 50 after the split → 100 with a 1:1 bonus; selling 95 leaves 5.
+        assertEquals(Units.whole(5), preview.symbols.single().unitsHeld)
+    }
+
+    @Test fun `a split with nothing held is reported, and a trade on the day of a split is read in the new terms`() {
+        assertEquals(1, previewTrades(parseTrades("$header\n2025-06-01,INFY,split,5,").rows).errors.size)
+        val sameDay = parseTrades("$header\n2025-01-10,INFY,buy,10,1000\n2025-06-01,INFY,buy,5,900\n2025-06-01,INFY,split,2,").rows
+        // The split comes first on its day, so it doubles only the January lot: 20 + 5.
+        assertEquals(Units.whole(25), previewTrades(sameDay).symbols.single().unitsHeld)
+    }
 }

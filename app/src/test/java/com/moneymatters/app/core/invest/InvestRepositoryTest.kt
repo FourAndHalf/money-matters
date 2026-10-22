@@ -219,4 +219,90 @@ class InvestRepositoryTest {
         ledger.setInNetWorth(bank, true)
         assertEquals(true, db.ledgerDao().getAccount(bank)!!.inNetWorth)
     }
+
+    // ---- dividends and corporate actions ----
+
+    @Test fun `a dividend pays the net into the account, keeps the TDS as a receivable and books the gross as income`() = runBlocking {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000.rupees)
+        val id = invest.recordDividend(holding, LocalDate.of(2026, 6, 1), 1_800.rupees, 200.rupees, bank, "Dividend INFY")
+        val snapshot = ledger.snapshot().first()
+        val byName = snapshot.accounts.associateBy { it.name }
+        assertEquals((-1_000 + 1_800).rupees, ledger.accountBalance(bank))
+        assertEquals(200.rupees, ledger.accountBalance(byName.getValue(TDS_RECEIVABLE).id))
+        assertEquals((-2_000).rupees, ledger.accountBalance(byName.getValue("Income:Dividends").id))
+        val legs = snapshot.postings.filter { it.transactionId == id }
+        assertEquals(legs.sumOf { it.debitPaise ?: 0 }, legs.sumOf { it.creditPaise ?: 0 })
+        val action = db.investDao().getAllCorporateActions().single()
+        assertEquals(CorporateActionKind.Dividend, action.kind)
+        assertEquals(2_000_00L, action.amountPaise)
+    }
+
+    @Test fun `a dividend with no tax needs no receivable account`() = runBlocking {
+        invest.recordDividend(holding, LocalDate.of(2026, 6, 1), 500.rupees, Paise.Zero, bank, "Dividend INFY")
+        assertNull(ledger.accountIdByName(TDS_RECEIVABLE))
+    }
+
+    @Test fun `a split posts a no-money entry, multiplies the units and keeps cost and holding period`() = runBlocking {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000.rupees)
+        val id = invest.applyCorporateAction(holding, RestateKind.Split, Units.whole(5), LocalDate.of(2026, 1, 1))
+        assertEquals(Units.whole(50), invest.unitsHeld(holding))
+        assertEquals(1_000.rupees, ledger.accountBalance(stockAccount)) // cost unchanged
+        assertEquals((-1_000).rupees, ledger.accountBalance(bank))      // no money moved
+        val lot = invest.openLots(holding).single()
+        assertEquals(LocalDate.of(2025, 1, 10), lot.acquiredOn)
+        assertEquals(1_000.rupees, lot.remainingCost)
+        val snapshot = ledger.snapshot().first()
+        val ledgerUnits = snapshot.postings.filter { it.accountId == stockAccount }.sumOf { if (it.debitPaise != null) it.units ?: 0 else -(it.units ?: 0) }
+        assertEquals(Units.whole(50).micro, ledgerUnits)
+        assertEquals(1, snapshot.postings.count { it.transactionId == id && it.debitPaise != null })
+    }
+
+    @Test fun `a bonus adds a zero-cost lot that starts its own holding period`() = runBlocking {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000.rupees)
+        invest.applyCorporateAction(holding, RestateKind.Bonus, Units.whole(1), LocalDate.of(2026, 1, 1))
+        assertEquals(Units.whole(20), invest.unitsHeld(holding))
+        val lots = invest.openLots(holding)
+        assertEquals(listOf(LocalDate.of(2025, 1, 10), LocalDate.of(2026, 1, 1)), lots.map { it.acquiredOn })
+        assertEquals(listOf(1_000.rupees, Paise.Zero), lots.map { it.remainingCost })
+        assertEquals(1_000.rupees, ledger.accountBalance(stockAccount))
+    }
+
+    @Test fun `selling after a split uses the restated lots and splits the gain`() = runBlocking {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000.rupees)
+        invest.applyCorporateAction(holding, RestateKind.Split, Units.whole(5), LocalDate.of(2025, 6, 1))
+        sell(LocalDate.of(2026, 3, 1), 25, 900.rupees) // half the 50 units: cost 500, proceeds 900
+        assertEquals(Units.whole(25), invest.unitsHeld(holding))
+        assertEquals(500.rupees, ledger.accountBalance(stockAccount))
+        assertEquals(Paise(-40_000), ledger.accountBalance(ledger.accountIdByName("Income:Capital Gains:LTCG:Equity")!!))
+    }
+
+    @Test fun `a trade dated before a recorded split is refused`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000.rupees)
+        runBlocking { invest.applyCorporateAction(holding, RestateKind.Split, Units.whole(5), LocalDate.of(2025, 6, 1)) }
+        assertThrows(IllegalArgumentException::class.java) { buy(LocalDate.of(2025, 3, 1), 1, 100.rupees) }
+        assertThrows(IllegalArgumentException::class.java) { sell(LocalDate.of(2025, 5, 1), 1, 100.rupees) }
+        buy(LocalDate.of(2025, 6, 1), 1, 100.rupees) // on the day is fine: it is in the new terms
+    }
+
+    @Test fun `reversing a split restores the original lots and lifts the date restriction`() = runBlocking {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000.rupees)
+        val id = invest.applyCorporateAction(holding, RestateKind.Split, Units.whole(5), LocalDate.of(2025, 6, 1))
+        ledger.reconcile(id)
+        ledger.reverse(id, "wrong ratio")
+        assertEquals(Units.whole(10), invest.unitsHeld(holding))
+        assertEquals(0, db.investDao().getAllCorporateActions().size)
+        buy(LocalDate.of(2025, 3, 1), 1, 100.rupees)
+        Unit
+    }
+
+    @Test fun `an import replays a split and a bonus in date order`() = runBlocking {
+        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
+        invest.importTrades(
+            trades("2025-01-10,TCS,buy,10,40000", "2025-06-01,TCS,split,5,", "2025-07-01,TCS,bonus,1,", "2026-03-01,TCS,sell,95,90000"),
+            equity, rules,
+        )
+        val tcs = db.investDao().holdingBySymbol("TCS")!!
+        assertEquals(Units.whole(5), invest.unitsHeld(tcs.id))
+        assertEquals(listOf(CorporateActionKind.Split, CorporateActionKind.Bonus), db.investDao().getAllCorporateActions().map { it.kind })
+    }
 }

@@ -90,7 +90,7 @@ internal fun ImportContent(
         ) {
             item("help") {
                 Module {
-                    ModuleHeader("Your trade history", subtitle = "A CSV with the columns date, symbol, type, units, amount (and optionally isin, name). Type is buy or sell; amount is the net ₹ paid or received after all charges.")
+                    ModuleHeader("Your trade history", subtitle = "A CSV with the columns date, symbol, type, units, amount (and optionally isin, name). Type is buy or sell; amount is the net ₹ paid or received after all charges. For a split or bonus, type it as split or bonus and put the ratio in units.")
                     Text(
                         "Trades are recorded as history against opening balances, so no bank balance changes. Every lot and past sale is rebuilt oldest-first. If any row is wrong, nothing is imported.",
                         style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted,

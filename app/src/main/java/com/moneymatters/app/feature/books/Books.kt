@@ -265,6 +265,9 @@ private fun summarize(t: TransactionEntity, postings: List<PostingEntity>, accou
     val (amount, accountName, category) = if (other.isNotEmpty()) {
         val net = real.sumOf { (_, p) -> (p.debitPaise ?: 0) - (p.creditPaise ?: 0) }
         Triple(net, real.joinToString(", ") { it.first.name }, other.joinToString(", ") { it.first.displayName() })
+    } else if (real.map { it.first.id }.distinct().size == 1) {
+        // Both legs on one account: a split or bonus, which restates units and moves no money.
+        Triple(0L, real.first().first.name, "Corporate action")
     } else {
         val from = real.filter { it.second.creditPaise != null }
         val to = real.filter { it.second.debitPaise != null }

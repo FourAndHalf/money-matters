@@ -64,7 +64,7 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(3, db.openHelper.readableDatabase.version) // 1 → 2 → 3 in one open
+            assertEquals(4, db.openHelper.readableDatabase.version) // 1 → 2 → 3 → 4 in one open
         }
         db.close()
     }
@@ -85,7 +85,26 @@ class MigrationTest {
             assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
             assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
             assertNull(db.investDao().holdingForAccount("bank"))
-            assertEquals(3, db.openHelper.readableDatabase.version)
+            assertEquals(4, db.openHelper.readableDatabase.version)
+        }
+        db.close()
+    }
+
+    @Test fun `v3 to v4 keeps corporate actions and gives them a ratio and an entry link`() {
+        createDatabase(3).apply {
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind, inNetWorth) VALUES ('a1', 'Infosys', 'Asset', NULL, 0, 'Investment', 1)")
+            execSQL("INSERT INTO holdings (id, accountId, instrument, symbol) VALUES ('h1', 'a1', 'Stock', 'INFY')")
+            execSQL("INSERT INTO corporate_actions (id, holdingId, kind, date, ratioNum, ratioDen, amountPaise) VALUES ('c1', 'h1', 'Dividend', '2026-06-01', NULL, NULL, 180000)")
+            close()
+        }
+
+        val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
+        runBlocking {
+            val action = db.investDao().getAllCorporateActions().single()
+            assertEquals(180_000L, action.amountPaise)
+            assertNull(action.ratioMicro)
+            assertNull(action.transactionId)
+            assertEquals(4, db.openHelper.readableDatabase.version)
         }
         db.close()
     }

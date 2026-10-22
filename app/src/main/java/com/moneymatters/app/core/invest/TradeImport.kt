@@ -8,9 +8,14 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
-enum class TradeSide { Buy, Sell }
+/**
+ * What a trade-history row does. Splits and bonuses come first so that, on the day they take effect,
+ * the day's trades are read as being in the new terms. For those two, `units` holds the ratio (new units per old
+ * for a split, bonus units per unit held for a bonus) and `amount` is unused.
+ */
+enum class TradeSide { Split, Bonus, Buy, Sell }
 
-/** One line of a broker's trade history: [amount] is the net rupee figure paid or received, after every charge. */
+/** One line of a broker's trade history: [amount] is the net rupee figure paid or received, after every charge (zero for a split or bonus). */
 data class TradeRow(
     val line: Int,
     val date: LocalDate,
@@ -57,15 +62,18 @@ fun parseTrades(csv: String): TradeParse {
         val side = when (cell("type")?.lowercase()) {
             "buy", "b" -> TradeSide.Buy
             "sell", "s" -> TradeSide.Sell
+            "split" -> TradeSide.Split
+            "bonus" -> TradeSide.Bonus
             else -> null
         }
+        val corporateAction = side == TradeSide.Split || side == TradeSide.Bonus
         val units = cell("units")?.let(::parseUnits)?.takeIf { it.micro > 0 }
-        val amount = cell("amount")?.let(::parseRupees)?.takeIf { it.value > 0 }
+        val amount = if (corporateAction) Paise.Zero else cell("amount")?.let(::parseRupees)?.takeIf { it.value > 0 }
         val problem = when {
             date == null -> "Date isn't valid (use yyyy-MM-dd or dd-MM-yyyy)"
             symbol == null -> "Symbol is missing"
-            side == null -> "Type must be buy or sell"
-            units == null -> "Units must be a positive number with at most 6 decimals"
+            side == null -> "Type must be buy, sell, split or bonus"
+            units == null -> "Units (or the split/bonus ratio) must be a positive number with at most 6 decimals"
             amount == null -> "Amount must be a positive rupee figure with at most 2 decimals"
             else -> null
         }
@@ -121,6 +129,16 @@ fun previewTrades(rows: List<TradeRow>, existing: Map<String, List<OpenLot>> = e
         tradeCounts[row.symbol] = (tradeCounts[row.symbol] ?: 0) + 1
         if (row.name != null) names[row.symbol] = row.name
         when (row.side) {
+            TradeSide.Split, TradeSide.Bonus -> {
+                val kind = if (row.side == TradeSide.Split) RestateKind.Split else RestateKind.Bonus
+                try {
+                    val plan = restate(symbolLots, kind, row.units, row.date)
+                    symbolLots.removeAll { lot -> plan.consumed.any { it.lotId == lot.id } }
+                    plan.created.forEachIndexed { i, lot -> symbolLots += OpenLot("import-${row.line}-$i", lot.acquiredOn, lot.units, lot.cost) }
+                } catch (_: IllegalArgumentException) {
+                    errors += RowError(row.line, "${row.symbol} has nothing held on ${row.date} for a ${kind.name.lowercase()}")
+                }
+            }
             TradeSide.Buy -> symbolLots += OpenLot("import-${row.line}", row.date, row.units, row.amount)
             TradeSide.Sell -> {
                 val eligible = symbolLots.filter { !it.acquiredOn.isAfter(row.date) }
