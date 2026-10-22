@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,7 +23,14 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.feature.accounts.AccountLedgerScreen
 import com.moneymatters.app.feature.accounts.AccountsScreen
 import com.moneymatters.app.feature.dashboard.HomeScreen
+import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.feature.books.BooksState
+import com.moneymatters.app.feature.invest.HoldingDetailScreen
+import com.moneymatters.app.feature.invest.ImportScreen
+import com.moneymatters.app.feature.invest.InvestScreen
+import com.moneymatters.app.feature.invest.InvestViewModel
+import com.moneymatters.app.feature.invest.PriceScreen
+import com.moneymatters.app.feature.invest.TradeScreen
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddScreen
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
@@ -46,11 +54,14 @@ private val Tabs = listOf(
 
 private const val TXNS_TAB = 1
 private const val ACCOUNTS_TAB = 2
+private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
+
+private enum class InvestOverlay { Trade, Price, Import }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -60,6 +71,9 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var openTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var openHoldingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
+    val investState = invest.state.collectAsState().value
     val c = MoneyTheme.colors
     val canvas = if (c.isDark) Brush.verticalGradient(listOf(c.canvas, c.canvas)) else Brush.verticalGradient(0f to Color(0xFFF0F0F2), 0.45f to c.canvas)
 
@@ -71,7 +85,30 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     ) {
         val openLedger = openAccountId?.let { ledgers[it] }
         val openTransaction = openTransactionId?.let { transactionDetails[it] }
+        val openHolding = openHoldingId?.let { investState?.details?.get(it) }
         when {
+            investOverlay == InvestOverlay.Trade -> {
+                BackHandler { investOverlay = null }
+                TradeScreen(invest, onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.Price -> {
+                BackHandler { investOverlay = null; invest.priceForm = null }
+                PriceScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.Import -> {
+                BackHandler { investOverlay = null; invest.resetImport() }
+                ImportScreen(invest, onClose = { investOverlay = null; invest.resetImport() })
+            }
+            openHolding != null -> {
+                BackHandler { openHoldingId = null }
+                HoldingDetailScreen(
+                    openHolding,
+                    onBack = { openHoldingId = null },
+                    onBuy = { invest.startTrade(TradeSide.Buy, openHolding.row.id); investOverlay = InvestOverlay.Trade },
+                    onSell = { invest.startTrade(TradeSide.Sell, openHolding.row.id); investOverlay = InvestOverlay.Trade },
+                    onUpdatePrice = { invest.startPrice(openHolding.row.id); investOverlay = InvestOverlay.Price },
+                )
+            }
             // Drilling into an account, a transaction or Quick Add hides the tab bar.
             openLedger != null -> {
                 BackHandler { openAccountId = null }
@@ -110,6 +147,15 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         onOpenAccount = { id -> openAccountId = id },
                         contentPadding = PaddingValues(bottom = 132.dp),
                     )
+                    INVEST_TAB -> investState?.let {
+                        InvestScreen(
+                            it,
+                            onOpenHolding = { id -> openHoldingId = id },
+                            onBuy = { invest.startTrade(TradeSide.Buy); investOverlay = InvestOverlay.Trade },
+                            onImport = { invest.resetImport(); investOverlay = InvestOverlay.Import },
+                            contentPadding = PaddingValues(bottom = 132.dp),
+                        )
+                    }
                     else -> Text(
                         "${Tabs[tab].label} is not built yet",
                         style = MoneyTheme.type.bodyMd,

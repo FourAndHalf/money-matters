@@ -1,6 +1,8 @@
 package com.moneymatters.app.feature.books
 
 import androidx.compose.runtime.Immutable
+import com.moneymatters.app.core.invest.InvestSnapshot
+import com.moneymatters.app.core.invest.valuations
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
@@ -89,6 +91,7 @@ fun buildBooks(
     today: LocalDate,
     monthStartDay: Int = 1,
     zone: ZoneId = ZoneId.systemDefault(),
+    invest: InvestSnapshot = InvestSnapshot.Empty,
 ): BooksState {
     val accountsById = snapshot.accounts.associateBy { it.id }
     val postingsByTxn = snapshot.postings.groupBy { it.transactionId }
@@ -112,6 +115,9 @@ fun buildBooks(
     val entryCounts = snapshot.postings.groupingBy { it.accountId }.eachCount()
     val realAccounts = snapshot.accounts.filter { it.isReal && !it.isArchived }
 
+    // Holdings with a price count at market value, everything else at its ledger balance (cost).
+    val marketByAccount = valuations(invest).mapNotNull { v -> v.marketValue?.let { v.holding.accountId to it } }.toMap()
+
     // ---- Accounts (P08) ----
     fun summaryRow(a: AccountEntity): AccountSummary {
         val count = entryCounts[a.id] ?: 0
@@ -120,8 +126,9 @@ fun buildBooks(
             id = a.id,
             kind = kind,
             name = a.name,
-            subtitle = "${kind.label()} · " + if (count == 0) "no entries yet" else "$count ${if (count == 1) "entry" else "entries"}",
-            balance = Paise(balances[a.id] ?: 0),
+            subtitle = "${kind.label()} · " + (if (count == 0) "no entries yet" else "$count ${if (count == 1) "entry" else "entries"}") +
+                if (a.id in marketByAccount) " · at market" else "",
+            balance = marketByAccount[a.id] ?: Paise(balances[a.id] ?: 0),
             isLiability = a.type == AccountType.Liability,
         )
     }

@@ -1,0 +1,6 @@
+{
+  "note": "Holding-period thresholds for long-term capital gains, versioned by the date a rule takes effect. To be verified against the official Income-tax Act 2025 text (docs/plan.html, open items) before Phase 3 relies on it.",
+  "capitalGains": [
+    { "effectiveFrom": "2018-04-01", "listedEquityLongTermMonths": 12, "otherLongTermMonths": 24 }
+  ]
+}

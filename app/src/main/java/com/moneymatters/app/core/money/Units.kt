@@ -54,3 +54,12 @@ fun parseUnitPrice(text: String): UnitPrice? {
     val (whole, fraction) = match.destructured
     return UnitPrice(whole.toLong() * PRICE_SCALE + fraction.padEnd(4, '0').toLong())
 }
+
+/** The per-unit price implied by a net [amount] paid for [units], to the nearest 1/10,000 rupee. For display and lot records only. */
+fun impliedPrice(units: Units, amount: Paise): UnitPrice {
+    require(units.micro > 0) { "Units must be positive" }
+    // price (1/10,000 ₹) = paise / 100 / (micro / 1e6) × 1e4 = paise × 1e8 / micro
+    val numerator = BigInteger.valueOf(amount.value) * BigInteger.valueOf(100_000_000L)
+    val denominator = BigInteger.valueOf(units.micro)
+    return UnitPrice(((numerator * BigInteger.valueOf(2) + denominator) / (denominator * BigInteger.valueOf(2))).toLong())
+}

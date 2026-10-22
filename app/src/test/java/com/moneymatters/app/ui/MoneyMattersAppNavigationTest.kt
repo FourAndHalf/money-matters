@@ -10,6 +10,8 @@ import androidx.compose.ui.test.performClick
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.moneymatters.app.core.invest.CapitalGainsRules
+import com.moneymatters.app.core.invest.InvestRepository
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
 import com.moneymatters.app.core.profile.ProfileStore
@@ -17,6 +19,7 @@ import com.moneymatters.app.core.profile.TaxRegime
 import com.moneymatters.app.core.profile.UserProfile
 import com.moneymatters.app.core.security.PasscodeStore
 import com.moneymatters.app.feature.books.SampleBooks
+import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.settings.AiSettingsStore
@@ -47,6 +50,14 @@ class MoneyMattersAppNavigationTest {
 
     private fun quickAddPrefs() = QuickAddPrefs(ApplicationProvider.getApplicationContext())
 
+    private fun investModel(): InvestViewModel {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, MoneyMattersDatabase::class.java).allowMainThreadQueries().build()
+        val ledger = LedgerRepository(db)
+        val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
+        return InvestViewModel(ledger, InvestRepository(db, ledger), rules)
+    }
+
     private fun settingsModel(): SettingsViewModel {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val profiles = ProfileStore(context.getSharedPreferences("nav_test_profile", Context.MODE_PRIVATE))
@@ -59,7 +70,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `View all on Home switches to the Accounts tab`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
         }
         compose.onAllNodesWithText("View all")[0].performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
@@ -67,7 +78,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `tapping an account opens its ledger and back returns to the tab bar`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
         }
         compose.onAllNodesWithText("View all")[0].performClick()
         compose.onNodeWithText("HDFC Bank").performClick()
@@ -82,7 +93,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `tapping Quick add opens the entry screen and back returns to the tab bar`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
         }
         compose.onNodeWithContentDescription("Quick add").performClick()
         compose.onAllNodesWithText("Quick add")[0].assertIsDisplayed()
@@ -91,5 +102,15 @@ class MoneyMattersAppNavigationTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
         compose.onNodeWithContentDescription("Quick add").assertIsDisplayed()
+    }
+
+    @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+    @Test fun `the Invest tab opens the portfolio and shows its empty state`() {
+        compose.setContent {
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
+        }
+        compose.onNodeWithText("Invest").performClick()
+        compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasText("No stocks yet"), 5_000)
+        compose.onNodeWithText("No stocks yet").assertIsDisplayed()
     }
 }

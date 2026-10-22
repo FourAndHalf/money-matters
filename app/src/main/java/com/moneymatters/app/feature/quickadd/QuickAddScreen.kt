@@ -76,7 +76,8 @@ fun QuickAddScreen(
         viewModel.form = block(viewModel.form)
     }
 
-    val accounts = snapshot?.accounts.orEmpty().filterNot { it.isArchived }
+    // Stock holdings are traded from the Invest tab, which records units and lots; Quick Add would leave them out of step.
+    val accounts = snapshot?.accounts.orEmpty().filterNot { it.isArchived || it.id in snapshot?.holdingAccountIds.orEmpty() }
     val accountsById = accounts.associateBy(AccountEntity::id)
     fun accountLabel(id: String?) = id?.let { accountsById[it]?.displayName() } ?: "Choose"
 

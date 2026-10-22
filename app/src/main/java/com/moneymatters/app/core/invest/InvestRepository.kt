@@ -1,5 +1,7 @@
 package com.moneymatters.app.core.invest
 
+import androidx.room.withTransaction
+import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
@@ -8,8 +10,11 @@ import com.moneymatters.app.core.ledger.TransactionTags
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.UnitPrice
 import com.moneymatters.app.core.money.Units
+import com.moneymatters.app.core.money.impliedPrice
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Buys and sells for stocks and mutual funds. Each writes one balanced ledger entry through
@@ -22,6 +27,43 @@ class InvestRepository(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val dao get() = database.investDao()
+
+    /** Every holding, lot, sale and price at one moment, re-read after any investment write. */
+    fun snapshot(): Flow<InvestSnapshot> =
+        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices").map {
+            database.withTransaction {
+                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices())
+            }
+        }
+
+    /**
+     * Finds a stock by ISIN, then symbol, or creates it with its own asset account. The account is
+     * named for the company when given, else the symbol, and is an Investment-kind asset.
+     */
+    suspend fun findOrCreateStock(symbol: String, isin: String? = null, name: String? = null): String = ledger.inTransaction {
+        val existing = isin?.let { dao.holdingByIsin(it) } ?: dao.holdingBySymbol(symbol)
+        if (existing != null) return@inTransaction existing.id
+        val accountName = if (name.isNullOrBlank()) symbol else "$name ($symbol)"
+        val accountId = ledger.createAccount(accountName, AccountType.Asset, kind = AccountKind.Investment)
+        addHolding(accountId, Instrument.Stock, isin = isin, symbol = symbol)
+    }
+
+    /**
+     * Rebuilds lots and past sales from a trade history, all or nothing. Trades settle against
+     * [settlementAccountId] (for history, `Equity:Opening`, so no bank balance moves). Sales are replayed
+     * in date order against FIFO lots; one that exceeds the units held on its date aborts the whole import.
+     */
+    suspend fun importTrades(rows: List<TradeRow>, settlementAccountId: String, rules: CapitalGainsRules): Int = ledger.inTransaction {
+        for (row in rows.inLedgerOrder()) {
+            val holdingId = findOrCreateStock(row.symbol, row.isin, row.name)
+            val price = impliedPrice(row.units, row.amount)
+            when (row.side) {
+                TradeSide.Buy -> buy(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Buy ${row.symbol}")
+                TradeSide.Sell -> sell(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Sell ${row.symbol}", rules.listedEquity(row.date))
+            }
+        }
+        rows.size
+    }
 
     suspend fun addHolding(
         accountId: String,
@@ -36,6 +78,9 @@ class InvestRepository(
         dao.insertHolding(HoldingEntity(id, accountId, instrument, isin, symbol, fundClass, exitLoadDays, exitLoadBps))
         return id
     }
+
+    /** (symbol, holding id) for every holding that has a symbol. */
+    suspend fun holdingSymbols(): List<Pair<String, String>> = dao.getAllHoldings().mapNotNull { h -> h.symbol?.let { it to h.id } }
 
     /** Lots with what is still unsold, oldest first. */
     suspend fun openLots(holdingId: String): List<OpenLot> {
@@ -135,4 +180,14 @@ class InvestRepository(
         val equity = holding.instrument == Instrument.Stock || holding.fundClass == FundClass.Equity || holding.fundClass == FundClass.Elss
         return "Income:Capital Gains:${if (term == GainTerm.Short) "STCG" else "LTCG"}:${if (equity) "Equity" else "Other"}"
     }
+}
+
+/** Everything the Invest tab reads, in one consistent view. */
+data class InvestSnapshot(
+    val holdings: List<HoldingEntity>,
+    val lots: List<LotEntity>,
+    val consumptions: List<LotConsumptionEntity>,
+    val prices: List<PriceEntity>,
+) {
+    companion object { val Empty = InvestSnapshot(emptyList(), emptyList(), emptyList(), emptyList()) }
 }

@@ -9,6 +9,24 @@ import androidx.room.Query
 interface InvestDao {
     @Insert suspend fun insertHolding(holding: HoldingEntity)
 
+    @Query("SELECT * FROM holdings")
+    suspend fun getAllHoldings(): List<HoldingEntity>
+
+    @Query("SELECT * FROM lots")
+    suspend fun getAllLots(): List<LotEntity>
+
+    @Query("SELECT * FROM lot_consumptions")
+    suspend fun getAllConsumptions(): List<LotConsumptionEntity>
+
+    @Query("SELECT * FROM prices ORDER BY date, id")
+    suspend fun getAllPrices(): List<PriceEntity>
+
+    @Query("SELECT * FROM holdings WHERE isin = :isin LIMIT 1")
+    suspend fun holdingByIsin(isin: String): HoldingEntity?
+
+    @Query("SELECT * FROM holdings WHERE symbol = :symbol COLLATE NOCASE LIMIT 1")
+    suspend fun holdingBySymbol(symbol: String): HoldingEntity?
+
     @Query("SELECT * FROM holdings WHERE id = :id")
     suspend fun getHolding(id: String): HoldingEntity?
 

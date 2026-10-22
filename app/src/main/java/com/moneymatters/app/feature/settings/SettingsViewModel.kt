@@ -113,6 +113,10 @@ class SettingsViewModel(
         viewModelScope.launch { repo.unarchiveAccount(id) }
     }
 
+    fun setInNetWorth(id: String, inNetWorth: Boolean) {
+        viewModelScope.launch { repo.setInNetWorth(id, inNetWorth) }
+    }
+
     fun toggleEssential(category: String) {
         val current = profileForm.essentialCategories
         profileForm = profileForm.copy(essentialCategories = if (category in current) current - category else current + category)
