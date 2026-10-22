@@ -53,7 +53,7 @@ class MigrationTest {
             close()
         }
 
-        // Opening at v2 runs the auto-migration, then Room checks the result against v2's schema and throws on any mismatch.
+        // Opening at the latest version runs the auto-migrations, then Room checks the result against v2's schema and throws on any mismatch.
         val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
         runBlocking {
             val repo = LedgerRepository(db)
@@ -64,7 +64,28 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(2, db.openHelper.readableDatabase.version)
+            assertEquals(3, db.openHelper.readableDatabase.version) // 1 → 2 → 3 in one open
+        }
+        db.close()
+    }
+
+    @Test fun `v2 to v3 keeps every entry and counts existing accounts in net worth`() {
+        createDatabase(2).apply {
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind) VALUES ('bank', 'HDFC Bank', 'Asset', NULL, 0, 'Bank')")
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind) VALUES ('eq', 'Equity:Opening', 'Equity', NULL, 0, NULL)")
+            execSQL("INSERT INTO transactions (id, date, payee, memo, status) VALUES ('t1', '2026-09-30', 'Opening', NULL, 'Posted')")
+            execSQL("INSERT INTO postings (transactionId, accountId, debitPaise, creditPaise) VALUES ('t1', 'bank', 5000000, NULL)")
+            execSQL("INSERT INTO postings (transactionId, accountId, debitPaise, creditPaise) VALUES ('t1', 'eq', NULL, 5000000)")
+            close()
+        }
+
+        val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
+        runBlocking {
+            assertEquals(Paise(5_000_000), LedgerRepository(db).accountBalance("bank"))
+            assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
+            assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
+            assertNull(db.investDao().holdingForAccount("bank"))
+            assertEquals(3, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
