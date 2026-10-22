@@ -1,5 +1,7 @@
 package com.moneymatters.app.core.invest
 
+import com.moneymatters.app.core.money.parseUnits
+import com.moneymatters.app.core.money.impliedPrice
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.moneymatters.app.core.ledger.AccountType
@@ -28,18 +30,18 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class InvestRepositoryTest {
 
+    private val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24, LocalDate.of(2023, 4, 1))))
     private lateinit var db: MoneyMattersDatabase
     private lateinit var ledger: LedgerRepository
     private lateinit var invest: InvestRepository
     private lateinit var bank: String
     private lateinit var stockAccount: String
     private lateinit var holding: String
-    private val rule = HoldingPeriodRule(12)
 
     @Before fun setUp() {
         db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), MoneyMattersDatabase::class.java).allowMainThreadQueries().build()
         ledger = LedgerRepository(db)
-        invest = InvestRepository(db, ledger)
+        invest = InvestRepository(db, ledger, rules)
         runBlocking {
             bank = ledger.createAccount("HDFC Bank", AccountType.Asset)
             stockAccount = ledger.createAccount("Assets:Stocks:Infosys", AccountType.Asset)
@@ -52,7 +54,7 @@ class InvestRepositoryTest {
     }
 
     private fun sell(date: LocalDate, units: Long, proceeds: Paise) = runBlocking {
-        invest.sell(holding, date, Units.whole(units), UnitPrice.rupees(proceeds.value / 100 / units), proceeds, bank, "Sell INFY", rule)
+        invest.sell(holding, date, Units.whole(units), UnitPrice.rupees(proceeds.value / 100 / units), proceeds, bank, "Sell INFY")
     }
 
     @Test fun `a buy posts a balanced entry, carries units on the holding leg and opens a lot`() = runBlocking {
@@ -153,15 +155,13 @@ class InvestRepositoryTest {
         assertNotNull(db.investDao().holdingForAccount(stockAccount))
     }
 
-    private val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
-
     private fun trades(vararg lines: String) = parseTrades("date,symbol,type,units,amount\n" + lines.joinToString("\n")).rows
 
     @Test fun `an import creates holdings, lots and sales against opening equity without touching the bank`() = runBlocking {
         val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
         val count = invest.importTrades(
             trades("2025-01-10,TCS,buy,10,40000", "2025-06-01,TCS,buy,5,21000", "2026-03-01,TCS,sell,12,60000", "2025-02-01,WIPRO,buy,100,25000"),
-            equity, rules,
+            equity,
         )
         assertEquals(4, count)
         assertEquals(Paise.Zero, ledger.accountBalance(bank))
@@ -178,8 +178,8 @@ class InvestRepositoryTest {
 
     @Test fun `importing again by ISIN or symbol reuses the holding instead of creating another`() = runBlocking {
         val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
-        invest.importTrades(trades("2025-01-10,TCS,buy,10,40000"), equity, rules)
-        invest.importTrades(trades("2025-02-10,tcs,buy,5,21000"), equity, rules)
+        invest.importTrades(trades("2025-01-10,TCS,buy,10,40000"), equity)
+        invest.importTrades(trades("2025-02-10,tcs,buy,5,21000"), equity)
         assertEquals(1, db.investDao().getAllHoldings().count { it.symbol == "TCS" })
         assertEquals(Units.whole(15), invest.unitsHeld(db.investDao().holdingBySymbol("TCS")!!.id))
     }
@@ -188,7 +188,7 @@ class InvestRepositoryTest {
         val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
         val accountsBefore = ledger.snapshot().first().accounts.size
         assertThrows(InsufficientUnitsException::class.java) {
-            runBlocking { invest.importTrades(trades("2025-01-10,TCS,buy,10,40000", "2025-03-01,TCS,sell,11,50000"), equity, rules) }
+            runBlocking { invest.importTrades(trades("2025-01-10,TCS,buy,10,40000", "2025-03-01,TCS,sell,11,50000"), equity) }
         }
         val after = ledger.snapshot().first()
         assertEquals(accountsBefore, after.accounts.size)
@@ -299,10 +299,160 @@ class InvestRepositoryTest {
         val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
         invest.importTrades(
             trades("2025-01-10,TCS,buy,10,40000", "2025-06-01,TCS,split,5,", "2025-07-01,TCS,bonus,1,", "2026-03-01,TCS,sell,95,90000"),
-            equity, rules,
+            equity,
         )
         val tcs = db.investDao().holdingBySymbol("TCS")!!
         assertEquals(Units.whole(5), invest.unitsHeld(tcs.id))
         assertEquals(listOf(CorporateActionKind.Split, CorporateActionKind.Bonus), db.investDao().getAllCorporateActions().map { it.kind })
+    }
+
+    // ---- mutual funds ----
+
+    private fun fund(name: String, fundClass: FundClass, exitLoadDays: Int? = null): Pair<String, String> = runBlocking {
+        val id = invest.findOrCreateHolding(Instrument.MutualFund, symbol = null, name = name, fundClass = fundClass, exitLoadDays = exitLoadDays)
+        id to db.investDao().getHolding(id)!!.accountId
+    }
+
+    private fun fundBuy(id: String, date: LocalDate, units: Long, amount: Paise) = runBlocking {
+        invest.buy(id, date, Units.whole(units), UnitPrice.rupees(amount.value / 100 / units), amount, bank, "Buy fund")
+    }
+
+    private fun fundSell(id: String, date: LocalDate, units: Long, proceeds: Paise) = runBlocking {
+        invest.sell(id, date, Units.whole(units), UnitPrice.rupees(proceeds.value / 100 / units), proceeds, bank, "Sell fund")
+    }
+
+    @Test fun `a fund order waits In Transit, then allotment moves it into the holding as units`() = runBlocking {
+        val (fundId, fundAccount) = fund("PPFAS Flexi Cap", FundClass.Equity)
+        val pending = invest.orderFund(fundId, LocalDate.of(2026, 10, 1), 10_000.rupees, bank, "Buy PPFAS (in transit)")
+        val inTransit = ledger.accountIdByName(IN_TRANSIT)!!
+        assertEquals(10_000.rupees, ledger.accountBalance(inTransit))
+        assertEquals((-10_000).rupees, ledger.accountBalance(bank))
+        assertEquals(Paise.Zero, ledger.accountBalance(fundAccount))
+        assertEquals(Units.Zero, invest.unitsHeld(fundId))
+        assertEquals(true, db.investDao().getPending(pending)!!.isOpen)
+
+        val txn = invest.allot(pending, LocalDate.of(2026, 10, 2), parseUnits("123.456")!!)
+        assertEquals(Paise.Zero, ledger.accountBalance(inTransit))
+        assertEquals(10_000.rupees, ledger.accountBalance(fundAccount))
+        assertEquals(parseUnits("123.456"), invest.unitsHeld(fundId))
+        assertEquals(false, db.investDao().getPending(pending)!!.isOpen)
+        val nav = db.ledgerDao().getPostingsForTransaction(txn).single { it.accountId == fundAccount }.unitPrice
+        assertEquals(impliedPrice(parseUnits("123.456")!!, 10_000.rupees).tenThousandths, nav) // about ₹81.00
+        assertEquals(LocalDate.of(2026, 10, 2), invest.openLots(fundId).single().acquiredOn)
+    }
+
+    @Test fun `an allotment cannot predate its order or happen twice`() = runBlocking {
+        val (fundId, _) = fund("PPFAS Flexi Cap", FundClass.Equity)
+        val pending = invest.orderFund(fundId, LocalDate.of(2026, 10, 1), 10_000.rupees, bank, "Buy (in transit)")
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.allot(pending, LocalDate.of(2026, 9, 30), Units.whole(100)) } }
+        invest.allot(pending, LocalDate.of(2026, 10, 2), Units.whole(100))
+        assertThrows(IllegalStateException::class.java) { runBlocking { invest.allot(pending, LocalDate.of(2026, 10, 3), Units.whole(100)) } }
+        assertThrows(IllegalStateException::class.java) { runBlocking { invest.cancelPending(pending, LocalDate.of(2026, 10, 3)) } }
+        Unit
+    }
+
+    @Test fun `cancelling an order puts the money back where it came from`() = runBlocking {
+        val (fundId, _) = fund("PPFAS Flexi Cap", FundClass.Equity)
+        val pending = invest.orderFund(fundId, LocalDate.of(2026, 10, 1), 10_000.rupees, bank, "Buy (in transit)")
+        invest.cancelPending(pending, LocalDate.of(2026, 10, 2))
+        assertEquals(Paise.Zero, ledger.accountBalance(bank))
+        assertEquals(Paise.Zero, ledger.accountBalance(ledger.accountIdByName(IN_TRANSIT)!!))
+        assertEquals(false, db.investDao().getPending(pending)!!.isOpen)
+    }
+
+    @Test fun `reversing an allotment takes the units back and reopens the order`() = runBlocking {
+        val (fundId, _) = fund("PPFAS Flexi Cap", FundClass.Equity)
+        val pending = invest.orderFund(fundId, LocalDate.of(2026, 10, 1), 10_000.rupees, bank, "Buy (in transit)")
+        val txn = invest.allot(pending, LocalDate.of(2026, 10, 2), Units.whole(100))
+        ledger.reconcile(txn)
+        ledger.reverse(txn, "wrong units")
+        assertEquals(Units.Zero, invest.unitsHeld(fundId))
+        assertEquals(true, db.investDao().getPending(pending)!!.isOpen)
+        assertEquals(10_000.rupees, ledger.accountBalance(ledger.accountIdByName(IN_TRANSIT)!!))
+    }
+
+    @Test fun `only funds go through In Transit`() {
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { invest.orderFund(holding, LocalDate.of(2026, 10, 1), 1_000.rupees, bank, "Buy INFY") }
+        }
+    }
+
+    @Test fun `ELSS units are locked three years from allotment`() = runBlocking {
+        val (fundId, _) = fund("Axis ELSS", FundClass.Elss)
+        fundBuy(fundId, LocalDate.of(2023, 1, 10), 10, 1_000.rupees)
+        fundBuy(fundId, LocalDate.of(2025, 6, 1), 10, 1_500.rupees)
+        assertEquals(listOf(LocalDate.of(2026, 1, 10), LocalDate.of(2028, 6, 1)), invest.openLots(fundId).map { it.lockUntil })
+
+        // On 2026-02-01 only the first lot's 10 units are free.
+        fundSell(fundId, LocalDate.of(2026, 2, 1), 10, 2_000.rupees)
+        val error = assertThrows(LockedUnitsException::class.java) { fundSell(fundId, LocalDate.of(2026, 2, 2), 1, 200.rupees) }
+        assertEquals("Some of those units are locked until 2028-06-01", error.message)
+        assertEquals(Units.whole(10), invest.unitsHeld(fundId))
+        fundSell(fundId, LocalDate.of(2028, 6, 2), 10, 2_500.rupees)
+        assertEquals(Units.Zero, invest.unitsHeld(fundId))
+    }
+
+    @Test fun `asking for more than is held is still an insufficient-units error, not a lock error`() {
+        val (fundId, _) = fund("Axis ELSS", FundClass.Elss)
+        fundBuy(fundId, LocalDate.of(2025, 6, 1), 10, 1_500.rupees)
+        assertThrows(InsufficientUnitsException::class.java) { fundSell(fundId, LocalDate.of(2025, 7, 1), 11, 1_800.rupees) }
+    }
+
+    @Test fun `an allotted ELSS lot is locked too`() = runBlocking {
+        val (fundId, _) = fund("Axis ELSS", FundClass.Elss)
+        val pending = invest.orderFund(fundId, LocalDate.of(2026, 10, 1), 5_000.rupees, bank, "Buy (in transit)")
+        invest.allot(pending, LocalDate.of(2026, 10, 2), Units.whole(50))
+        assertEquals(LocalDate.of(2029, 10, 2), invest.openLots(fundId).single().lockUntil)
+    }
+
+    @Test fun `debt fund gains on units bought after the cutoff are slab-taxed, whatever the holding period`() = runBlocking {
+        val (fundId, _) = fund("HDFC Short Term Debt", FundClass.Debt)
+        fundBuy(fundId, LocalDate.of(2023, 6, 1), 10, 1_000.rupees)
+        fundSell(fundId, LocalDate.of(2026, 10, 1), 10, 1_400.rupees)
+        val slab = ledger.accountIdByName("Income:Capital Gains:Slab")!!
+        assertEquals((-400).rupees, ledger.accountBalance(slab))
+        assertNull(ledger.accountIdByName("Income:Capital Gains:LTCG:Other"))
+    }
+
+    @Test fun `debt fund units bought before the cutoff keep the 24 month long-term rule`() = runBlocking {
+        val (fundId, _) = fund("HDFC Short Term Debt", FundClass.Debt)
+        fundBuy(fundId, LocalDate.of(2022, 6, 1), 10, 1_000.rupees)
+        fundSell(fundId, LocalDate.of(2026, 10, 1), 10, 1_400.rupees)
+        assertEquals((-400).rupees, ledger.accountBalance(ledger.accountIdByName("Income:Capital Gains:LTCG:Other")!!))
+        assertNull(ledger.accountIdByName("Income:Capital Gains:Slab"))
+    }
+
+    @Test fun `an equity fund uses the 12 month rule and a non-equity hybrid the 24 month rule`() = runBlocking {
+        val (equityFund, _) = fund("Flexi Cap", FundClass.Equity)
+        val (hybridFund, _) = fund("Hybrid Fund", FundClass.Hybrid)
+        fundBuy(equityFund, LocalDate.of(2025, 1, 1), 10, 1_000.rupees)
+        fundBuy(hybridFund, LocalDate.of(2025, 1, 1), 10, 1_000.rupees)
+        fundSell(equityFund, LocalDate.of(2026, 10, 1), 10, 1_300.rupees) // 21 months: long-term for equity
+        fundSell(hybridFund, LocalDate.of(2026, 10, 1), 10, 1_300.rupees) // 21 months: still short-term for other
+        assertEquals((-300).rupees, ledger.accountBalance(ledger.accountIdByName("Income:Capital Gains:LTCG:Equity")!!))
+        assertEquals((-300).rupees, ledger.accountBalance(ledger.accountIdByName("Income:Capital Gains:STCG:Other")!!))
+    }
+
+    @Test fun `finding a fund by name reuses it instead of creating a second one`() = runBlocking {
+        val first = invest.findOrCreateHolding(Instrument.MutualFund, null, name = "PPFAS Flexi Cap", fundClass = FundClass.Equity)
+        val second = invest.findOrCreateHolding(Instrument.MutualFund, null, name = "PPFAS Flexi Cap")
+        assertEquals(first, second)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.findOrCreateHolding(Instrument.MutualFund, null) } }
+        Unit
+    }
+
+    @Test fun `a trade import can carry funds with their class`() = runBlocking {
+        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
+        val rows = parseTrades(
+            "date,symbol,type,units,amount,instrument,class,name\n" +
+                "2023-01-10,ELSS1,buy,100,10000,mf,elss,Axis ELSS\n" +
+                "2024-02-01,TCS,buy,5,20000,stock,,\n",
+        ).rows
+        invest.importTrades(rows, equity)
+        val elss = db.investDao().holdingBySymbol("ELSS1")!!
+        assertEquals(Instrument.MutualFund, elss.instrument)
+        assertEquals(FundClass.Elss, elss.fundClass)
+        assertEquals(LocalDate.of(2026, 1, 10), invest.openLots(elss.id).single().lockUntil)
+        assertEquals(Instrument.Stock, db.investDao().holdingBySymbol("TCS")!!.instrument)
     }
 }

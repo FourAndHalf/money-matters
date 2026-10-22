@@ -17,6 +17,7 @@ import com.moneymatters.app.core.invest.InvestDao
 import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.LotConsumptionEntity
 import com.moneymatters.app.core.invest.LotEntity
+import com.moneymatters.app.core.invest.PendingAllotmentEntity
 import com.moneymatters.app.core.invest.PriceEntity
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.SipPlanEntity
@@ -64,9 +65,9 @@ class CorporateActionsV4 : AutoMigrationSpec
     entities = [
         AccountEntity::class, TransactionEntity::class, PostingEntity::class, AuditLogEntity::class,
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
-        FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class,
+        FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class,
     ],
-    version = 4,
+    version = 5,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -74,6 +75,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 2, to = 3),
         // v4: corporate actions carry a ratio and their ledger entry instead of a num/den pair.
         AutoMigration(from = 3, to = 4, spec = CorporateActionsV4::class),
+        // v5: fund purchases waiting In Transit for their units.
+        AutoMigration(from = 4, to = 5),
     ],
 )
 @TypeConverters(LedgerConverters::class)

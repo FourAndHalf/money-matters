@@ -11,7 +11,8 @@ private const val RULES_ASSET = "tax/capital_gains.json"
  * written into code: each entry applies to sales on or after its `effectiveFrom` date.
  */
 class CapitalGainsRules(private val entries: List<Entry>) {
-    data class Entry(val effectiveFrom: LocalDate, val listedEquityMonths: Int, val otherMonths: Int)
+    /** [debtSlabFrom]: debt fund units bought on or after this date are taxed at slab rate, with no long-term treatment. */
+    data class Entry(val effectiveFrom: LocalDate, val listedEquityMonths: Int, val otherMonths: Int, val debtSlabFrom: LocalDate? = null)
 
     init {
         require(entries.isNotEmpty()) { "At least one capital gains rule is required" }
@@ -27,13 +28,19 @@ class CapitalGainsRules(private val entries: List<Entry>) {
     /** The rule for every other asset sold on [saleDate]. */
     fun other(saleDate: LocalDate) = HoldingPeriodRule(on(saleDate).otherMonths)
 
+    /** The purchase date from which debt fund gains are slab-taxed, as in force for a sale on [saleDate]; null if none. */
+    fun debtSlabFrom(saleDate: LocalDate): LocalDate? = on(saleDate).debtSlabFrom
+
     companion object {
         fun parse(json: String): CapitalGainsRules {
             val array = JSONObject(json).getJSONArray("capitalGains")
             return CapitalGainsRules(
                 (0 until array.length()).map {
                     val e = array.getJSONObject(it)
-                    Entry(LocalDate.parse(e.getString("effectiveFrom")), e.getInt("listedEquityLongTermMonths"), e.getInt("otherLongTermMonths"))
+                    Entry(
+                        LocalDate.parse(e.getString("effectiveFrom")), e.getInt("listedEquityLongTermMonths"), e.getInt("otherLongTermMonths"),
+                        e.optString("debtFundSlabTaxedFrom").takeIf { s -> s.isNotEmpty() }?.let(LocalDate::parse),
+                    )
                 },
             )
         }

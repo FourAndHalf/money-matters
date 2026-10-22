@@ -10,7 +10,19 @@ import com.moneymatters.app.core.ledger.TransactionEntity
 enum class Instrument { Stock, MutualFund }
 
 /** A mutual fund's tax class; [Elss] adds a 3-year lock per instalment. Null for stocks. */
-enum class FundClass { Equity, Debt, Hybrid, Elss }
+enum class FundClass {
+    Equity,
+    /** A hybrid fund with at least 65% in equity, taxed like equity. */
+    EquityHybrid,
+    /** Any other hybrid fund. */
+    Hybrid,
+    Debt,
+    Elss,
+}
+
+/** Equity-oriented holdings (stocks, equity and ELSS funds, equity-oriented hybrids) use the listed-equity holding period. */
+val HoldingEntity.isEquityOriented: Boolean
+    get() = instrument == Instrument.Stock || fundClass == FundClass.Equity || fundClass == FundClass.Elss || fundClass == FundClass.EquityHybrid
 
 enum class CorporateActionKind { Split, Bonus, Dividend }
 
@@ -138,3 +150,29 @@ data class CorporateActionEntity(
     /** The ledger entry this action wrote, so reversing that entry also withdraws the action. */
     val transactionId: String? = null,
 )
+
+/**
+ * Money sent for a fund purchase that has not been allotted units yet: it waits in `Assets:Investments:In Transit`
+ * (plan.html → "SIP via In Transit") until the units and NAV are known. Open while neither allotted nor cancelled.
+ */
+@Entity(
+    tableName = "pending_allotments",
+    foreignKeys = [
+        ForeignKey(HoldingEntity::class, ["id"], ["holdingId"]),
+        ForeignKey(TransactionEntity::class, ["id"], ["orderTransactionId"]),
+    ],
+    indices = [Index("holdingId"), Index("orderTransactionId")],
+)
+data class PendingAllotmentEntity(
+    @PrimaryKey val id: String,
+    val holdingId: String,
+    val orderDate: String,
+    val amountPaise: Long,
+    val orderTransactionId: String,
+    val allotmentTransactionId: String? = null,
+    val cancelTransactionId: String? = null,
+    /** Set when a SIP plan proposed this order. */
+    val sipPlanId: String? = null,
+) {
+    val isOpen: Boolean get() = allotmentTransactionId == null && cancelTransactionId == null
+}

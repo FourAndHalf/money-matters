@@ -97,4 +97,11 @@ class LotsAndGainsTest {
         assertEquals(Units(1_500_000), scaleUnits(Units(1_000_000), Units(1_500_000)))
         assertEquals(Units(2), scaleUnits(Units(3), Units(500_000))) // 1.5 micro-units → 2
     }
+
+    @Test fun `lots bought on or after the slab cutoff land in the slab bucket`() {
+        val old = DatedConsumption(Consumption("old", Units.whole(10), 1_000.rupees), LocalDate.of(2022, 1, 1))
+        val new = DatedConsumption(Consumption("new", Units.whole(10), 1_000.rupees), LocalDate.of(2023, 4, 1))
+        val buckets = splitGain(2_800.rupees, listOf(old, new), LocalDate.of(2026, 10, 1), HoldingPeriodRule(24), slabFrom = LocalDate.of(2023, 4, 1))
+        assertEquals(listOf(GainBucket(GainTerm.Long, 400.rupees), GainBucket(GainTerm.Slab, 400.rupees)), buckets)
+    }
 }

@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.moneymatters.app.core.invest.FundClass
+import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.money.impliedPrice
@@ -32,6 +34,7 @@ import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
+import com.moneymatters.app.ui.components.SegmentedControl
 import com.moneymatters.app.ui.theme.MoneyTheme
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -70,7 +73,7 @@ internal fun TradeContent(
     val canSave = form.canSave && !isSaving
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(top = status.calculateTopPadding())) {
-            DetailTopBar(title = if (isBuy) "Buy stock" else "Sell stock", onBack = onClose)
+            DetailTopBar(title = (if (isBuy) "Buy " else "Sell ") + (if (form.isFund) "fund" else "stock"), onBack = onClose)
         }
         LazyColumn(
             Modifier.weight(1f),
@@ -80,9 +83,23 @@ internal fun TradeContent(
             item("fields") {
                 Module {
                     if (form.holdingId == null) {
-                        FormField("Symbol", form.symbol, { onChange(form.copy(symbol = it)) }, placeholder = "e.g. INFY")
-                        Column(Modifier.padding(top = 10.dp)) { FormField("Company (optional)", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. Infosys") }
-                        Column(Modifier.padding(top = 10.dp)) { FormField("ISIN (optional)", form.isin, { onChange(form.copy(isin = it)) }, placeholder = "e.g. INE009A01021") }
+                        SegmentedControl(Instrument.entries, form.instrument, { onChange(form.copy(instrument = it)) }, { if (it == Instrument.Stock) "Stock" else "Mutual fund" })
+                        Column(Modifier.padding(top = 12.dp)) {
+                            if (!form.isFund) {
+                                FormField("Symbol", form.symbol, { onChange(form.copy(symbol = it)) }, placeholder = "e.g. INFY")
+                                Column(Modifier.padding(top = 10.dp)) { FormField("Company (optional)", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. Infosys") }
+                            } else {
+                                FormField("Fund name", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. Parag Parikh Flexi Cap")
+                            }
+                            Column(Modifier.padding(top = 10.dp)) { FormField("ISIN (optional)", form.isin, { onChange(form.copy(isin = it)) }, placeholder = "e.g. INE009A01021") }
+                            if (form.isFund) {
+                                Text("Type", style = MoneyTheme.type.labelRegular, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+                                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FundClass.entries.forEach { c -> Pill(c.label(), { onChange(form.copy(fundClass = c)) }, style = if (form.fundClass == c) PillStyle.Primary else PillStyle.Secondary) }
+                                }
+                                Column(Modifier.padding(top = 10.dp)) { FormField("Exit load window in days (optional)", form.exitLoadDaysText, { onChange(form.copy(exitLoadDaysText = it)) }, keyboardType = KeyboardType.Number, placeholder = "e.g. 365") }
+                            }
+                        }
                     }
                     Column(Modifier.padding(top = if (form.holdingId == null) 10.dp else 0.dp)) {
                         FormField(
@@ -95,7 +112,12 @@ internal fun TradeContent(
                             error = if (runCatching { LocalDate.parse(dateText) }.isFailure) "Use yyyy-MM-dd" else null,
                         )
                     }
-                    Column(Modifier.padding(top = 10.dp)) { FormField("Units", form.unitsText, { onChange(form.copy(unitsText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 12.5") }
+                    Column(Modifier.padding(top = 10.dp)) {
+                        FormField(
+                            if (form.isFund && isBuy) "Units allotted (blank if not yet)" else "Units",
+                            form.unitsText, { onChange(form.copy(unitsText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 12.5",
+                        )
+                    }
                     Column(Modifier.padding(top = 10.dp)) {
                         FormField(
                             if (isBuy) "Total paid (₹, after all charges)" else "Total received (₹, after all charges)",
@@ -105,7 +127,9 @@ internal fun TradeContent(
                     }
                     val units = form.units
                     val amount = form.amount
-                    if (units != null && amount != null) {
+                    if (form.inTransit) {
+                        Text("The money moves to In Transit until the units are allotted.", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 8.dp))
+                    } else if (units != null && amount != null) {
                         Text(
                             "≈ ${formatUnitPrice(impliedPrice(units, amount).tenThousandths)} per unit",
                             style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 8.dp),
@@ -133,7 +157,7 @@ internal fun TradeContent(
         }
         Column(Modifier.padding(horizontal = margin, vertical = 12.dp)) {
             Pill(
-                if (isSaving) "Saving…" else if (isBuy) "Save buy" else "Save sale",
+                if (isSaving) "Saving…" else if (form.inTransit) "Send to In Transit" else if (isBuy) "Save buy" else "Save sale",
                 onClick = { if (canSave) onSave() },
                 style = PillStyle.Primary,
                 height = 44.dp,

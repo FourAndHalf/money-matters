@@ -64,7 +64,7 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(4, db.openHelper.readableDatabase.version) // 1 → 2 → 3 → 4 in one open
+            assertEquals(5, db.openHelper.readableDatabase.version) // 1 → 2 → 3 → 4 → 5 in one open
         }
         db.close()
     }
@@ -85,7 +85,7 @@ class MigrationTest {
             assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
             assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
             assertNull(db.investDao().holdingForAccount("bank"))
-            assertEquals(4, db.openHelper.readableDatabase.version)
+            assertEquals(5, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -104,7 +104,23 @@ class MigrationTest {
             assertEquals(180_000L, action.amountPaise)
             assertNull(action.ratioMicro)
             assertNull(action.transactionId)
-            assertEquals(4, db.openHelper.readableDatabase.version)
+            assertEquals(5, db.openHelper.readableDatabase.version)
+        }
+        db.close()
+    }
+
+    @Test fun `v4 to v5 adds the In Transit orders table and keeps the holdings`() {
+        createDatabase(4).apply {
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind, inNetWorth) VALUES ('a1', 'PPFAS', 'Asset', NULL, 0, 'Investment', 1)")
+            execSQL("INSERT INTO holdings (id, accountId, instrument, fundClass) VALUES ('h1', 'a1', 'MutualFund', 'Equity')")
+            close()
+        }
+
+        val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
+        runBlocking {
+            assertEquals("h1", db.investDao().holdingForAccount("a1")!!.id)
+            assertEquals(0, db.investDao().getAllPending().size)
+            assertEquals(5, db.openHelper.readableDatabase.version)
         }
         db.close()
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,6 +28,7 @@ import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.feature.books.BooksState
 import com.moneymatters.app.feature.invest.ActionScreen
+import com.moneymatters.app.feature.invest.AllotScreen
 import com.moneymatters.app.feature.invest.DividendScreen
 import com.moneymatters.app.feature.invest.HoldingDetailScreen
 import com.moneymatters.app.feature.invest.ImportScreen
@@ -60,7 +62,7 @@ private const val ACCOUNTS_TAB = 2
 private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
 
-private enum class InvestOverlay { Trade, Price, Import, Dividend, Action }
+private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
@@ -110,13 +112,18 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 BackHandler { investOverlay = null; invest.actionForm = null }
                 ActionScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
             }
+            investOverlay == InvestOverlay.Allot -> {
+                BackHandler { investOverlay = null; invest.allotForm = null }
+                val order = investState?.pending?.firstOrNull { it.id == invest.allotForm?.pendingId }
+                if (order != null) AllotScreen(invest, order, onClose = { investOverlay = null }) else LaunchedEffect(Unit) { investOverlay = null }
+            }
             openHolding != null -> {
                 BackHandler { openHoldingId = null }
                 HoldingDetailScreen(
                     openHolding,
                     onBack = { openHoldingId = null },
-                    onBuy = { invest.startTrade(TradeSide.Buy, openHolding.row.id); investOverlay = InvestOverlay.Trade },
-                    onSell = { invest.startTrade(TradeSide.Sell, openHolding.row.id); investOverlay = InvestOverlay.Trade },
+                    onBuy = { invest.startTrade(TradeSide.Buy, openHolding.row.id, openHolding.row.instrument); investOverlay = InvestOverlay.Trade },
+                    onSell = { invest.startTrade(TradeSide.Sell, openHolding.row.id, openHolding.row.instrument); investOverlay = InvestOverlay.Trade },
                     onUpdatePrice = { invest.startPrice(openHolding.row.id); investOverlay = InvestOverlay.Price },
                     onDividend = { invest.startDividend(openHolding.row.id); investOverlay = InvestOverlay.Dividend },
                     onCorporateAction = { invest.startAction(openHolding.row.id, RestateKind.Split); investOverlay = InvestOverlay.Action },
@@ -166,6 +173,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                             onOpenHolding = { id -> openHoldingId = id },
                             onBuy = { invest.startTrade(TradeSide.Buy); investOverlay = InvestOverlay.Trade },
                             onImport = { invest.resetImport(); investOverlay = InvestOverlay.Import },
+                            onAllot = { id -> invest.startAllot(id); investOverlay = InvestOverlay.Allot },
+                            onCancelOrder = invest::cancelOrder,
                             contentPadding = PaddingValues(bottom = 132.dp),
                         )
                     }

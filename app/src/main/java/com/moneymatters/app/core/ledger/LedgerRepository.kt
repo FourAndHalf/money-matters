@@ -200,6 +200,7 @@ class LedgerRepository(
             invest.deleteConsumptionsForSale(transactionId)
             createdLots.forEach { invest.deleteLot(it.id) }
             invest.deleteCorporateActionsForTransaction(transactionId)
+            invest.reopenPendingForAllotment(transactionId)
             audit(reversalId, "Reversal", "Reverses $transactionId: $reason")
             audit(transactionId, "Reversed", "Reversed by $reversalId: $reason")
         }

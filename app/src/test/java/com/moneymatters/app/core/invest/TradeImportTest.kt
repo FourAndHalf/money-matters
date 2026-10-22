@@ -130,4 +130,17 @@ class TradeImportTest {
         // The split comes first on its day, so it doubles only the January lot: 20 + 5.
         assertEquals(Units.whole(25), previewTrades(sameDay).symbols.single().unitsHeld)
     }
+
+    @Test fun `instrument and class columns are read, and bad values are reported`() {
+        val ok = parseTrades("date,symbol,type,units,amount,instrument,class\n2025-01-10,F1,buy,10,1000,mf,Equity hybrid")
+        assertEquals(emptyList<RowError>(), ok.errors)
+        assertEquals(Instrument.MutualFund, ok.rows.single().instrument)
+        assertEquals(FundClass.EquityHybrid, ok.rows.single().fundClass)
+        assertEquals(Instrument.Stock, parseTrades("$header\n2025-01-10,INFY,buy,10,1000").rows.single().instrument)
+        assertEquals("Instrument must be stock or mf", parseTrades("date,symbol,type,units,amount,instrument\n2025-01-10,X,buy,1,100,bond").errors.single().message)
+        assertEquals(
+            "Class must be equity, equity-hybrid, hybrid, debt or elss",
+            parseTrades("date,symbol,type,units,amount,class\n2025-01-10,X,buy,1,100,gold").errors.single().message,
+        )
+    }
 }

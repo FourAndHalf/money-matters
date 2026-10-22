@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.moneymatters.app.core.invest.CapitalGainsRules
 import com.moneymatters.app.core.invest.InsufficientUnitsException
+import com.moneymatters.app.core.invest.Instrument
+import com.moneymatters.app.core.invest.LockedUnitsException
 import com.moneymatters.app.core.invest.InvestRepository
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.RestateKind
@@ -67,38 +69,82 @@ class InvestViewModel(
     var error by mutableStateOf<String?>(null)
         private set
 
-    fun startTrade(side: TradeSide, holdingId: String? = null) {
-        tradeForm = TradeForm.empty(side, today(), holdingId)
+    fun startTrade(side: TradeSide, holdingId: String? = null, instrument: Instrument = Instrument.Stock) {
+        tradeForm = TradeForm.empty(side, today(), holdingId, instrument)
         error = null
     }
 
     fun saveTrade(onSaved: () -> Unit) {
         val form = tradeForm
-        val units = form.units
         val amount = form.amount
         val accountId = form.accountId
-        if (!form.canSave || units == null || amount == null || accountId == null || isSaving) return
+        if (!form.canSave || amount == null || accountId == null || isSaving) return
         viewModelScope.launch {
             isSaving = true
             error = null
             try {
-                val holdingId = form.holdingId ?: invest.findOrCreateStock(form.symbol.trim().uppercase(), form.isin.trim().uppercase().ifBlank { null }, form.name.trim().ifBlank { null })
-                val symbol = form.symbol.trim().uppercase().ifBlank { "stock" }
-                val price = impliedPrice(units, amount)
-                if (form.side == TradeSide.Buy) {
-                    invest.buy(holdingId, form.date, units, price, amount, accountId, "Buy $symbol")
-                } else {
-                    invest.sell(holdingId, form.date, units, price, amount, accountId, "Sell $symbol", rules.listedEquity(form.date))
+                val symbol = form.symbol.trim().uppercase().ifBlank { null }
+                val holdingId = form.holdingId ?: invest.findOrCreateHolding(
+                    form.instrument, symbol, form.isin.trim().uppercase().ifBlank { null }, form.name.trim().ifBlank { null },
+                    fundClass = if (form.isFund) form.fundClass else null,
+                    exitLoadDays = form.exitLoadDaysText.trim().toIntOrNull(),
+                )
+                val label = symbol ?: form.name.trim().ifBlank { "holding" }
+                val units = form.units
+                when {
+                    form.inTransit -> invest.orderFund(holdingId, form.date, amount, accountId, "Buy $label (in transit)")
+                    units == null -> return@launch
+                    form.side == TradeSide.Buy -> invest.buy(holdingId, form.date, units, impliedPrice(units, amount), amount, accountId, "Buy $label")
+                    else -> invest.sell(holdingId, form.date, units, impliedPrice(units, amount), amount, accountId, "Sell $label")
                 }
                 onSaved()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: InsufficientUnitsException) {
                 error = "That's more than you held on that date."
+            } catch (e: LockedUnitsException) {
+                error = (e.message ?: "Some of those units are locked") + "."
             } catch (_: Exception) {
                 error = "Couldn't save the trade. Nothing was changed."
             } finally {
                 isSaving = false
+            }
+        }
+    }
+
+    // ---- Allotment of a fund order waiting In Transit ----
+    var allotForm by mutableStateOf<AllotForm?>(null)
+
+    fun startAllot(pendingId: String) {
+        allotForm = AllotForm(pendingId, today())
+        error = null
+    }
+
+    fun saveAllot(onSaved: () -> Unit) {
+        val form = allotForm ?: return
+        val units = form.units ?: return
+        val nav = form.nav ?: return
+        viewModelScope.launch {
+            try {
+                invest.allot(form.pendingId, form.date, units, nav)
+                allotForm = null
+                onSaved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't allot the units. Check the date is on or after the order."
+            }
+        }
+    }
+
+    fun cancelOrder(pendingId: String) {
+        viewModelScope.launch {
+            try {
+                invest.cancelPending(pendingId, today())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't cancel that order."
             }
         }
     }
@@ -217,7 +263,7 @@ class InvestViewModel(
             error = null
             try {
                 val settlement = ledger.createAccountIfAbsent(OPENING_EQUITY, AccountType.Equity)
-                importDone = invest.importTrades(rows, settlement, rules)
+                importDone = invest.importTrades(rows, settlement)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
