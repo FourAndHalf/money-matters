@@ -182,3 +182,11 @@ data class PendingAllotmentEntity(
 ) {
     val isOpen: Boolean get() = allotmentTransactionId == null && cancelTransactionId == null
 }
+
+/** A SIP instalment the investor chose not to pay. It stops nagging but still counts as missed for the goal. */
+@Entity(
+    tableName = "sip_skips",
+    primaryKeys = ["planId", "dueDate"],
+    foreignKeys = [ForeignKey(SipPlanEntity::class, ["id"], ["planId"])],
+)
+data class SipSkipEntity(val planId: String, val dueDate: String)

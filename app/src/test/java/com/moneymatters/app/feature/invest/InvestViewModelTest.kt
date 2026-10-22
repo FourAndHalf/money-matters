@@ -288,4 +288,46 @@ class InvestViewModelTest {
         assertEquals("TDS can't be as much as the deposit", model.error)
         assertNull(db.investDao().getFixedDeposit(fd)!!.closedOn)
     }
+
+    @Test fun `a SIP form needs a fund, an amount, a day and an account`() {
+        model.startSip()
+        val form = model.sipForm!!
+        assertFalse(form.canSave)
+        val filled = form.copy(holdingId = "h", amountText = "10,000", dayText = "5", accountId = bank)
+        assertTrue(filled.canSave)
+        assertFalse(filled.copy(dayText = "32").canSave)
+        assertFalse(filled.copy(amountText = "0").canSave)
+        assertFalse(filled.copy(holdingId = null).canSave)
+    }
+
+    @Test fun `saving a SIP, paying an instalment, skipping one and stopping it all update the books`() = runBlocking {
+        val fund = invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity)
+        model.startSip()
+        model.sipForm = model.sipForm!!.copy(holdingId = fund, amountText = "10000", dayText = "5", accountId = bank, start = LocalDate.of(2026, 9, 1))
+        var saved = false
+        model.saveSip { saved = true }
+        idle()
+        assertTrue(saved)
+        val plan = db.investDao().getAllSipPlans().single()
+
+        model.payInstalment(plan.id, LocalDate.of(2026, 9, 5))
+        idle()
+        assertEquals((-10_000).rupees, ledger.accountBalance(bank))
+        model.skipInstalment(plan.id, LocalDate.of(2026, 10, 5))
+        idle()
+        assertEquals(1, db.investDao().getAllSipSkips().size)
+        model.stopSip(plan.id)
+        idle()
+        assertEquals(today.toString(), db.investDao().getSipPlan(plan.id)!!.endDate)
+        assertNull(model.error)
+    }
+
+    @Test fun `paying an instalment that isn't due reports it`() = runBlocking {
+        val fund = invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity)
+        val plan = invest.createSipPlan(fund, 10_000.rupees, 5, bank, LocalDate.of(2026, 9, 1))
+        model.payInstalment(plan, LocalDate.of(2026, 9, 6))
+        idle()
+        assertEquals("Couldn't update the SIP.", model.error)
+        assertEquals(Paise.Zero, ledger.accountBalance(bank))
+    }
 }

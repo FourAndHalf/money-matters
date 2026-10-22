@@ -21,6 +21,7 @@ import com.moneymatters.app.core.invest.PendingAllotmentEntity
 import com.moneymatters.app.core.invest.PriceEntity
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.SipPlanEntity
+import com.moneymatters.app.core.invest.SipSkipEntity
 
 class LedgerConverters {
     @TypeConverter fun fromAccountType(value: AccountType) = value.name
@@ -65,9 +66,9 @@ class CorporateActionsV4 : AutoMigrationSpec
     entities = [
         AccountEntity::class, TransactionEntity::class, PostingEntity::class, AuditLogEntity::class,
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
-        FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class,
+        FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class,
     ],
-    version = 6,
+    version = 7,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -79,6 +80,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 4, to = 5),
         // v6: fixed deposits remember the entries that opened and closed them.
         AutoMigration(from = 5, to = 6),
+        // v7: SIP instalments the investor skipped.
+        AutoMigration(from = 6, to = 7),
     ],
 )
 @TypeConverters(LedgerConverters::class)

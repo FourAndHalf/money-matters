@@ -84,6 +84,26 @@ interface InvestDao {
 
     @Insert suspend fun insertSipPlan(plan: SipPlanEntity)
 
+    @Update suspend fun updateSipPlan(plan: SipPlanEntity)
+
+    @Query("SELECT * FROM sip_plans ORDER BY startDate, id")
+    suspend fun getAllSipPlans(): List<SipPlanEntity>
+
+    @Query("SELECT * FROM sip_plans WHERE id = :id")
+    suspend fun getSipPlan(id: String): SipPlanEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertSipSkip(skip: SipSkipEntity)
+
+    @Query("SELECT * FROM sip_skips")
+    suspend fun getAllSipSkips(): List<SipSkipEntity>
+
+    @Query("SELECT COUNT(*) FROM pending_allotments WHERE orderTransactionId = :transactionId")
+    suspend fun pendingCountForOrder(transactionId: String): Int
+
+    /** Reversing a cancellation puts the order back In Transit. */
+    @Query("UPDATE pending_allotments SET cancelTransactionId = NULL WHERE cancelTransactionId = :transactionId")
+    suspend fun reopenPendingCancelledBy(transactionId: String)
+
     @Insert suspend fun insertCorporateAction(action: CorporateActionEntity)
 
     @Insert suspend fun insertPending(pending: PendingAllotmentEntity)

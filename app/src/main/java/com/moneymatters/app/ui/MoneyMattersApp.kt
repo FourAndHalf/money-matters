@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.feature.accounts.AccountLedgerScreen
 import com.moneymatters.app.feature.accounts.AccountsScreen
 import com.moneymatters.app.feature.dashboard.HomeScreen
+import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.feature.books.BooksState
@@ -38,6 +39,8 @@ import com.moneymatters.app.feature.invest.ImportScreen
 import com.moneymatters.app.feature.invest.InvestScreen
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.PriceScreen
+import com.moneymatters.app.feature.invest.SipDetailScreen
+import com.moneymatters.app.feature.invest.SipFormScreen
 import com.moneymatters.app.feature.invest.TradeScreen
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddScreen
@@ -65,7 +68,7 @@ private const val ACCOUNTS_TAB = 2
 private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
 
-private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot, NewDeposit, CloseDeposit }
+private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot, NewDeposit, CloseDeposit, NewSip }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
@@ -81,6 +84,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var openHoldingId by rememberSaveable { mutableStateOf<String?>(null) }
     var openDepositId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openSipId by rememberSaveable { mutableStateOf<String?>(null) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
     val c = MoneyTheme.colors
@@ -96,6 +100,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
         val openTransaction = openTransactionId?.let { transactionDetails[it] }
         val openHolding = openHoldingId?.let { investState?.details?.get(it) }
         val openDeposit = openDepositId?.let { investState?.depositDetails?.get(it) }
+        val openSip = openSipId?.let { investState?.sipDetails?.get(it) }
         when {
             investOverlay == InvestOverlay.Trade -> {
                 BackHandler { investOverlay = null }
@@ -116,6 +121,20 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             investOverlay == InvestOverlay.Action -> {
                 BackHandler { investOverlay = null; invest.actionForm = null }
                 ActionScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.NewSip -> {
+                BackHandler { investOverlay = null; invest.sipForm = null }
+                SipFormScreen(invest, funds = investState?.holdings?.filter { it.instrument == Instrument.MutualFund }.orEmpty(), onClose = { investOverlay = null })
+            }
+            openSip != null -> {
+                BackHandler { openSipId = null }
+                SipDetailScreen(
+                    openSip,
+                    onBack = { openSipId = null },
+                    onPay = { invest.payInstalment(openSip.row.planId, it.due) },
+                    onSkip = { invest.skipInstalment(openSip.row.planId, it.due) },
+                    onStop = { invest.stopSip(openSip.row.planId); openSipId = null },
+                )
             }
             investOverlay == InvestOverlay.NewDeposit -> {
                 BackHandler { investOverlay = null; invest.depositForm = null }
@@ -197,6 +216,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                             onImport = { invest.resetImport(); investOverlay = InvestOverlay.Import },
                             onAllot = { id -> invest.startAllot(id); investOverlay = InvestOverlay.Allot },
                             onNewDeposit = { invest.startDeposit(); investOverlay = InvestOverlay.NewDeposit },
+                            onNewSip = { invest.startSip(); investOverlay = InvestOverlay.NewSip },
+                            onOpenSip = { id -> openSipId = id },
                             onOpenDeposit = { id -> openDepositId = id },
                             onCancelOrder = invest::cancelOrder,
                             contentPadding = PaddingValues(bottom = 132.dp),

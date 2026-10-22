@@ -1,0 +1,1031 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 7,
+    "identityHash": "26905243543efd2fb2c195b274eab110",
+    "entities": [
+      {
+        "tableName": "accounts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `parentId` TEXT, `isArchived` INTEGER NOT NULL, `kind` TEXT, `inNetWorth` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentId",
+            "columnName": "parentId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "inNetWorth",
+            "columnName": "inNetWorth",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "transactions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `date` TEXT NOT NULL, `payee` TEXT NOT NULL, `memo` TEXT, `status` TEXT NOT NULL, `decision` TEXT, `plan` TEXT, `paymentMethod` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payee",
+            "columnName": "payee",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memo",
+            "columnName": "memo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decision",
+            "columnName": "decision",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "plan",
+            "columnName": "plan",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "paymentMethod",
+            "columnName": "paymentMethod",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "postings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `transactionId` TEXT NOT NULL, `accountId` TEXT NOT NULL, `debitPaise` INTEGER, `creditPaise` INTEGER, `units` INTEGER, `unitPrice` INTEGER, FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "debitPaise",
+            "columnName": "debitPaise",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "creditPaise",
+            "columnName": "creditPaise",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "units",
+            "columnName": "units",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unitPrice",
+            "columnName": "unitPrice",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_postings_transactionId",
+            "unique": false,
+            "columnNames": [
+              "transactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_postings_transactionId` ON `${TABLE_NAME}` (`transactionId`)"
+          },
+          {
+            "name": "index_postings_accountId",
+            "unique": false,
+            "columnNames": [
+              "accountId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_postings_accountId` ON `${TABLE_NAME}` (`accountId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "transactions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "transactionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "accounts",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "accountId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "audit_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `whenMillis` INTEGER NOT NULL, `transactionId` TEXT, `action` TEXT NOT NULL, `summary` TEXT NOT NULL, `before` TEXT, `after` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "whenMillis",
+            "columnName": "whenMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "before",
+            "columnName": "before",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "after",
+            "columnName": "after",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "holdings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `accountId` TEXT NOT NULL, `instrument` TEXT NOT NULL, `isin` TEXT, `symbol` TEXT, `fundClass` TEXT, `exitLoadDays` INTEGER, `exitLoadBps` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "instrument",
+            "columnName": "instrument",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isin",
+            "columnName": "isin",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "symbol",
+            "columnName": "symbol",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fundClass",
+            "columnName": "fundClass",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exitLoadDays",
+            "columnName": "exitLoadDays",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "exitLoadBps",
+            "columnName": "exitLoadBps",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_holdings_accountId",
+            "unique": true,
+            "columnNames": [
+              "accountId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_holdings_accountId` ON `${TABLE_NAME}` (`accountId`)"
+          },
+          {
+            "name": "index_holdings_isin",
+            "unique": false,
+            "columnNames": [
+              "isin"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_holdings_isin` ON `${TABLE_NAME}` (`isin`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "accounts",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "accountId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "lots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `holdingId` TEXT NOT NULL, `acquiredOn` TEXT NOT NULL, `units` INTEGER NOT NULL, `costPaise` INTEGER NOT NULL, `lockUntil` TEXT, `fmv2018Paise` INTEGER, `sourceTransactionId` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`holdingId`) REFERENCES `holdings`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`sourceTransactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "holdingId",
+            "columnName": "holdingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "acquiredOn",
+            "columnName": "acquiredOn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "units",
+            "columnName": "units",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costPaise",
+            "columnName": "costPaise",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lockUntil",
+            "columnName": "lockUntil",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fmv2018Paise",
+            "columnName": "fmv2018Paise",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sourceTransactionId",
+            "columnName": "sourceTransactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_lots_holdingId",
+            "unique": false,
+            "columnNames": [
+              "holdingId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_lots_holdingId` ON `${TABLE_NAME}` (`holdingId`)"
+          },
+          {
+            "name": "index_lots_sourceTransactionId",
+            "unique": false,
+            "columnNames": [
+              "sourceTransactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_lots_sourceTransactionId` ON `${TABLE_NAME}` (`sourceTransactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "holdings",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "holdingId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "transactions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sourceTransactionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "lot_consumptions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `lotId` TEXT NOT NULL, `saleTransactionId` TEXT NOT NULL, `units` INTEGER NOT NULL, `costPaise` INTEGER NOT NULL, FOREIGN KEY(`lotId`) REFERENCES `lots`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`saleTransactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lotId",
+            "columnName": "lotId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "saleTransactionId",
+            "columnName": "saleTransactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "units",
+            "columnName": "units",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costPaise",
+            "columnName": "costPaise",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_lot_consumptions_lotId",
+            "unique": false,
+            "columnNames": [
+              "lotId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_lot_consumptions_lotId` ON `${TABLE_NAME}` (`lotId`)"
+          },
+          {
+            "name": "index_lot_consumptions_saleTransactionId",
+            "unique": false,
+            "columnNames": [
+              "saleTransactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_lot_consumptions_saleTransactionId` ON `${TABLE_NAME}` (`saleTransactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "lots",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "lotId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "transactions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "saleTransactionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "prices",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `holdingId` TEXT NOT NULL, `date` TEXT NOT NULL, `price` INTEGER NOT NULL, `source` TEXT NOT NULL, `status` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, FOREIGN KEY(`holdingId`) REFERENCES `holdings`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "holdingId",
+            "columnName": "holdingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "price",
+            "columnName": "price",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_prices_holdingId_date",
+            "unique": false,
+            "columnNames": [
+              "holdingId",
+              "date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_prices_holdingId_date` ON `${TABLE_NAME}` (`holdingId`, `date`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "holdings",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "holdingId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "fixed_deposits",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` TEXT NOT NULL, `principalPaise` INTEGER NOT NULL, `rateBps` INTEGER NOT NULL, `compounding` TEXT NOT NULL, `startDate` TEXT NOT NULL, `maturityDate` TEXT NOT NULL, `autoRenew` INTEGER NOT NULL, `penaltyBps` INTEGER NOT NULL, `openTransactionId` TEXT, `closedOn` TEXT, `payoutPaise` INTEGER, `closeTransactionId` TEXT, PRIMARY KEY(`accountId`), FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "principalPaise",
+            "columnName": "principalPaise",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rateBps",
+            "columnName": "rateBps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "compounding",
+            "columnName": "compounding",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startDate",
+            "columnName": "startDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maturityDate",
+            "columnName": "maturityDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoRenew",
+            "columnName": "autoRenew",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "penaltyBps",
+            "columnName": "penaltyBps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "openTransactionId",
+            "columnName": "openTransactionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "closedOn",
+            "columnName": "closedOn",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "payoutPaise",
+            "columnName": "payoutPaise",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "closeTransactionId",
+            "columnName": "closeTransactionId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountId"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "accounts",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "accountId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sip_plans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `holdingId` TEXT NOT NULL, `amountPaise` INTEGER NOT NULL, `dayOfMonth` INTEGER NOT NULL, `fromAccountId` TEXT NOT NULL, `startDate` TEXT NOT NULL, `endDate` TEXT, `goalId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`holdingId`) REFERENCES `holdings`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`fromAccountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "holdingId",
+            "columnName": "holdingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountPaise",
+            "columnName": "amountPaise",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dayOfMonth",
+            "columnName": "dayOfMonth",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromAccountId",
+            "columnName": "fromAccountId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startDate",
+            "columnName": "startDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endDate",
+            "columnName": "endDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "goalId",
+            "columnName": "goalId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sip_plans_holdingId",
+            "unique": false,
+            "columnNames": [
+              "holdingId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sip_plans_holdingId` ON `${TABLE_NAME}` (`holdingId`)"
+          },
+          {
+            "name": "index_sip_plans_fromAccountId",
+            "unique": false,
+            "columnNames": [
+              "fromAccountId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sip_plans_fromAccountId` ON `${TABLE_NAME}` (`fromAccountId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "holdings",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "holdingId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "accounts",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fromAccountId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "corporate_actions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `holdingId` TEXT NOT NULL, `kind` TEXT NOT NULL, `date` TEXT NOT NULL, `ratioMicro` INTEGER, `amountPaise` INTEGER, `transactionId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`holdingId`) REFERENCES `holdings`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "holdingId",
+            "columnName": "holdingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ratioMicro",
+            "columnName": "ratioMicro",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "amountPaise",
+            "columnName": "amountPaise",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_corporate_actions_holdingId",
+            "unique": false,
+            "columnNames": [
+              "holdingId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_corporate_actions_holdingId` ON `${TABLE_NAME}` (`holdingId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "holdings",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "holdingId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pending_allotments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `holdingId` TEXT NOT NULL, `orderDate` TEXT NOT NULL, `amountPaise` INTEGER NOT NULL, `orderTransactionId` TEXT NOT NULL, `allotmentTransactionId` TEXT, `cancelTransactionId` TEXT, `sipPlanId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`holdingId`) REFERENCES `holdings`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`orderTransactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "holdingId",
+            "columnName": "holdingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderDate",
+            "columnName": "orderDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountPaise",
+            "columnName": "amountPaise",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orderTransactionId",
+            "columnName": "orderTransactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allotmentTransactionId",
+            "columnName": "allotmentTransactionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cancelTransactionId",
+            "columnName": "cancelTransactionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sipPlanId",
+            "columnName": "sipPlanId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pending_allotments_holdingId",
+            "unique": false,
+            "columnNames": [
+              "holdingId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_allotments_holdingId` ON `${TABLE_NAME}` (`holdingId`)"
+          },
+          {
+            "name": "index_pending_allotments_orderTransactionId",
+            "unique": false,
+            "columnNames": [
+              "orderTransactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_allotments_orderTransactionId` ON `${TABLE_NAME}` (`orderTransactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "holdings",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "holdingId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "transactions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "orderTransactionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sip_skips",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`planId` TEXT NOT NULL, `dueDate` TEXT NOT NULL, PRIMARY KEY(`planId`, `dueDate`), FOREIGN KEY(`planId`) REFERENCES `sip_plans`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "planId",
+            "columnName": "planId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dueDate",
+            "columnName": "dueDate",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "planId",
+            "dueDate"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "sip_plans",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "planId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '26905243543efd2fb2c195b274eab110')"
+    ]
+  }
+}

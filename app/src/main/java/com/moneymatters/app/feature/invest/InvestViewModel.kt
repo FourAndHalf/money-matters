@@ -49,9 +49,11 @@ class InvestViewModel(
     private val invest: InvestRepository,
     private val rules: CapitalGainsRules,
     private val today: () -> LocalDate = LocalDate::now,
+    /** The wealth goal SIP shortfalls are measured against, if the investor has one. */
+    private val goal: () -> SipGoal? = { null },
 ) : ViewModel() {
 
-    val state: StateFlow<InvestState?> = combine(ledger.snapshot(), invest.snapshot()) { l, i -> buildInvest(l, i, today(), rules) }
+    val state: StateFlow<InvestState?> = combine(ledger.snapshot(), invest.snapshot()) { l, i -> buildInvest(l, i, today(), rules, goal()) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -108,6 +110,52 @@ class InvestViewModel(
                 error = "Couldn't save the trade. Nothing was changed."
             } finally {
                 isSaving = false
+            }
+        }
+    }
+
+    // ---- SIPs ----
+    var sipForm by mutableStateOf<SipForm?>(null)
+
+    fun startSip() {
+        sipForm = SipForm(start = today())
+        error = null
+    }
+
+    fun saveSip(onSaved: () -> Unit) {
+        val form = sipForm ?: return
+        val holdingId = form.holdingId ?: return
+        val amount = form.amount ?: return
+        val day = form.day ?: return
+        val accountId = form.accountId ?: return
+        viewModelScope.launch {
+            try {
+                invest.createSipPlan(holdingId, amount, day, accountId, form.start)
+                sipForm = null
+                onSaved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't save the SIP."
+            }
+        }
+    }
+
+    /** Confirms a due instalment as paid; it goes In Transit and can then be allotted. */
+    fun payInstalment(planId: String, due: LocalDate) = launchSip { invest.payInstalment(planId, due) }
+
+    fun skipInstalment(planId: String, due: LocalDate) = launchSip { invest.skipInstalment(planId, due) }
+
+    fun stopSip(planId: String) = launchSip { invest.stopSip(planId, today()) }
+
+    private fun launchSip(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't update the SIP."
             }
         }
     }

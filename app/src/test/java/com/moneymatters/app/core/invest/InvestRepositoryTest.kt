@@ -455,4 +455,76 @@ class InvestRepositoryTest {
         assertEquals(LocalDate.of(2026, 1, 10), invest.openLots(elss.id).single().lockUntil)
         assertEquals(Instrument.Stock, db.investDao().holdingBySymbol("TCS")!!.instrument)
     }
+
+    // ---- SIPs ----
+
+    private fun sipPlan(start: LocalDate = LocalDate.of(2026, 1, 1)): Pair<String, String> = runBlocking {
+        val (fundId, _) = fund("PPFAS Flexi Cap", FundClass.Equity)
+        fundId to invest.createSipPlan(fundId, 10_000.rupees, 5, bank, start)
+    }
+
+    @Test fun `confirming an instalment sends the money In Transit against the plan`() = runBlocking {
+        val (fundId, plan) = sipPlan()
+        val order = invest.payInstalment(plan, LocalDate.of(2026, 2, 5))
+        val pending = db.investDao().getPending(order)!!
+        assertEquals(plan, pending.sipPlanId)
+        assertEquals("2026-02-05", pending.orderDate)
+        assertEquals(10_000_00L, pending.amountPaise)
+        assertEquals((-10_000).rupees, ledger.accountBalance(bank))
+        assertEquals(10_000.rupees, ledger.accountBalance(ledger.accountIdByName(IN_TRANSIT)!!))
+        assertEquals(fundId, pending.holdingId)
+    }
+
+    @Test fun `an instalment can't be paid twice, off-schedule or after the plan ended`() = runBlocking {
+        val (_, plan) = sipPlan()
+        invest.payInstalment(plan, LocalDate.of(2026, 2, 5))
+        assertThrows(IllegalStateException::class.java) { runBlocking { invest.payInstalment(plan, LocalDate.of(2026, 2, 5)) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.payInstalment(plan, LocalDate.of(2026, 2, 6)) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.payInstalment(plan, LocalDate.of(2025, 12, 5)) } }
+        invest.stopSip(plan, LocalDate.of(2026, 3, 1))
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.payInstalment(plan, LocalDate.of(2026, 4, 5)) } }
+        Unit
+    }
+
+    @Test fun `cancelling a SIP order makes its instalment payable again`() = runBlocking {
+        val (_, plan) = sipPlan()
+        val order = invest.payInstalment(plan, LocalDate.of(2026, 2, 5))
+        invest.cancelPending(order, LocalDate.of(2026, 2, 6))
+        invest.payInstalment(plan, LocalDate.of(2026, 2, 5)) // no longer "already paid"
+        assertEquals(2, db.investDao().getAllPending().size)
+    }
+
+    @Test fun `a skipped instalment can still be paid later`() = runBlocking {
+        val (_, plan) = sipPlan()
+        invest.skipInstalment(plan, LocalDate.of(2026, 2, 5))
+        invest.skipInstalment(plan, LocalDate.of(2026, 2, 5)) // idempotent
+        assertEquals(1, db.investDao().getAllSipSkips().size)
+        invest.payInstalment(plan, LocalDate.of(2026, 2, 5))
+        Unit
+    }
+
+    @Test fun `a SIP needs a positive amount, a real day, a fund and a sensible end`() {
+        val (fundId, _) = fund("Some Fund", FundClass.Equity)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.createSipPlan(fundId, Paise.Zero, 5, bank, LocalDate.of(2026, 1, 1)) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.createSipPlan(fundId, 1_000.rupees, 0, bank, LocalDate.of(2026, 1, 1)) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { invest.createSipPlan(fundId, 1_000.rupees, 5, bank, LocalDate.of(2026, 1, 1), LocalDate.of(2025, 1, 1)) } }
+        assertThrows(IllegalStateException::class.java) { runBlocking { invest.createSipPlan(holding, 1_000.rupees, 5, bank, LocalDate.of(2026, 1, 1)) } }
+    }
+
+    @Test fun `an order's own entry can't be edited or reversed, but reversing its cancellation reopens it`() = runBlocking {
+        val (fundId, _) = fund("PPFAS Flexi Cap", FundClass.Equity)
+        val order = invest.orderFund(fundId, LocalDate.of(2026, 10, 1), 5_000.rupees, bank, "Buy (in transit)")
+        val orderTxn = db.investDao().getPending(order)!!.orderTransactionId
+        assertThrows(IllegalLifecycleTransitionException::class.java) {
+            runBlocking { ledger.edit(orderTxn, LocalDate.of(2026, 10, 1), "x", listOf(PostingLine(bank, credit = 1.rupees), PostingLine(ledger.accountIdByName(IN_TRANSIT)!!, debit = 1.rupees))) }
+        }
+        ledger.reconcile(orderTxn)
+        assertThrows(IllegalLifecycleTransitionException::class.java) { runBlocking { ledger.reverse(orderTxn, "oops") } }
+
+        val cancel = invest.cancelPending(order, LocalDate.of(2026, 10, 2))
+        ledger.reconcile(cancel)
+        ledger.reverse(cancel, "cancelled by mistake")
+        assertEquals(true, db.investDao().getPending(order)!!.isOpen)
+        Unit
+    }
 }

@@ -82,6 +82,19 @@ data class ActionForm(
     val canSave: Boolean get() = ratio != null
 }
 
+/** A new monthly SIP into one of the investor's funds. [dayText] is the day of the month it is paid on. */
+data class SipForm(
+    val start: LocalDate,
+    val holdingId: String? = null,
+    val amountText: String = "",
+    val dayText: String = "5",
+    val accountId: String? = null,
+) {
+    val amount: Paise? get() = parseRupees(amountText)?.takeIf { it.value > 0 }
+    val day: Int? get() = dayText.trim().toIntOrNull()?.takeIf { it in 1..31 }
+    val canSave: Boolean get() = holdingId != null && amount != null && day != null && accountId != null
+}
+
 /** Units arriving for an order that was waiting In Transit. [navText] is optional; the price is worked out from the amount otherwise. */
 data class AllotForm(val pendingId: String, val date: LocalDate, val unitsText: String = "", val navText: String = "") {
     val units: Units? get() = parseUnits(unitsText)?.takeIf { it.micro > 0 }
