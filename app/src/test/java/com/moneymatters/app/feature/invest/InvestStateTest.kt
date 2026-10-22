@@ -286,4 +286,45 @@ class InvestStateTest {
         assertEquals("7.25%", formatBps(725))
         assertEquals("0.50%", formatBps(50))
     }
+
+    @Test fun `a SIP shows its schedule, what is due and missed, and what the misses cost the goal`() {
+        val fund = runBlocking { invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity) }
+        val plan = runBlocking { invest.createSipPlan(fund, 10_000.rupees, 5, bank, LocalDate.of(2026, 6, 1)) }
+        runBlocking {
+            invest.payInstalment(plan, LocalDate.of(2026, 6, 5))
+            invest.skipInstalment(plan, LocalDate.of(2026, 7, 5))
+        }
+        // today is 20 Oct 2026: Aug, Sep are missed; July skipped; Oct 5 is 15 days overdue so missed too.
+        val goal = SipGoal(LocalDate.of(2029, 11, 20), 0.12)
+        val s = buildInvest(runBlocking { ledger.snapshot().first() }, runBlocking { invest.snapshot().first() }, today, rules, goal)
+        val row = s.sips.single()
+        assertEquals("Flexi Cap", row.fundName)
+        assertEquals("on the 5th of every month", row.scheduleLabel)
+        assertEquals("5 Nov 2026", row.nextLabel)
+        assertEquals(4, row.missedCount) // skipped Jul + missed Aug, Sep, Oct
+        assertEquals(3, row.dueCount)    // Aug, Sep, Oct still waiting (the skipped one isn't)
+        assertTrue(s.hasFunds)
+
+        val detail = s.sipDetails.getValue(plan)
+        assertEquals(1, detail.paidCount)
+        assertEquals(listOf("5 Oct 2026", "5 Sep 2026", "5 Aug 2026", "5 Jul 2026"), detail.dues.map { it.dateLabel })
+        assertEquals("20 Nov 2029", detail.goalLabel)
+        val impact = detail.missedImpact!!
+        val oneLump = com.moneymatters.app.feature.dashboard.projectedValue(10_000.rupees, Paise.Zero, 37, 0.12)
+        assertTrue("4 missed lumps should be worth more than one: $impact vs $oneLump", impact.value > oneLump.value * 3)
+    }
+
+    @Test fun `no goal means no impact figure, and a stopped SIP shows as ended`() {
+        val fund = runBlocking { invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity) }
+        val plan = runBlocking { invest.createSipPlan(fund, 10_000.rupees, 5, bank, LocalDate.of(2026, 6, 1)) }
+        runBlocking { invest.stopSip(plan, LocalDate.of(2026, 8, 1)) }
+        val s = state()
+        assertNull(s.sipDetails.getValue(plan).missedImpact)
+        assertTrue(s.sips.single().ended)
+        assertNull(s.sips.single().nextLabel)
+    }
+
+    @Test fun `ordinals read naturally`() {
+        assertEquals(listOf("1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "31st"), listOf(1, 2, 3, 4, 11, 12, 13, 21, 22, 31).map(::ordinal))
+    }
 }

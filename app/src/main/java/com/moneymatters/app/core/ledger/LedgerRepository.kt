@@ -176,6 +176,9 @@ class LedgerRepository(
             throw IllegalLifecycleTransitionException("Cannot reverse a ${original.status} transaction; only Reconciled entries can be")
         }
         val invest = database.investDao()
+        if (invest.pendingCountForOrder(transactionId) > 0) {
+            throw IllegalLifecycleTransitionException("This entry sent money to In Transit for a fund order; cancel the order from the Invest tab instead")
+        }
         val createdLots = invest.lotsFromTransaction(transactionId)
         if (createdLots.any { invest.consumptionCountForLot(it.id) > 0 }) {
             throw IllegalLifecycleTransitionException("Cannot reverse this purchase while later sales have used its lots; reverse those sales first")
@@ -201,6 +204,7 @@ class LedgerRepository(
             createdLots.forEach { invest.deleteLot(it.id) }
             invest.deleteCorporateActionsForTransaction(transactionId)
             invest.reopenPendingForAllotment(transactionId)
+            invest.reopenPendingCancelledBy(transactionId)
             invest.reopenDepositsClosedBy(transactionId)
             invest.deleteDepositsOpenedBy(transactionId)
             audit(reversalId, "Reversal", "Reverses $transactionId: $reason")
@@ -248,7 +252,8 @@ class LedgerRepository(
 
     private suspend fun isInvestmentEntry(transactionId: String): Boolean {
         val invest = database.investDao()
-        return invest.lotsFromTransaction(transactionId).isNotEmpty() || invest.consumptionCountForSale(transactionId) > 0
+        return invest.lotsFromTransaction(transactionId).isNotEmpty() || invest.consumptionCountForSale(transactionId) > 0 ||
+            invest.pendingCountForOrder(transactionId) > 0
     }
 
     private suspend fun requireTransaction(id: String) =

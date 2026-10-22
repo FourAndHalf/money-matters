@@ -64,7 +64,7 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(6, db.openHelper.readableDatabase.version) // 1 → 2 → 3 → 4 → 5 → 6 in one open
+            assertEquals(7, db.openHelper.readableDatabase.version) // 1 → 2 → … → 7 in one open
         }
         db.close()
     }
@@ -85,7 +85,7 @@ class MigrationTest {
             assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
             assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
             assertNull(db.investDao().holdingForAccount("bank"))
-            assertEquals(6, db.openHelper.readableDatabase.version)
+            assertEquals(7, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -104,7 +104,7 @@ class MigrationTest {
             assertEquals(180_000L, action.amountPaise)
             assertNull(action.ratioMicro)
             assertNull(action.transactionId)
-            assertEquals(6, db.openHelper.readableDatabase.version)
+            assertEquals(7, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -120,7 +120,7 @@ class MigrationTest {
         runBlocking {
             assertEquals("h1", db.investDao().holdingForAccount("a1")!!.id)
             assertEquals(0, db.investDao().getAllPending().size)
-            assertEquals(6, db.openHelper.readableDatabase.version)
+            assertEquals(7, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -138,7 +138,25 @@ class MigrationTest {
             assertEquals(10_000_000L, fd.principalPaise)
             assertNull(fd.closedOn)
             assertNull(fd.openTransactionId)
-            assertEquals(6, db.openHelper.readableDatabase.version)
+            assertEquals(7, db.openHelper.readableDatabase.version)
+        }
+        db.close()
+    }
+
+    @Test fun `v6 to v7 keeps SIP plans and adds a place for skipped instalments`() {
+        createDatabase(6).apply {
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind, inNetWorth) VALUES ('a1', 'PPFAS', 'Asset', NULL, 0, 'Investment', 1)")
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind, inNetWorth) VALUES ('bank', 'HDFC', 'Asset', NULL, 0, 'Bank', 1)")
+            execSQL("INSERT INTO holdings (id, accountId, instrument, fundClass) VALUES ('h1', 'a1', 'MutualFund', 'Equity')")
+            execSQL("INSERT INTO sip_plans (id, holdingId, amountPaise, dayOfMonth, fromAccountId, startDate) VALUES ('s1', 'h1', 1000000, 5, 'bank', '2026-01-01')")
+            close()
+        }
+
+        val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
+        runBlocking {
+            assertEquals(1_000_000L, db.investDao().getSipPlan("s1")!!.amountPaise)
+            assertEquals(0, db.investDao().getAllSipSkips().size)
+            assertEquals(7, db.openHelper.readableDatabase.version)
         }
         db.close()
     }

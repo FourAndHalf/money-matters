@@ -107,6 +107,10 @@ data class InvestState(
     val pending: List<PendingRow> = emptyList(),
     val deposits: List<DepositRow> = emptyList(),
     val depositDetails: Map<String, DepositDetail> = emptyMap(),
+    val sips: List<SipRow> = emptyList(),
+    val sipDetails: Map<String, SipDetail> = emptyMap(),
+    /** Whether there is a fund to start a SIP in. */
+    val hasFunds: Boolean = false,
 )
 
 /** A fixed deposit in the portfolio list; [value] is principal plus interest earned so far. */
@@ -162,7 +166,7 @@ private fun perUnit(cost: Paise, units: Long): String =
     if (units <= 0) "—" else Paise((cost.value * 1_000_000 + units / 2) / units).formatInr(showPaise = true)
 
 /** Builds [InvestState]. Pure: same snapshots in, same state out. */
-fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate, rules: CapitalGainsRules): InvestState {
+fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate, rules: CapitalGainsRules, goal: SipGoal? = null): InvestState {
     val accountsById = ledger.accounts.associateBy { it.id }
     val valued = valuations(invest)
     val rowsById = valued.associate { v -> v.holding.id to rowFor(v, accountsById.getValue(v.holding.accountId).name) }
@@ -193,6 +197,7 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
     val totalGain = gain + Paise(openDeposits.sumOf { it.accruedInterest.value })
     val totalPricedCost = pricedCost + openDeposits.sumOf { it.principal.value }
     val allPriced = (held.isNotEmpty() || deposits.isNotEmpty()) && held.all { it.marketValue != null }
+    val (sipRows, sipDetails) = buildSips(ledger, invest, today, goal, rowsById.mapValues { it.value.name })
     val depositRows = deposits.associate { v -> v.deposit.accountId to depositRow(v, accountsById.getValue(v.deposit.accountId).name, today) }
     return InvestState(
         holdings = holdings,
@@ -203,6 +208,9 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
         xirr = if (allPriced) xirr(flows + CashFlow(today, totalValue)) else null,
         deposits = openDeposits.sortedBy { it.deposit.maturityDate }.map { depositRows.getValue(it.deposit.accountId) },
         depositDetails = deposits.associate { v -> v.deposit.accountId to depositDetail(v, depositRows.getValue(v.deposit.accountId), today) },
+        sips = sipRows,
+        sipDetails = sipDetails,
+        hasFunds = valued.any { it.holding.instrument == Instrument.MutualFund },
         unpricedCount = held.count { it.marketValue == null },
         details = details,
         pending = invest.pending.filter { it.isOpen }.sortedBy { it.orderDate }.map { p ->

@@ -46,6 +46,8 @@ fun InvestScreen(
     onCancelOrder: (pendingId: String) -> Unit = {},
     onNewDeposit: () -> Unit = {},
     onOpenDeposit: (accountId: String) -> Unit = {},
+    onNewSip: () -> Unit = {},
+    onOpenSip: (planId: String) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -95,6 +97,30 @@ fun InvestScreen(
                                             Pill("Cancel", { onCancelOrder(p.id) }, height = 26.dp)
                                             Pill("Allot", { onAllot(p.id) }, style = PillStyle.Primary, height = 26.dp)
                                         }
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            if (state.hasFunds || state.sips.isNotEmpty()) {
+                item("sips") {
+                    Module(Modifier.padding(horizontal = margin)) {
+                        ModuleHeader("SIPs", subtitle = if (state.sips.isEmpty()) "Monthly investments into a fund" else "${state.sips.size} ${if (state.sips.size == 1) "SIP" else "SIPs"}", action = { Pill("+ New", onNewSip, height = 28.dp) })
+                        state.sips.forEachIndexed { i, sip ->
+                            ListRow(
+                                title = sip.fundName,
+                                subtitle = "${sip.amount.formatInr()} ${sip.scheduleLabel}" + (sip.nextLabel?.takeIf { !sip.ended }?.let { " · next $it" } ?: ""),
+                                divider = i < state.sips.lastIndex,
+                                modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open ${sip.fundName} SIP") { onOpenSip(sip.planId) },
+                                leading = { GlyphChip(text = "↻") },
+                                trailing = {
+                                    when {
+                                        sip.ended -> StatusBadge("Ended", Tone.Neutral)
+                                        sip.missedCount > 0 -> StatusBadge("${sip.missedCount} missed", Tone.Negative)
+                                        sip.dueCount > 0 -> StatusBadge("${sip.dueCount} due", Tone.Warning)
+                                        else -> StatusBadge("On track", Tone.Positive)
                                     }
                                 },
                             )

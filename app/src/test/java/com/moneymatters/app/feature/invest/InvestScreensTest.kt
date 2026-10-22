@@ -307,4 +307,73 @@ class InvestScreensTest {
         compose.onNodeWithText("Renew into a new deposit").assertIsDisplayed()
         compose.onNodeWithText("Paid into").assertIsDisplayed()
     }
+
+    private val sipRow = SipRow("s1", "PPFAS Flexi Cap", 10_000.rupees, "on the 5th of every month", "5 Nov 2026", dueCount = 2, missedCount = 1, ended = false)
+    private val sipDetail = SipDetail(
+        row = sipRow, fromAccountName = "HDFC Bank",
+        dues = listOf(DueRow(LocalDate.of(2026, 10, 5), "5 Oct 2026", com.moneymatters.app.core.invest.InstalmentState.Missed), DueRow(LocalDate.of(2026, 11, 5), "5 Nov 2026", com.moneymatters.app.core.invest.InstalmentState.Due)),
+        paidCount = 4, missedImpact = 52_000.rupees, goalLabel = "20 Nov 2029",
+    )
+
+    @Test fun `the portfolio lists SIPs with their status and offers a new one`() {
+        var opened: String? = null
+        var added = false
+        val withSip = state.copy(sips = listOf(sipRow, sipRow.copy(planId = "s2", fundName = "Index Fund", missedCount = 0, dueCount = 0)), hasFunds = true)
+        compose.setContent { MoneyMattersTheme { InvestScreen(withSip, onOpenHolding = {}, onBuy = {}, onImport = {}, onNewSip = { added = true }, onOpenSip = { opened = it }) } }
+        compose.onNodeWithText("SIPs").assertIsDisplayed()
+        compose.onNodeWithText("1 missed").assertIsDisplayed()
+        compose.onNodeWithText("On track").assertIsDisplayed()
+        compose.onNodeWithText("PPFAS Flexi Cap").performClick()
+        compose.onNodeWithText("+ New").performClick()
+        assertEquals("s1", opened)
+        assertTrue(added)
+    }
+
+    @Test fun `a portfolio with a fund but no SIP invites starting one`() {
+        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(hasFunds = true), onOpenHolding = {}, onBuy = {}, onImport = {}) } }
+        compose.onNodeWithText("Monthly investments into a fund").assertIsDisplayed()
+    }
+
+    @Test fun `SIP detail shows what's waiting, the goal impact, and Paid, Skip and Stop work`() {
+        var paid: LocalDate? = null
+        var skipped: LocalDate? = null
+        var stopped = false
+        compose.setContent { MoneyMattersTheme { SipDetailScreen(sipDetail, onBack = {}, onPay = { paid = it.due }, onSkip = { skipped = it.due }, onStop = { stopped = true }) } }
+        compose.onNodeWithText("Missed instalments cost your goal").assertIsDisplayed()
+        compose.onNodeWithText("They would have grown to about ₹52,000 by 20 Nov 2029.").assertIsDisplayed()
+        compose.onNodeWithText("Missed").assertIsDisplayed()
+        compose.onAllNodesWithText("Paid")[0].performClick()
+        compose.onAllNodesWithText("Skip")[0].performClick()
+        compose.onNodeWithText("Stop this SIP").performClick()
+        assertEquals(false, stopped) // one tap only asks for confirmation
+        compose.onNodeWithText("Tap again to stop this SIP").performClick()
+        assertEquals(LocalDate.of(2026, 10, 5), paid)
+        assertEquals(LocalDate.of(2026, 10, 5), skipped)
+        assertTrue(stopped)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_sip_detail.png")
+    }
+
+    @Test fun `an ended SIP offers no stop button, and a skipped instalment offers no skip`() {
+        val ended = sipDetail.copy(
+            row = sipRow.copy(ended = true),
+            dues = listOf(DueRow(LocalDate.of(2026, 7, 5), "5 Jul 2026", com.moneymatters.app.core.invest.InstalmentState.Skipped)),
+        )
+        compose.setContent { MoneyMattersTheme { SipDetailScreen(ended, onBack = {}, onPay = {}, onSkip = {}, onStop = {}) } }
+        assertEquals(0, compose.onAllNodesWithText("Stop this SIP").fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodesWithText("Skip").fetchSemanticsNodes().size)
+        compose.onNodeWithText("Skipped").assertIsDisplayed()
+    }
+
+    @Test fun `the SIP form lists funds to choose from, or says to buy one first`() {
+        val form = SipForm(LocalDate.of(2026, 10, 20))
+        compose.setContent { MoneyMattersTheme { SipFormContent(form, listOf(infy.copy(name = "PPFAS Flexi Cap")), emptyList(), null, {}, {}, {}) } }
+        compose.onNodeWithText("PPFAS Flexi Cap").assertIsDisplayed()
+        compose.onNodeWithText("Start SIP").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_sip_form.png")
+    }
+
+    @Test fun `the SIP form with no funds says to buy one first`() {
+        compose.setContent { MoneyMattersTheme { SipFormContent(SipForm(LocalDate.of(2026, 10, 20)), emptyList(), emptyList(), null, {}, {}, {}) } }
+        compose.onNodeWithText("Buy a mutual fund first, then set up its SIP.").assertIsDisplayed()
+    }
 }

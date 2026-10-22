@@ -29,6 +29,7 @@ import com.moneymatters.app.core.security.BiometricUnlock
 import com.moneymatters.app.core.security.PasscodeStore
 import com.moneymatters.app.feature.books.BooksViewModel
 import com.moneymatters.app.feature.invest.InvestViewModel
+import com.moneymatters.app.feature.invest.SipGoal
 import com.moneymatters.app.feature.lock.AppLock
 import com.moneymatters.app.feature.lock.LockScreen
 import com.moneymatters.app.feature.onboarding.OnboardingSaver
@@ -60,7 +61,15 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val investModel: InvestViewModel by viewModels {
-        viewModelFactory { initializer { InvestViewModel(ledgerRepo, investRepo, capitalGainsRules) } }
+        viewModelFactory {
+            initializer {
+                InvestViewModel(
+                    ledgerRepo, investRepo, capitalGainsRules,
+                    // The ₹1 Crore-by-30 goal's date is the 30th birthday; 12% is a placeholder until Goals (P16) lets it be set.
+                    goal = { profiles.profile()?.takeIf { it.croreByThirtyGoal }?.let { SipGoal(it.dateOfBirth.plusYears(30), 0.12) } },
+                )
+            }
+        }
     }
     private val appLock: AppLock by viewModels {
         viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet()) } }

@@ -32,9 +32,9 @@ class InvestRepository(
 
     /** Every holding, lot, sale and price at one moment, re-read after any investment write. */
     fun snapshot(): Flow<InvestSnapshot> =
-        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments", "fixed_deposits").map {
+        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments", "fixed_deposits", "sip_plans", "sip_skips").map {
             database.withTransaction {
-                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending(), dao.getAllFixedDeposits())
+                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending(), dao.getAllFixedDeposits(), dao.getAllSipPlans(), dao.getAllSipSkips())
             }
         }
 
@@ -369,6 +369,49 @@ class InvestRepository(
         return delta
     }
 
+    // ---- SIPs ----
+
+    /** Starts a monthly SIP into a fund. Instalments are proposed from [start]; each is confirmed with [payInstalment]. */
+    suspend fun createSipPlan(holdingId: String, amount: Paise, dayOfMonth: Int, fromAccountId: String, start: LocalDate, end: LocalDate? = null): String {
+        require(amount.value > 0) { "The SIP amount must be positive" }
+        require(dayOfMonth in 1..31) { "Day of month must be 1 to 31" }
+        require(end == null || end.isAfter(start)) { "A SIP must end after it starts" }
+        check(requireHolding(holdingId).instrument == Instrument.MutualFund) { "A SIP goes into a mutual fund" }
+        val id = newId()
+        dao.insertSipPlan(SipPlanEntity(id, holdingId, amount.value, dayOfMonth, fromAccountId, start.toString(), end?.toString()))
+        return id
+    }
+
+    /** Ends a SIP after [lastDate]; instalments due later are no longer proposed. */
+    suspend fun stopSip(planId: String, lastDate: LocalDate) {
+        val plan = dao.getSipPlan(planId) ?: throw NoSuchElementException("No SIP with id $planId")
+        dao.updateSipPlan(plan.copy(endDate = lastDate.toString()))
+    }
+
+    /**
+     * Confirms an instalment as paid: the money goes In Transit for the fund, ready to be allotted units.
+     * [due] must be one of the plan's own dates and not already paid; a skipped instalment can still be paid later.
+     * Returns the order's id.
+     */
+    suspend fun payInstalment(planId: String, due: LocalDate): String = ledger.inTransaction {
+        val plan = dao.getSipPlan(planId) ?: throw NoSuchElementException("No SIP with id $planId")
+        val end = plan.endDate?.let(LocalDate::parse)
+        require(sipDueDates(LocalDate.parse(plan.startDate), plan.dayOfMonth, due).lastOrNull() == due && (end == null || !due.isAfter(end))) {
+            "That isn't one of this SIP's due dates"
+        }
+        val alreadyPaid = dao.getAllPending().any { it.sipPlanId == planId && it.orderDate == due.toString() && it.cancelTransactionId == null }
+        check(!alreadyPaid) { "That instalment is already paid" }
+        val holding = requireHolding(plan.holdingId)
+        val name = database.ledgerDao().getAccount(holding.accountId)?.name ?: "fund"
+        orderFund(plan.holdingId, due, Paise(plan.amountPaise), plan.fromAccountId, "SIP $name", sipPlanId = planId)
+    }
+
+    /** Skips an instalment on purpose: it stops being proposed, and still counts as missed. */
+    suspend fun skipInstalment(planId: String, due: LocalDate) {
+        dao.getSipPlan(planId) ?: throw NoSuchElementException("No SIP with id $planId")
+        dao.insertSipSkip(SipSkipEntity(planId, due.toString()))
+    }
+
     // ---- Fund purchases waiting for units (In Transit) ----
 
     /** Sends [amount] for a fund purchase: it leaves [fromAccountId] and waits In Transit until [allot] gives it units. */
@@ -449,6 +492,8 @@ data class InvestSnapshot(
     val corporateActions: List<CorporateActionEntity> = emptyList(),
     val pending: List<PendingAllotmentEntity> = emptyList(),
     val fixedDeposits: List<FixedDepositEntity> = emptyList(),
+    val sipPlans: List<SipPlanEntity> = emptyList(),
+    val sipSkips: List<SipSkipEntity> = emptyList(),
 ) {
     companion object { val Empty = InvestSnapshot(emptyList(), emptyList(), emptyList(), emptyList()) }
 }
