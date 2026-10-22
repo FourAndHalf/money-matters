@@ -29,6 +29,9 @@ import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.feature.books.BooksState
 import com.moneymatters.app.feature.invest.ActionScreen
 import com.moneymatters.app.feature.invest.AllotScreen
+import com.moneymatters.app.feature.invest.DepositCloseScreen
+import com.moneymatters.app.feature.invest.DepositDetailScreen
+import com.moneymatters.app.feature.invest.DepositScreen
 import com.moneymatters.app.feature.invest.DividendScreen
 import com.moneymatters.app.feature.invest.HoldingDetailScreen
 import com.moneymatters.app.feature.invest.ImportScreen
@@ -62,7 +65,7 @@ private const val ACCOUNTS_TAB = 2
 private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
 
-private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot }
+private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot, NewDeposit, CloseDeposit }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
@@ -77,6 +80,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var openHoldingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openDepositId by rememberSaveable { mutableStateOf<String?>(null) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
     val c = MoneyTheme.colors
@@ -91,6 +95,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
         val openLedger = openAccountId?.let { ledgers[it] }
         val openTransaction = openTransactionId?.let { transactionDetails[it] }
         val openHolding = openHoldingId?.let { investState?.details?.get(it) }
+        val openDeposit = openDepositId?.let { investState?.depositDetails?.get(it) }
         when {
             investOverlay == InvestOverlay.Trade -> {
                 BackHandler { investOverlay = null }
@@ -111,6 +116,23 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             investOverlay == InvestOverlay.Action -> {
                 BackHandler { investOverlay = null; invest.actionForm = null }
                 ActionScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.NewDeposit -> {
+                BackHandler { investOverlay = null; invest.depositForm = null }
+                DepositScreen(invest, onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.CloseDeposit -> {
+                BackHandler { investOverlay = null; invest.closeForm = null }
+                if (openDeposit != null) DepositCloseScreen(invest, openDeposit, onClose = { investOverlay = null; openDepositId = null }) else LaunchedEffect(Unit) { investOverlay = null }
+            }
+            openDeposit != null -> {
+                BackHandler { openDepositId = null }
+                DepositDetailScreen(
+                    openDeposit,
+                    onBack = { openDepositId = null },
+                    onPostInterest = { invest.postInterest(openDeposit.row.accountId) },
+                    onClose = { invest.startClose(openDeposit.row.accountId); investOverlay = InvestOverlay.CloseDeposit },
+                )
             }
             investOverlay == InvestOverlay.Allot -> {
                 BackHandler { investOverlay = null; invest.allotForm = null }
@@ -174,6 +196,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                             onBuy = { invest.startTrade(TradeSide.Buy); investOverlay = InvestOverlay.Trade },
                             onImport = { invest.resetImport(); investOverlay = InvestOverlay.Import },
                             onAllot = { id -> invest.startAllot(id); investOverlay = InvestOverlay.Allot },
+                            onNewDeposit = { invest.startDeposit(); investOverlay = InvestOverlay.NewDeposit },
+                            onOpenDeposit = { id -> openDepositId = id },
                             onCancelOrder = invest::cancelOrder,
                             contentPadding = PaddingValues(bottom = 132.dp),
                         )

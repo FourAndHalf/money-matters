@@ -1,5 +1,6 @@
 package com.moneymatters.app.feature.invest
 
+import com.moneymatters.app.core.invest.Compounding
 import com.moneymatters.app.core.invest.FundClass
 import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.RestateKind
@@ -86,4 +87,47 @@ data class AllotForm(val pendingId: String, val date: LocalDate, val unitsText: 
     val units: Units? get() = parseUnits(unitsText)?.takeIf { it.micro > 0 }
     val nav: UnitPrice? get() = if (navText.isBlank()) UnitPrice(0) else parseUnitPrice(navText)
     val canSave: Boolean get() = units != null && nav != null
+}
+
+/**
+ * A new fixed deposit. [rateText] is a percentage ("7.25"); [existing] means it is already running, so it is
+ * recorded against opening balances and no account is debited.
+ */
+data class DepositForm(
+    val name: String = "",
+    val start: LocalDate,
+    val maturity: LocalDate,
+    val principalText: String = "",
+    val rateText: String = "",
+    val compounding: Compounding = Compounding.Quarterly,
+    val penaltyText: String = "1",
+    val autoRenew: Boolean = false,
+    val existing: Boolean = false,
+    val accountId: String? = null,
+) {
+    val principal: Paise? get() = parseRupees(principalText)?.takeIf { it.value > 0 }
+    val rateBps: Int? get() = percentToBps(rateText)?.takeIf { it > 0 }
+    val penaltyBps: Int? get() = if (penaltyText.isBlank()) 0 else percentToBps(penaltyText)
+    val datesValid: Boolean get() = maturity.isAfter(start)
+    val canSave: Boolean
+        get() = name.isNotBlank() && principal != null && rateBps != null && penaltyBps != null && datesValid && (existing || accountId != null)
+}
+
+/** "7.25" → 725 basis points, with at most two decimals; null for anything else. */
+internal fun percentToBps(text: String): Int? {
+    val match = Regex("""(\d{1,3})(?:\.(\d{1,2}))?""").matchEntire(text.trim().removeSuffix("%").trim()) ?: return null
+    val (whole, fraction) = match.destructured
+    return whole.toInt() * 100 + fraction.padEnd(2, '0').toInt()
+}
+
+/** Paying out a deposit on [date]: where the money goes, or whether it renews, and any TDS withheld. */
+data class DepositCloseForm(
+    val accountId: String,
+    val date: LocalDate,
+    val tdsText: String = "",
+    val renew: Boolean = false,
+    val toAccountId: String? = null,
+) {
+    val tds: Paise? get() = if (tdsText.isBlank()) Paise.Zero else parseRupees(tdsText)
+    val canSave: Boolean get() = tds != null && (renew || toAccountId != null)
 }

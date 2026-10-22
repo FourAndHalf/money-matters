@@ -232,4 +232,79 @@ class InvestScreensTest {
         compose.setContent { MoneyMattersTheme { HoldingDetailScreen(locked, onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {}) } }
         compose.onNodeWithText("10 Jan 2025 · Locked until 10 Jan 2028").assertIsDisplayed()
     }
+
+    private val depositRow = DepositRow("d1", "HDFC FD 1", "7.00% · quarterly", 1_00_000.rupees, 1_03_500.rupees, PriceTag("Matures in 21 days", Tone.Warning))
+    private val depositDetail = DepositDetail(
+        row = depositRow, rateLabel = "7.00%", compoundingLabel = "Quarterly", startLabel = "1 Jan 2026", maturityLabel = "1 Jan 2027",
+        accruedInterest = 3_500.rupees, postedInterest = 2_000.rupees, unpostedInterest = 1_500.rupees,
+        maturityValue = 1_07_186.rupees, breakProceeds = 1_02_900.rupees, breakPenalty = 600.rupees,
+        autoRenew = true, isClosed = false, matured = false, closedLabel = null, payout = null,
+    )
+
+    @Test fun `the portfolio lists fixed deposits and opens one`() {
+        val withDeposit = state.copy(deposits = listOf(depositRow))
+        var opened: String? = null
+        var added = false
+        compose.setContent { MoneyMattersTheme { InvestScreen(withDeposit, onOpenHolding = {}, onBuy = {}, onImport = {}, onNewDeposit = { added = true }, onOpenDeposit = { opened = it }) } }
+        compose.onNodeWithText("Fixed deposits").assertIsDisplayed()
+        compose.onNodeWithText("Matures in 21 days").assertIsDisplayed()
+        compose.onNodeWithText("HDFC FD 1").performClick()
+        compose.onNodeWithText("+ FD").performClick()
+        assertEquals("d1", opened)
+        assertTrue(added)
+    }
+
+    @Test fun `a portfolio with only a deposit still shows its summary`() {
+        val onlyDeposit = InvestState(emptyList(), 1_00_000.rupees, 1_03_500.rupees, 3_500.rupees, 0.035, 0.07, 0, emptyMap(), deposits = listOf(depositRow))
+        compose.setContent { MoneyMattersTheme { InvestScreen(onlyDeposit, onOpenHolding = {}, onBuy = {}, onImport = {}) } }
+        compose.onNodeWithText("Portfolio value").assertIsDisplayed()
+    }
+
+    @Test fun `the deposit form validates dates and switches funding for a running deposit`() {
+        val form = DepositForm(name = "HDFC FD", start = LocalDate.of(2026, 1, 1), maturity = LocalDate.of(2026, 1, 1), principalText = "1,00,000", rateText = "7.25")
+        compose.setContent { MoneyMattersTheme { DepositContent(form, emptyList(), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("New fixed deposit").assertIsDisplayed()
+        compose.onNodeWithText("Must be after the start date").assertIsDisplayed()
+        compose.onNodeWithText("Paid from").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_deposit_form.png")
+    }
+
+    @Test fun `an existing deposit's form explains that no money moves`() {
+        val form = DepositForm(start = LocalDate.of(2025, 1, 1), maturity = LocalDate.of(2027, 1, 1), existing = true)
+        compose.setContent { MoneyMattersTheme { DepositContent(form, emptyList(), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("Recorded against your opening balances, so no bank balance changes. Interest earned so far is counted from the start date.").assertIsDisplayed()
+    }
+
+    @Test fun `deposit detail shows value, terms, break value and its actions`() {
+        var posted = false
+        var closed = false
+        compose.setContent { MoneyMattersTheme { DepositDetailScreen(depositDetail, onBack = {}, onPostInterest = { posted = true }, onClose = { closed = true }) } }
+        compose.onNodeWithText("Value today").assertIsDisplayed()
+        compose.onNodeWithText("Breaking early costs ₹600.00").assertIsDisplayed()
+        compose.onNodeWithText("Post interest").performClick()
+        compose.onNodeWithText("Break early").performClick()
+        assertTrue(posted && closed)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_deposit_detail.png")
+    }
+
+    @Test fun `a matured deposit offers Mature and a closed one offers no actions`() {
+        compose.setContent { MoneyMattersTheme { DepositDetailScreen(depositDetail.copy(matured = true, unpostedInterest = 0.rupees), onBack = {}, onPostInterest = {}, onClose = {}) } }
+        compose.onNodeWithText("Mature").assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("Post interest").fetchSemanticsNodes().size)
+    }
+
+    @Test fun `a closed deposit shows what it paid out`() {
+        val closed = depositDetail.copy(isClosed = true, closedLabel = "1 Jan 2027", payout = 1_07_186.rupees, row = depositRow.copy(value = 1_07_186.rupees, badge = PriceTag("Closed", Tone.Neutral)))
+        compose.setContent { MoneyMattersTheme { DepositDetailScreen(closed, onBack = {}, onPostInterest = {}, onClose = {}) } }
+        compose.onNodeWithText("Paid out").assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("Break early").fetchSemanticsNodes().size)
+    }
+
+    @Test fun `the close form words itself for maturing or breaking`() {
+        val form = DepositCloseForm("d1", LocalDate.of(2026, 7, 1))
+        compose.setContent { MoneyMattersTheme { DepositCloseContent(depositDetail, form, emptyList(), null, false, {}, {}, {}) } }
+        assertEquals(2, compose.onAllNodesWithText("Break deposit").fetchSemanticsNodes().size) // the title and the button
+        compose.onNodeWithText("Renew into a new deposit").assertIsDisplayed()
+        compose.onNodeWithText("Paid into").assertIsDisplayed()
+    }
 }

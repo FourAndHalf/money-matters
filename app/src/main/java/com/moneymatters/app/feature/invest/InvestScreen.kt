@@ -44,6 +44,8 @@ fun InvestScreen(
     contentPadding: PaddingValues = PaddingValues(),
     onAllot: (pendingId: String) -> Unit = {},
     onCancelOrder: (pendingId: String) -> Unit = {},
+    onNewDeposit: () -> Unit = {},
+    onOpenDeposit: (accountId: String) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -64,18 +66,19 @@ fun InvestScreen(
                 Text("Invest", style = MoneyTheme.type.headlineXlMobile, color = MoneyTheme.colors.ink)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Pill("Import", onImport)
+                    Pill("+ FD", onNewDeposit)
                     Pill("+ Buy", onBuy, style = PillStyle.Primary)
                 }
             }
         }
-        if (state.holdings.isEmpty() && state.pending.isEmpty()) {
+        if (state.holdings.isEmpty() && state.pending.isEmpty() && state.deposits.isEmpty()) {
             item("empty") {
                 Module(Modifier.padding(horizontal = margin)) {
-                    ModuleHeader("No stocks yet", subtitle = "Buy a stock or fund, or import your trade history from a CSV to rebuild your holdings exactly.")
+                    ModuleHeader("No stocks yet", subtitle = "Buy a stock or fund, add a fixed deposit, or import your trade history from a CSV to rebuild your holdings exactly.")
                 }
             }
         } else {
-            if (state.holdings.isNotEmpty()) item("summary") { SummaryModule(state, Modifier.padding(horizontal = margin)) }
+            if (state.holdings.isNotEmpty() || state.deposits.isNotEmpty()) item("summary") { SummaryModule(state, Modifier.padding(horizontal = margin)) }
             if (state.pending.isNotEmpty()) {
                 item("in-transit") {
                     Module(Modifier.padding(horizontal = margin)) {
@@ -94,6 +97,23 @@ fun InvestScreen(
                                         }
                                     }
                                 },
+                            )
+                        }
+                    }
+                }
+            }
+            if (state.deposits.isNotEmpty()) {
+                item("deposits") {
+                    Module(Modifier.padding(horizontal = margin)) {
+                        ModuleHeader("Fixed deposits", subtitle = "${state.deposits.size} ${if (state.deposits.size == 1) "deposit" else "deposits"}")
+                        state.deposits.forEachIndexed { i, d ->
+                            ListRow(
+                                title = d.name,
+                                subtitle = d.subtitle,
+                                divider = i < state.deposits.lastIndex,
+                                modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open ${d.name}") { onOpenDeposit(d.accountId) },
+                                leading = { GlyphChip(text = "◈") },
+                                trailing = { AmountWithBadge(d.value.formatInr()) { StatusBadge(d.badge.text, d.badge.tone) } },
                             )
                         }
                     }

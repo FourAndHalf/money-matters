@@ -12,6 +12,7 @@ import com.moneymatters.app.core.money.UnitPrice
 import com.moneymatters.app.core.money.Units
 import com.moneymatters.app.core.money.impliedPrice
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -31,9 +32,9 @@ class InvestRepository(
 
     /** Every holding, lot, sale and price at one moment, re-read after any investment write. */
     fun snapshot(): Flow<InvestSnapshot> =
-        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments").map {
+        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments", "fixed_deposits").map {
             database.withTransaction {
-                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending())
+                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending(), dao.getAllFixedDeposits())
             }
         }
 
@@ -263,6 +264,111 @@ class InvestRepository(
         }
     }
 
+    // ---- Fixed deposits ----
+
+    /**
+     * Opens a deposit as its own asset account. The [principal] leaves [fromAccountId] (for an
+     * already-running deposit, pass `Equity:Opening` so no bank balance moves). Interest is booked later by [accrueInterest].
+     */
+    suspend fun openDeposit(
+        name: String,
+        principal: Paise,
+        rateBps: Int,
+        compounding: Compounding,
+        start: LocalDate,
+        maturity: LocalDate,
+        fromAccountId: String,
+        autoRenew: Boolean = false,
+        penaltyBps: Int = 0,
+    ): String {
+        require(principal.value > 0) { "The principal must be positive" }
+        require(rateBps > 0) { "The rate must be positive" }
+        require(maturity.isAfter(start)) { "A deposit must mature after it starts" }
+        require(name.isNotBlank()) { "A deposit needs a name" }
+        return ledger.inTransaction {
+            val accountId = ledger.createAccount(name.trim(), AccountType.Asset, kind = AccountKind.FixedDeposit)
+            val txn = ledger.postTransaction(start, "Open $name", listOf(PostingLine(accountId, debit = principal), PostingLine(fromAccountId, credit = principal)))
+            dao.insertFixedDeposit(FixedDepositEntity(accountId, principal.value, rateBps, compounding, start.toString(), maturity.toString(), autoRenew, penaltyBps, openTransactionId = txn))
+            accountId
+        }
+    }
+
+    /**
+     * Books the interest earned to [asOf] (capped at maturity) that the ledger doesn't hold yet, as income.
+     * A deposit's posted interest is its balance above principal, so this is always the exact top-up.
+     */
+    suspend fun accrueInterest(depositAccountId: String, asOf: LocalDate): Paise = ledger.inTransaction {
+        val deposit = requireOpenDeposit(depositAccountId)
+        val valuation = depositValuation(deposit, ledger.accountBalance(depositAccountId), asOf)
+        postInterestAdjustment(deposit, valuation.accruedInterest - valuation.postedInterest, asOf)
+    }
+
+    /**
+     * Pays a deposit out on [date]: at maturity, or early at the penalty rate if [date] is before it. The
+     * interest is topped up (or trimmed, after an early break) to what is owed, any [tds] withheld becomes a
+     * receivable, and the rest goes to [toAccountId], or, if [renew], straight into a new deposit of the same term.
+     * Returns what was paid out.
+     */
+    suspend fun closeDeposit(depositAccountId: String, date: LocalDate, toAccountId: String?, tds: Paise = Paise.Zero, renew: Boolean = false): Paise {
+        require(tds.value >= 0) { "TDS can't be negative" }
+        require(renew || toAccountId != null) { "Choose where the money goes" }
+        return ledger.inTransaction {
+            val deposit = requireOpenDeposit(depositAccountId)
+            val start = LocalDate.parse(deposit.startDate)
+            val maturity = LocalDate.parse(deposit.maturityDate)
+            require(date.isAfter(start)) { "A deposit can't be closed before it starts" }
+            val principal = Paise(deposit.principalPaise)
+            val posted = ledger.accountBalance(depositAccountId) - principal
+            val owed = if (date.isBefore(maturity)) {
+                breakValue(principal, deposit.rateBps, deposit.compounding, start, maturity, date, deposit.penaltyBps).proceeds - principal
+            } else {
+                accruedInterest(principal, deposit.rateBps, deposit.compounding, start, date, maturity)
+            }
+            postInterestAdjustment(deposit, owed - posted, date)
+            val balance = principal + owed
+            val payout = balance - tds
+            require(payout.value > 0) { "TDS can't be as much as the deposit" }
+            val name = requireNotNull(database.ledgerDao().getAccount(depositAccountId)).name
+            val postings = mutableListOf(PostingLine(depositAccountId, credit = balance))
+            var renewedInto: String? = null
+            if (renew) {
+                renewedInto = ledger.createAccount("$name (renewed ${date})", AccountType.Asset, kind = AccountKind.FixedDeposit)
+                postings += PostingLine(renewedInto, debit = payout)
+            } else {
+                postings += PostingLine(toAccountId!!, debit = payout)
+            }
+            if (tds.value > 0) postings += PostingLine(ledger.createAccountIfAbsent(TDS_RECEIVABLE, AccountType.Asset), debit = tds)
+            val txn = ledger.postTransaction(date, if (date.isBefore(maturity)) "Broke $name early" else "Matured $name", postings)
+            dao.updateFixedDeposit(deposit.copy(closedOn = date.toString(), payoutPaise = payout.value, closeTransactionId = txn))
+            if (renewedInto != null) {
+                val term = ChronoUnit.DAYS.between(start, maturity)
+                dao.insertFixedDeposit(
+                    FixedDepositEntity(renewedInto, payout.value, deposit.rateBps, deposit.compounding, date.toString(), date.plusDays(term).toString(), deposit.autoRenew, deposit.penaltyBps, openTransactionId = txn),
+                )
+            }
+            payout
+        }
+    }
+
+    private suspend fun requireOpenDeposit(accountId: String): FixedDepositEntity {
+        val deposit = dao.getFixedDeposit(accountId) ?: throw NoSuchElementException("No fixed deposit on account $accountId")
+        check(deposit.closedOn == null) { "That deposit is already closed" }
+        return deposit
+    }
+
+    /** Positive [delta] is more interest earned (income); negative takes back interest booked at a higher rate. Zero posts nothing. */
+    private suspend fun postInterestAdjustment(deposit: FixedDepositEntity, delta: Paise, date: LocalDate): Paise {
+        if (delta.value == 0L) return Paise.Zero
+        val income = ledger.createAccountIfAbsent("Income:Interest", AccountType.Income)
+        val postings = if (delta.value > 0) {
+            listOf(PostingLine(deposit.accountId, debit = delta), PostingLine(income, credit = delta))
+        } else {
+            listOf(PostingLine(deposit.accountId, credit = -delta), PostingLine(income, debit = -delta))
+        }
+        ledger.postTransaction(date, "Interest on FD", postings)
+        return delta
+    }
+
     // ---- Fund purchases waiting for units (In Transit) ----
 
     /** Sends [amount] for a fund purchase: it leaves [fromAccountId] and waits In Transit until [allot] gives it units. */
@@ -342,6 +448,7 @@ data class InvestSnapshot(
     val prices: List<PriceEntity>,
     val corporateActions: List<CorporateActionEntity> = emptyList(),
     val pending: List<PendingAllotmentEntity> = emptyList(),
+    val fixedDeposits: List<FixedDepositEntity> = emptyList(),
 ) {
     companion object { val Empty = InvestSnapshot(emptyList(), emptyList(), emptyList(), emptyList()) }
 }

@@ -112,6 +112,81 @@ class InvestViewModel(
         }
     }
 
+    // ---- Fixed deposits ----
+    var depositForm by mutableStateOf<DepositForm?>(null)
+
+    fun startDeposit() {
+        depositForm = DepositForm(start = today(), maturity = today().plusYears(1))
+        error = null
+    }
+
+    fun saveDeposit(onSaved: () -> Unit) {
+        val form = depositForm ?: return
+        val principal = form.principal ?: return
+        val rateBps = form.rateBps ?: return
+        val penaltyBps = form.penaltyBps ?: return
+        if (!form.canSave || isSaving) return
+        viewModelScope.launch {
+            isSaving = true
+            error = null
+            try {
+                val from = if (form.existing) ledger.createAccountIfAbsent(OPENING_EQUITY, AccountType.Equity) else form.accountId!!
+                invest.openDeposit(form.name, principal, rateBps, form.compounding, form.start, form.maturity, from, form.autoRenew, penaltyBps)
+                depositForm = null
+                onSaved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't save the deposit. Nothing was changed."
+            } finally {
+                isSaving = false
+            }
+        }
+    }
+
+    /** Books the interest earned to today as income. */
+    fun postInterest(depositAccountId: String) {
+        viewModelScope.launch {
+            try {
+                invest.accrueInterest(depositAccountId, today())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't post the interest."
+            }
+        }
+    }
+
+    var closeForm by mutableStateOf<DepositCloseForm?>(null)
+
+    fun startClose(depositAccountId: String) {
+        closeForm = DepositCloseForm(depositAccountId, today())
+        error = null
+    }
+
+    fun saveClose(onSaved: () -> Unit) {
+        val form = closeForm ?: return
+        val tds = form.tds ?: return
+        if (!form.canSave || isSaving) return
+        viewModelScope.launch {
+            isSaving = true
+            error = null
+            try {
+                invest.closeDeposit(form.accountId, form.date, form.toAccountId, tds, form.renew)
+                closeForm = null
+                onSaved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IllegalArgumentException) {
+                error = e.message
+            } catch (_: Exception) {
+                error = "Couldn't close the deposit. Nothing was changed."
+            } finally {
+                isSaving = false
+            }
+        }
+    }
+
     // ---- Allotment of a fund order waiting In Transit ----
     var allotForm by mutableStateOf<AllotForm?>(null)
 

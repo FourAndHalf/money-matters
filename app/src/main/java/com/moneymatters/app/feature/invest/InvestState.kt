@@ -3,7 +3,9 @@ package com.moneymatters.app.feature.invest
 import androidx.compose.runtime.Immutable
 import com.moneymatters.app.core.invest.CapitalGainsRules
 import com.moneymatters.app.core.invest.CashFlow
+import com.moneymatters.app.core.invest.Compounding
 import com.moneymatters.app.core.invest.CorporateActionKind
+import com.moneymatters.app.core.invest.DepositValuation
 import com.moneymatters.app.core.invest.FundClass
 import com.moneymatters.app.core.invest.GainTerm
 import com.moneymatters.app.core.invest.HoldingValuation
@@ -13,6 +15,7 @@ import com.moneymatters.app.core.invest.PriceEntity
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.formatUnits
 import com.moneymatters.app.core.invest.gainTerm
+import com.moneymatters.app.core.invest.depositValuation
 import com.moneymatters.app.core.invest.holdingFlows
 import com.moneymatters.app.core.invest.isEquityOriented
 import com.moneymatters.app.core.invest.valuations
@@ -102,6 +105,39 @@ data class InvestState(
     val unpricedCount: Int,
     val details: Map<String, HoldingDetail>,
     val pending: List<PendingRow> = emptyList(),
+    val deposits: List<DepositRow> = emptyList(),
+    val depositDetails: Map<String, DepositDetail> = emptyMap(),
+)
+
+/** A fixed deposit in the portfolio list; [value] is principal plus interest earned so far. */
+@Immutable
+data class DepositRow(
+    val accountId: String,
+    val name: String,
+    val subtitle: String,
+    val principal: Paise,
+    val value: Paise,
+    val badge: PriceTag,
+)
+
+@Immutable
+data class DepositDetail(
+    val row: DepositRow,
+    val rateLabel: String,
+    val compoundingLabel: String,
+    val startLabel: String,
+    val maturityLabel: String,
+    val accruedInterest: Paise,
+    val postedInterest: Paise,
+    val unpostedInterest: Paise,
+    val maturityValue: Paise,
+    val breakProceeds: Paise,
+    val breakPenalty: Paise,
+    val autoRenew: Boolean,
+    val isClosed: Boolean,
+    val matured: Boolean,
+    val closedLabel: String?,
+    val payout: Paise?,
 )
 
 fun formatPercent(fraction: Double): String = String.format(Locale.ROOT, "%+.2f%%", fraction * 100)
@@ -146,14 +182,27 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
     val value = Paise(held.sumOf { it.marketValue?.value ?: it.cost.value })
     val pricedCost = held.filter { it.marketValue != null }.sumOf { it.cost.value }
     val gain = Paise(held.sumOf { it.gain?.value ?: 0 })
-    val allPriced = held.isNotEmpty() && held.all { it.marketValue != null }
+    val deposits = invest.fixedDeposits.map { fd -> depositValuation(fd, bookedBalance(ledger, fd.accountId), today) }
+    val openDeposits = deposits.filter { !it.isClosed }
+    for (d in deposits) {
+        flows += CashFlow(LocalDate.parse(d.deposit.startDate), -d.principal)
+        d.deposit.closedOn?.let { flows += CashFlow(LocalDate.parse(it), Paise(d.deposit.payoutPaise ?: 0)) }
+    }
+    val totalCost = cost + Paise(openDeposits.sumOf { it.principal.value })
+    val totalValue = value + Paise(openDeposits.sumOf { it.value.value })
+    val totalGain = gain + Paise(openDeposits.sumOf { it.accruedInterest.value })
+    val totalPricedCost = pricedCost + openDeposits.sumOf { it.principal.value }
+    val allPriced = (held.isNotEmpty() || deposits.isNotEmpty()) && held.all { it.marketValue != null }
+    val depositRows = deposits.associate { v -> v.deposit.accountId to depositRow(v, accountsById.getValue(v.deposit.accountId).name, today) }
     return InvestState(
         holdings = holdings,
-        cost = cost,
-        value = value,
-        gain = gain,
-        gainPercent = if (pricedCost > 0) gain.value.toDouble() / pricedCost else null,
-        xirr = if (allPriced) xirr(flows + CashFlow(today, value)) else null,
+        cost = totalCost,
+        value = totalValue,
+        gain = totalGain,
+        gainPercent = if (totalPricedCost > 0) totalGain.value.toDouble() / totalPricedCost else null,
+        xirr = if (allPriced) xirr(flows + CashFlow(today, totalValue)) else null,
+        deposits = openDeposits.sortedBy { it.deposit.maturityDate }.map { depositRows.getValue(it.deposit.accountId) },
+        depositDetails = deposits.associate { v -> v.deposit.accountId to depositDetail(v, depositRows.getValue(v.deposit.accountId), today) },
         unpricedCount = held.count { it.marketValue == null },
         details = details,
         pending = invest.pending.filter { it.isOpen }.sortedBy { it.orderDate }.map { p ->
@@ -263,3 +312,59 @@ internal fun FundClass.label(): String = when (this) {
     FundClass.Debt -> "Debt"
     FundClass.Elss -> "ELSS"
 }
+
+/** An account's booked balance (drafts excluded), debit minus credit: what an asset holds. */
+private fun bookedBalance(ledger: LedgerSnapshot, accountId: String): Paise {
+    val booked = ledger.transactions.filter { it.status != TransactionStatus.Draft }.map { it.id }.toSet()
+    return Paise(ledger.postings.filter { it.accountId == accountId && it.transactionId in booked }.sumOf { (it.debitPaise ?: 0) - (it.creditPaise ?: 0) })
+}
+
+private fun Compounding.label() = when (this) {
+    Compounding.Monthly -> "Monthly"
+    Compounding.Quarterly -> "Quarterly"
+    Compounding.Simple -> "Simple, paid at maturity"
+}
+
+private fun depositRow(v: DepositValuation, name: String, today: LocalDate): DepositRow {
+    val d = v.deposit
+    val maturity = LocalDate.parse(d.maturityDate)
+    val badge = when {
+        v.isClosed -> PriceTag("Closed", Tone.Neutral)
+        v.daysToMaturity < 0 -> PriceTag("Matured", Tone.Warning)
+        v.daysToMaturity <= 30 -> PriceTag("Matures in ${v.daysToMaturity} ${if (v.daysToMaturity == 1L) "day" else "days"}", Tone.Warning)
+        else -> PriceTag("Matures ${maturity.format(DayMonthYear)}", Tone.Neutral)
+    }
+    return DepositRow(
+        accountId = d.accountId,
+        name = name,
+        subtitle = "${formatBps(d.rateBps)} · ${d.compounding.label().substringBefore(",").lowercase()}",
+        principal = v.principal,
+        value = if (v.isClosed) Paise(d.payoutPaise ?: 0) else v.value,
+        badge = badge,
+    )
+}
+
+private fun depositDetail(v: DepositValuation, row: DepositRow, today: LocalDate): DepositDetail {
+    val d = v.deposit
+    return DepositDetail(
+        row = row,
+        rateLabel = formatBps(d.rateBps),
+        compoundingLabel = d.compounding.label(),
+        startLabel = LocalDate.parse(d.startDate).format(DayMonthYear),
+        maturityLabel = LocalDate.parse(d.maturityDate).format(DayMonthYear),
+        accruedInterest = v.accruedInterest,
+        postedInterest = v.postedInterest,
+        unpostedInterest = v.unposted,
+        maturityValue = v.maturityValue,
+        breakProceeds = v.breakProceeds,
+        breakPenalty = v.breakPenalty,
+        autoRenew = d.autoRenew,
+        isClosed = v.isClosed,
+        matured = v.daysToMaturity <= 0,
+        closedLabel = d.closedOn?.let { LocalDate.parse(it).format(DayMonthYear) },
+        payout = d.payoutPaise?.let(::Paise),
+    )
+}
+
+/** 725 basis points as `7.25%`. */
+internal fun formatBps(bps: Int): String = String.format(Locale.ROOT, "%d.%02d%%", bps / 100, bps % 100)
