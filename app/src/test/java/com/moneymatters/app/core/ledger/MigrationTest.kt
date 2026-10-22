@@ -64,7 +64,7 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(5, db.openHelper.readableDatabase.version) // 1 → 2 → 3 → 4 → 5 in one open
+            assertEquals(6, db.openHelper.readableDatabase.version) // 1 → 2 → 3 → 4 → 5 → 6 in one open
         }
         db.close()
     }
@@ -85,7 +85,7 @@ class MigrationTest {
             assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
             assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
             assertNull(db.investDao().holdingForAccount("bank"))
-            assertEquals(5, db.openHelper.readableDatabase.version)
+            assertEquals(6, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -104,7 +104,7 @@ class MigrationTest {
             assertEquals(180_000L, action.amountPaise)
             assertNull(action.ratioMicro)
             assertNull(action.transactionId)
-            assertEquals(5, db.openHelper.readableDatabase.version)
+            assertEquals(6, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -120,7 +120,25 @@ class MigrationTest {
         runBlocking {
             assertEquals("h1", db.investDao().holdingForAccount("a1")!!.id)
             assertEquals(0, db.investDao().getAllPending().size)
-            assertEquals(5, db.openHelper.readableDatabase.version)
+            assertEquals(6, db.openHelper.readableDatabase.version)
+        }
+        db.close()
+    }
+
+    @Test fun `v5 to v6 keeps existing fixed deposits and leaves their new fields empty`() {
+        createDatabase(5).apply {
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind, inNetWorth) VALUES ('a1', 'HDFC FD', 'Asset', NULL, 0, 'FixedDeposit', 1)")
+            execSQL("INSERT INTO fixed_deposits (accountId, principalPaise, rateBps, compounding, startDate, maturityDate, autoRenew, penaltyBps) VALUES ('a1', 10000000, 700, 'Quarterly', '2026-01-01', '2027-01-01', 0, 100)")
+            close()
+        }
+
+        val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
+        runBlocking {
+            val fd = db.investDao().getFixedDeposit("a1")!!
+            assertEquals(10_000_000L, fd.principalPaise)
+            assertNull(fd.closedOn)
+            assertNull(fd.openTransactionId)
+            assertEquals(6, db.openHelper.readableDatabase.version)
         }
         db.close()
     }

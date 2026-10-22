@@ -69,6 +69,19 @@ interface InvestDao {
     @Query("SELECT * FROM fixed_deposits WHERE accountId = :accountId")
     suspend fun getFixedDeposit(accountId: String): FixedDepositEntity?
 
+    @Query("SELECT * FROM fixed_deposits")
+    suspend fun getAllFixedDeposits(): List<FixedDepositEntity>
+
+    @Update suspend fun updateFixedDeposit(deposit: FixedDepositEntity)
+
+    /** Reversing a closing entry reopens the deposit. */
+    @Query("UPDATE fixed_deposits SET closedOn = NULL, payoutPaise = NULL, closeTransactionId = NULL WHERE closeTransactionId = :transactionId")
+    suspend fun reopenDepositsClosedBy(transactionId: String)
+
+    /** Reversing an opening entry withdraws the deposit's record. */
+    @Query("DELETE FROM fixed_deposits WHERE openTransactionId = :transactionId")
+    suspend fun deleteDepositsOpenedBy(transactionId: String)
+
     @Insert suspend fun insertSipPlan(plan: SipPlanEntity)
 
     @Insert suspend fun insertCorporateAction(action: CorporateActionEntity)

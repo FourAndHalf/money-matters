@@ -11,6 +11,7 @@ import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
+import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.Units
 import com.moneymatters.app.core.money.rupees
 import java.time.LocalDate
@@ -228,5 +229,63 @@ class InvestViewModelTest {
         idle()
         assertEquals(0.rupees, ledger.accountBalance(bank))
         assertFalse(db.investDao().getPending(pending)!!.isOpen)
+    }
+
+    @Test fun `a deposit form needs a name, principal, rate, sensible dates and a source`() {
+        model.startDeposit()
+        val form = model.depositForm!!
+        assertFalse(form.canSave)
+        val filled = form.copy(name = "HDFC FD", principalText = "1,00,000", rateText = "7.25", accountId = bank)
+        assertTrue(filled.canSave)
+        assertFalse(filled.copy(rateText = "0").canSave)
+        assertFalse(filled.copy(maturity = filled.start).canSave)
+        assertFalse(filled.copy(accountId = null).canSave)
+        assertTrue(filled.copy(accountId = null, existing = true).canSave)
+        assertFalse(filled.copy(penaltyText = "x").canSave)
+    }
+
+    @Test fun `saving a deposit opens it, then interest can be posted and it can be matured`() = runBlocking {
+        model.startDeposit()
+        model.depositForm = model.depositForm!!.copy(
+            name = "HDFC FD", principalText = "100000", rateText = "7", start = LocalDate.of(2026, 1, 1), maturity = LocalDate.of(2026, 12, 31), accountId = bank,
+        )
+        var saved = false
+        model.saveDeposit { saved = true }
+        idle()
+        assertTrue(saved)
+        val fd = db.investDao().getAllFixedDeposits().single()
+        assertEquals((-100_000).rupees, ledger.accountBalance(bank))
+
+        model.postInterest(fd.accountId)
+        idle()
+        assertTrue(ledger.accountBalance(fd.accountId).value > 100_000_00)
+
+        model.startClose(fd.accountId)
+        assertFalse(model.closeForm!!.canSave)
+        model.closeForm = model.closeForm!!.copy(date = LocalDate.of(2026, 12, 31), toAccountId = bank)
+        model.saveClose {}
+        idle()
+        assertEquals(Paise.Zero, ledger.accountBalance(fd.accountId))
+        assertTrue(ledger.accountBalance(bank).value > 0)
+        assertNotNull(db.investDao().getFixedDeposit(fd.accountId)!!.closedOn)
+    }
+
+    @Test fun `an existing deposit is recorded against opening equity and leaves the bank alone`() = runBlocking {
+        model.startDeposit()
+        model.depositForm = model.depositForm!!.copy(name = "Old FD", principalText = "50000", rateText = "6.5", start = LocalDate.of(2025, 6, 1), maturity = LocalDate.of(2027, 6, 1), existing = true)
+        model.saveDeposit {}
+        idle()
+        assertEquals(Paise.Zero, ledger.accountBalance(bank))
+        assertEquals(1, db.investDao().getAllFixedDeposits().size)
+    }
+
+    @Test fun `closing with a TDS that exceeds the deposit explains why it failed`() = runBlocking {
+        val fd = invest.openDeposit("FD", 10_000.rupees, 700, com.moneymatters.app.core.invest.Compounding.Simple, LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1), bank)
+        model.startClose(fd)
+        model.closeForm = model.closeForm!!.copy(date = LocalDate.of(2026, 1, 1), toAccountId = bank, tdsText = "99999")
+        model.saveClose {}
+        idle()
+        assertEquals("TDS can't be as much as the deposit", model.error)
+        assertNull(db.investDao().getFixedDeposit(fd)!!.closedOn)
     }
 }

@@ -67,7 +67,7 @@ class CorporateActionsV4 : AutoMigrationSpec
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class,
     ],
-    version = 5,
+    version = 6,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -77,6 +77,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 3, to = 4, spec = CorporateActionsV4::class),
         // v5: fund purchases waiting In Transit for their units.
         AutoMigration(from = 4, to = 5),
+        // v6: fixed deposits remember the entries that opened and closed them.
+        AutoMigration(from = 5, to = 6),
     ],
 )
 @TypeConverters(LedgerConverters::class)

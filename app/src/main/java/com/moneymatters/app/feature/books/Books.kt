@@ -2,6 +2,7 @@ package com.moneymatters.app.feature.books
 
 import androidx.compose.runtime.Immutable
 import com.moneymatters.app.core.invest.InvestSnapshot
+import com.moneymatters.app.core.invest.depositValuation
 import com.moneymatters.app.core.invest.valuations
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.AccountKind
@@ -118,6 +119,11 @@ fun buildBooks(
     // Holdings with a price count at market value, everything else at its ledger balance (cost).
     val marketByAccount = valuations(invest).mapNotNull { v -> v.marketValue?.let { v.holding.accountId to it } }.toMap()
 
+    // Open deposits count interest earned to today even before it is booked, as holdings count market value.
+    val unpostedByAccount = invest.fixedDeposits.filter { it.closedOn == null }.associate { fd ->
+        fd.accountId to depositValuation(fd, Paise(balances[fd.accountId] ?: 0), today).unposted
+    }
+
     // ---- Accounts (P08) ----
     fun summaryRow(a: AccountEntity): AccountSummary {
         val count = entryCounts[a.id] ?: 0
@@ -127,8 +133,8 @@ fun buildBooks(
             kind = kind,
             name = a.name,
             subtitle = "${kind.label()} · " + (if (count == 0) "no entries yet" else "$count ${if (count == 1) "entry" else "entries"}") +
-                if (a.id in marketByAccount) " · at market" else "",
-            balance = marketByAccount[a.id] ?: Paise(balances[a.id] ?: 0),
+                if (a.id in marketByAccount) " · at market" else if ((unpostedByAccount[a.id]?.value ?: 0) > 0) " · with accrued interest" else "",
+            balance = marketByAccount[a.id] ?: (Paise(balances[a.id] ?: 0) + (unpostedByAccount[a.id] ?: Paise.Zero)),
             isLiability = a.type == AccountType.Liability,
         )
     }

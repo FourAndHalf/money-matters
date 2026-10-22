@@ -10,6 +10,7 @@ import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
+import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.UnitPrice
 import com.moneymatters.app.core.money.Units
 import com.moneymatters.app.core.money.rupees
@@ -226,5 +227,63 @@ class InvestStateTest {
         }
         val books = buildBooks(runBlocking { ledger.snapshot().first() }, today, zone = ZoneOffset.UTC, invest = runBlocking { invest.snapshot().first() })
         assertEquals(5_000.rupees, books.accounts.netWorth)
+    }
+
+    @Test fun `deposits appear in the portfolio with their value, a maturity badge and a return, and in net worth with accrued interest`() {
+        val equity = runBlocking { ledger.createAccount("Equity:Opening", AccountType.Equity) }
+        runBlocking {
+            ledger.postTransaction(
+                LocalDate.of(2026, 1, 1), "Opening: bank",
+                listOf(com.moneymatters.app.core.ledger.PostingLine(bank, debit = 2_00_000.rupees), com.moneymatters.app.core.ledger.PostingLine(equity, credit = 2_00_000.rupees)),
+            )
+        }
+        val soon = runBlocking {
+            invest.openDeposit("Soon FD", 1_00_000.rupees, 700, com.moneymatters.app.core.invest.Compounding.Quarterly, LocalDate.of(2025, 11, 20), LocalDate.of(2026, 11, 10), bank, penaltyBps = 100)
+        }
+        val later = runBlocking {
+            invest.openDeposit("Later FD", 50_000.rupees, 650, com.moneymatters.app.core.invest.Compounding.Monthly, LocalDate.of(2026, 3, 1), LocalDate.of(2028, 3, 1), bank, penaltyBps = 100)
+        }
+        val s = state()
+        assertEquals(listOf("Soon FD", "Later FD"), s.deposits.map { it.name })
+        assertEquals("Matures in 21 days", s.deposits.first().badge.text)
+        assertEquals("Matures 1 Mar 2028", s.deposits.last().badge.text)
+        assertEquals("7.00% · quarterly", s.deposits.first().subtitle)
+
+        val detail = s.depositDetails.getValue(soon)
+        assertTrue(detail.accruedInterest.value > 0)
+        assertEquals(detail.accruedInterest, detail.unpostedInterest)
+        assertEquals(1_00_000.rupees + detail.accruedInterest, s.deposits.first().value)
+        assertEquals(Paise.Zero, detail.breakPenalty) // 21 days from maturity: inside the penalty-free window
+        assertTrue(s.depositDetails.getValue(later).breakPenalty.value > 0)
+        assertEquals(1_50_000.rupees, s.cost)
+        assertTrue(s.value.value > s.cost.value)
+        assertTrue(s.xirr!! > 0.05)
+
+        val books = buildBooks(runBlocking { ledger.snapshot().first() }, today, zone = ZoneOffset.UTC, invest = runBlocking { invest.snapshot().first() })
+        val accrued = s.depositDetails.values.sumOf { it.accruedInterest.value }
+        assertEquals(2_00_000.rupees + Paise(accrued), books.accounts.netWorth)
+        assertTrue(books.accounts.groups.flatMap { it.items }.single { it.name == "Soon FD" }.subtitle.endsWith("with accrued interest"))
+    }
+
+    @Test fun `a closed deposit leaves the list but keeps its detail`() {
+        val fd = runBlocking { invest.openDeposit("Old FD", 1_00_000.rupees, 700, com.moneymatters.app.core.invest.Compounding.Quarterly, LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1), bank) }
+        runBlocking { invest.closeDeposit(fd, LocalDate.of(2026, 1, 1), bank) }
+        val s = state()
+        assertTrue(s.deposits.isEmpty())
+        val detail = s.depositDetails.getValue(fd)
+        assertTrue(detail.isClosed)
+        assertEquals("1 Jan 2026", detail.closedLabel)
+        assertEquals(Paise(detail.payout!!.value), detail.row.value)
+        assertEquals(0.rupees, s.cost)
+    }
+
+    @Test fun `percent text converts to basis points`() {
+        assertEquals(725, percentToBps("7.25"))
+        assertEquals(700, percentToBps("7"))
+        assertEquals(650, percentToBps("6.5%"))
+        assertNull(percentToBps("7.255"))
+        assertNull(percentToBps("abc"))
+        assertEquals("7.25%", formatBps(725))
+        assertEquals("0.50%", formatBps(50))
     }
 }

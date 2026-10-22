@@ -112,6 +112,12 @@ data class FixedDepositEntity(
     val autoRenew: Boolean = false,
     /** Break penalty as a cut in the rate, in basis points. */
     val penaltyBps: Int = 0,
+    /** The entry that opened it, so reversing that entry withdraws the deposit. */
+    val openTransactionId: String? = null,
+    /** Set when matured, broken or renewed; [payoutPaise] is what came out of it after TDS. */
+    val closedOn: String? = null,
+    val payoutPaise: Long? = null,
+    val closeTransactionId: String? = null,
 )
 
 @Entity(
