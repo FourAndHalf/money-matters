@@ -39,6 +39,7 @@ import com.moneymatters.app.feature.invest.ImportScreen
 import com.moneymatters.app.feature.invest.InvestScreen
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.PriceScreen
+import com.moneymatters.app.feature.invest.PricesScreen
 import com.moneymatters.app.feature.invest.SipDetailScreen
 import com.moneymatters.app.feature.invest.SipFormScreen
 import com.moneymatters.app.feature.invest.TradeScreen
@@ -85,6 +86,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var openHoldingId by rememberSaveable { mutableStateOf<String?>(null) }
     var openDepositId by rememberSaveable { mutableStateOf<String?>(null) }
     var openSipId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showPrices by rememberSaveable { mutableStateOf(false) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
     val c = MoneyTheme.colors
@@ -108,7 +110,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             }
             investOverlay == InvestOverlay.Price -> {
                 BackHandler { investOverlay = null; invest.priceForm = null }
-                PriceScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+                val priceHolding = invest.priceForm?.holdingId
+                PriceScreen(invest, holdingName = investState?.details?.get(priceHolding)?.row?.name.orEmpty(), onClose = { investOverlay = null })
             }
             investOverlay == InvestOverlay.Import -> {
                 BackHandler { investOverlay = null; invest.resetImport() }
@@ -121,6 +124,18 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             investOverlay == InvestOverlay.Action -> {
                 BackHandler { investOverlay = null; invest.actionForm = null }
                 ActionScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+            }
+            showPrices && investState != null && openHolding == null -> {
+                BackHandler { showPrices = false }
+                PricesScreen(
+                    investState.prices, invest.sources, invest.isRefreshing,
+                    onBack = { showPrices = false },
+                    onRefresh = invest::refreshPrices,
+                    onUpdateManual = { id -> invest.startPrice(id); investOverlay = InvestOverlay.Price },
+                    onConfirm = invest::confirmPrice,
+                    onResolve = invest::resolveMismatch,
+                    onSaveSources = invest::saveSources,
+                )
             }
             investOverlay == InvestOverlay.NewSip -> {
                 BackHandler { investOverlay = null; invest.sipForm = null }
@@ -217,6 +232,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                             onAllot = { id -> invest.startAllot(id); investOverlay = InvestOverlay.Allot },
                             onNewDeposit = { invest.startDeposit(); investOverlay = InvestOverlay.NewDeposit },
                             onNewSip = { invest.startSip(); investOverlay = InvestOverlay.NewSip },
+                            onOpenPrices = { showPrices = true },
                             onOpenSip = { id -> openSipId = id },
                             onOpenDeposit = { id -> openDepositId = id },
                             onCancelOrder = invest::cancelOrder,

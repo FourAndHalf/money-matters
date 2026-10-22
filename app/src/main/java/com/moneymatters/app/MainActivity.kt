@@ -21,7 +21,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.moneymatters.app.core.invest.CapitalGainsRules
+import com.moneymatters.app.core.invest.HttpPriceFetcher
 import com.moneymatters.app.core.invest.InvestRepository
+import com.moneymatters.app.core.invest.PriceSourcePrefs
+import com.moneymatters.app.core.invest.PriceUpdater
+import com.moneymatters.app.core.invest.PriceWorker
 import com.moneymatters.app.core.ledger.LedgerDatabaseProvider
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.profile.ProfileStore
@@ -60,6 +64,7 @@ class MainActivity : ComponentActivity() {
             initializer { BooksViewModel(ledgerRepo, investRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) }
         }
     }
+    private val priceSourcePrefs by lazy { PriceSourcePrefs(applicationContext.getSharedPreferences("price_sources", MODE_PRIVATE)) }
     private val investModel: InvestViewModel by viewModels {
         viewModelFactory {
             initializer {
@@ -67,6 +72,8 @@ class MainActivity : ComponentActivity() {
                     ledgerRepo, investRepo, capitalGainsRules,
                     // The ₹1 Crore-by-30 goal's date is the 30th birthday; 12% is a placeholder until Goals (P16) lets it be set.
                     goal = { profiles.profile()?.takeIf { it.croreByThirtyGoal }?.let { SipGoal(it.dateOfBirth.plusYears(30), 0.12) } },
+                    priceUpdater = PriceUpdater(investRepo, HttpPriceFetcher(), priceSourcePrefs::sources),
+                    sourcePrefs = priceSourcePrefs,
                 )
             }
         }
@@ -95,6 +102,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Only runs on a cold process start; a warm resume from the background skips this entirely.
         val splashScreen = installSplashScreen()
+        PriceWorker.schedule(applicationContext)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 

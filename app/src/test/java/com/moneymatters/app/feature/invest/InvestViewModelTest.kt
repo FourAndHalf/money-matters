@@ -330,4 +330,67 @@ class InvestViewModelTest {
         assertEquals("Couldn't update the SIP.", model.error)
         assertEquals(Paise.Zero, ledger.accountBalance(bank))
     }
+
+    private class StubFetcher(val responses: Map<String, com.moneymatters.app.core.invest.FetchResult>) : com.moneymatters.app.core.invest.PriceFetcher {
+        override suspend fun fetch(url: String) = responses[url] ?: com.moneymatters.app.core.invest.FetchResult.Failed(404, "File not found (404)")
+    }
+
+    private fun modelWith(fetcher: com.moneymatters.app.core.invest.PriceFetcher, prefs: com.moneymatters.app.core.invest.PriceSourcePrefs? = null): InvestViewModel {
+        val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
+        val sources = com.moneymatters.app.core.invest.PriceSources("https://nse.test/{yyyyMMdd}.zip", "https://amfi.test/NAV.txt")
+        return InvestViewModel(
+            ledger, invest, rules, today = { today },
+            priceUpdater = com.moneymatters.app.core.invest.PriceUpdater(invest, fetcher, { sources }, { today }),
+            sourcePrefs = prefs,
+        )
+    }
+
+    @Test fun `refreshing downloads prices for held funds and records the attempt`() = runBlocking {
+        val fund = invest.findOrCreateHolding(Instrument.MutualFund, null, "INF000000001", "Fund One", com.moneymatters.app.core.invest.FundClass.Equity)
+        invest.buy(fund, LocalDate.of(2025, 1, 1), Units.whole(10), com.moneymatters.app.core.money.UnitPrice.rupees(100), 1_000.rupees, bank, "Buy")
+        val nav = "Scheme Code;a;b;Scheme Name;Plan;Option;Net Asset Value;Date\n1;INF000000001;-;Fund One;Direct;Growth;81.2345;22-Oct-2026"
+        val m = modelWith(StubFetcher(mapOf("https://amfi.test/NAV.txt" to com.moneymatters.app.core.invest.FetchResult.Ok(nav.toByteArray()))))
+        m.refreshPrices()
+        idle()
+        assertFalse(m.isRefreshing)
+        assertEquals(812_345L, invest.latestPrice(fund)!!.price)
+        assertEquals(1, db.investDao().getAllFetchLog().count { it.source == "amfi" && it.ok })
+    }
+
+    @Test fun `without an updater, refresh does nothing`() {
+        model.refreshPrices()
+        assertFalse(model.isRefreshing)
+    }
+
+    @Test fun `source addresses are saved and read back`() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = com.moneymatters.app.core.invest.PriceSourcePrefs(context.getSharedPreferences("vm_sources", android.content.Context.MODE_PRIVATE))
+        val m = modelWith(StubFetcher(emptyMap()), prefs)
+        assertEquals(com.moneymatters.app.core.invest.PriceSources.Default, m.sources)
+        val changed = com.moneymatters.app.core.invest.PriceSources("https://x/{yyyyMMdd}.zip", "https://y/nav.txt")
+        m.saveSources(changed)
+        assertEquals(changed, m.sources)
+        assertEquals(changed, prefs.sources())
+    }
+
+    @Test fun `confirming and resolving prices go through to the books`() = runBlocking {
+        fillBuy()
+        model.saveTrade {}
+        idle()
+        val holding = db.investDao().getAllHoldings().single()
+        invest.recordPrice(holding.id, LocalDate.of(2026, 10, 20), com.moneymatters.app.core.money.UnitPrice.rupees(100), "manual", PriceStatus.Manual)
+        invest.recordPrice(holding.id, LocalDate.of(2026, 10, 20), com.moneymatters.app.core.money.UnitPrice.rupees(120), "nse", PriceStatus.Mismatch)
+        val manual = db.investDao().pricesFor(holding.id, "2026-10-20").first { it.source == "manual" }
+        db.investDao().updatePrice(manual.copy(status = PriceStatus.Mismatch))
+        model.resolveMismatch(holding.id, "2026-10-20", keepDownloaded = true)
+        idle()
+        assertEquals(listOf("nse" to PriceStatus.Verified), db.investDao().pricesFor(holding.id, "2026-10-20").map { it.source to it.status })
+
+        invest.recordPrice(holding.id, LocalDate.of(2026, 10, 21), com.moneymatters.app.core.money.UnitPrice.rupees(300), "nse", PriceStatus.Suspicious)
+        val suspicious = db.investDao().pricesFor(holding.id, "2026-10-21").single()
+        model.confirmPrice(suspicious.id)
+        idle()
+        assertEquals(PriceStatus.Manual, db.investDao().getPrice(suspicious.id)!!.status)
+        assertNull(model.error)
+    }
 }

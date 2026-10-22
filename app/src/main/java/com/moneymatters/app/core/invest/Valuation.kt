@@ -59,3 +59,10 @@ fun holdingFlows(ledger: LedgerSnapshot, accountId: String): List<Pair<String, C
             txn.id to CashFlow(LocalDate.parse(txn.date), Paise(flow))
         }
 }
+
+/**
+ * The status to show for this price today: a verified or confirmed price more than [STALE_DAYS] old is stale,
+ * whoever supplied it, so an old number is never passed off as current (plan.html → "Price status badges").
+ */
+fun PriceEntity.effectiveStatus(today: LocalDate): PriceStatus =
+    if ((status == PriceStatus.Verified || status == PriceStatus.Manual) && LocalDate.parse(date).isBefore(today.minusDays(STALE_DAYS))) PriceStatus.Stale else status

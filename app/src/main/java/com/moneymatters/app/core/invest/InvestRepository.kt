@@ -32,9 +32,9 @@ class InvestRepository(
 
     /** Every holding, lot, sale and price at one moment, re-read after any investment write. */
     fun snapshot(): Flow<InvestSnapshot> =
-        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments", "fixed_deposits", "sip_plans", "sip_skips").map {
+        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments", "fixed_deposits", "sip_plans", "sip_skips", "price_fetch_log").map {
             database.withTransaction {
-                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending(), dao.getAllFixedDeposits(), dao.getAllSipPlans(), dao.getAllSipSkips())
+                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending(), dao.getAllFixedDeposits(), dao.getAllSipPlans(), dao.getAllSipSkips(), dao.getAllFetchLog())
             }
         }
 
@@ -55,7 +55,7 @@ class InvestRepository(
         require(!symbol.isNullOrBlank() || !name.isNullOrBlank()) { "A holding needs a symbol or a name" }
         val accountName = when {
             name.isNullOrBlank() -> symbol!!
-            instrument == Instrument.Stock && !symbol.isNullOrBlank() -> "$name ($symbol)"
+            instrument == Instrument.Stock && !symbol.isNullOrBlank() && !name.equals(symbol, ignoreCase = true) -> "$name ($symbol)"
             else -> name
         }
         val existing = isin?.let { dao.holdingByIsin(it) }
@@ -471,6 +471,61 @@ class InvestRepository(
 
     suspend fun latestPrice(holdingId: String): PriceEntity? = dao.latestPrice(holdingId)
 
+    suspend fun holdings(): List<HoldingEntity> = dao.getAllHoldings()
+
+    /** Each holding's display name (its account's name), by holding id. */
+    suspend fun holdingNames(): Map<String, String> =
+        dao.getAllHoldings().associate { h -> h.id to (database.ledgerDao().getAccount(h.accountId)?.name ?: h.symbol ?: h.id) }
+
+    suspend fun logFetch(entry: PriceFetchLogEntity) = dao.insertFetchLog(entry)
+
+    /**
+     * Stores a downloaded price with the status it has earned (plan.html → "Price status badges"): [PriceStatus.Stale] if
+     * its date is more than [STALE_DAYS] old (a frozen NAV, a suspended stock), [PriceStatus.Suspicious] if it moved
+     * more than 20% from the previous price within ten days, [PriceStatus.Mismatch] (for it and the manual price
+     * it disagrees with) if a manual price for the same day differs by more than 1%, else [PriceStatus.Verified].
+     * A price of zero or less is never stored. Returns null if nothing was stored.
+     */
+    suspend fun ingestPrice(holdingId: String, date: LocalDate, price: UnitPrice, source: String, today: LocalDate, fetchedAt: Long): PriceStatus? = ledger.inTransaction {
+        if (price.tenThousandths <= 0) return@inTransaction null
+        requireHolding(holdingId)
+        val sameDay = dao.pricesFor(holdingId, date.toString())
+        if (sameDay.any { it.source == source }) return@inTransaction null
+        val manual = sameDay.firstOrNull { it.source == MANUAL_SOURCE }
+        val previous = dao.latestPriceBefore(holdingId, date.toString())
+        val status = when {
+            date.isBefore(today.minusDays(STALE_DAYS)) -> PriceStatus.Stale
+            manual != null && differsBy(price.tenThousandths, manual.price, 0.01) -> PriceStatus.Mismatch
+            previous != null && !LocalDate.parse(previous.date).isBefore(date.minusDays(10)) && differsBy(price.tenThousandths, previous.price, 0.20) -> PriceStatus.Suspicious
+            else -> PriceStatus.Verified
+        }
+        if (status == PriceStatus.Mismatch && manual != null) dao.updatePrice(manual.copy(status = PriceStatus.Mismatch))
+        dao.insertPrice(PriceEntity(holdingId = holdingId, date = date.toString(), price = price.tenThousandths, source = source, status = status, fetchedAt = fetchedAt))
+        status
+    }
+
+    private fun differsBy(a: Long, b: Long, fraction: Double) = b > 0 && kotlin.math.abs(a - b).toDouble() / b > fraction
+
+    /** You've looked at a stale, suspicious or mismatched price and accept it: it becomes a confirmed (manual) price. */
+    suspend fun confirmPrice(priceId: Long) {
+        val price = dao.getPrice(priceId) ?: throw NoSuchElementException("No price with id $priceId")
+        dao.updatePrice(price.copy(status = PriceStatus.Manual))
+    }
+
+    /** Settles a manual price that disagreed with a download: keep the downloaded one (now verified) or your own (now confirmed). */
+    suspend fun resolveMismatch(holdingId: String, date: LocalDate, keepDownloaded: Boolean) = ledger.inTransaction {
+        val rows = dao.pricesFor(holdingId, date.toString()).filter { it.status == PriceStatus.Mismatch }
+        check(rows.isNotEmpty()) { "There's no mismatch to resolve on $date" }
+        val (mine, downloaded) = rows.partition { it.source == MANUAL_SOURCE }
+        if (keepDownloaded) {
+            mine.forEach { dao.deletePrice(it.id) }
+            downloaded.forEach { dao.updatePrice(it.copy(status = PriceStatus.Verified)) }
+        } else {
+            downloaded.forEach { dao.deletePrice(it.id) }
+            mine.forEach { dao.updatePrice(it.copy(status = PriceStatus.Manual)) }
+        }
+    }
+
     private suspend fun requireHolding(id: String) = dao.getHolding(id) ?: throw NoSuchElementException("No holding with id $id")
 
     private fun gainAccountName(holding: HoldingEntity, term: GainTerm): String = when (term) {
@@ -494,6 +549,7 @@ data class InvestSnapshot(
     val fixedDeposits: List<FixedDepositEntity> = emptyList(),
     val sipPlans: List<SipPlanEntity> = emptyList(),
     val sipSkips: List<SipSkipEntity> = emptyList(),
+    val fetchLog: List<PriceFetchLogEntity> = emptyList(),
 ) {
     companion object { val Empty = InvestSnapshot(emptyList(), emptyList(), emptyList(), emptyList()) }
 }
@@ -505,3 +561,9 @@ const val TDS_RECEIVABLE = "Assets:TDS Receivable"
 const val IN_TRANSIT = "Assets:Investments:In Transit"
 
 private const val ELSS_LOCK_YEARS = 3L
+
+/** A price older than this many days is shown as stale however it was obtained (the weekly download leaves a week's gap). */
+const val STALE_DAYS = 8L
+
+/** The `source` of a price typed in by hand. */
+const val MANUAL_SOURCE = "manual"

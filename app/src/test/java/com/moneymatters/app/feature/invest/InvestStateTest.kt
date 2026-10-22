@@ -327,4 +327,70 @@ class InvestStateTest {
     @Test fun `ordinals read naturally`() {
         assertEquals(listOf("1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "31st"), listOf(1, 2, 3, 4, 11, 12, 13, 21, 22, 31).map(::ordinal))
     }
+
+    private fun log(source: String, at: Long, ok: Boolean, message: String) = runBlocking {
+        invest.logFetch(com.moneymatters.app.core.invest.PriceFetchLogEntity(source = source, attemptedAt = at, ok = ok, message = message))
+    }
+
+    private val oct15 = LocalDate.of(2026, 10, 15).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    private val oct19 = LocalDate.of(2026, 10, 19).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+    @Test fun `a source that worked shows when, and one that has failed since shows the reason and the last success`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000)
+        log("nse", oct15, true, "Closing prices for 2026-10-15: matched 1 of 1 stocks")
+        log("nse", oct19, false, "File not found (404): the source has moved, or there was no trading that day.")
+        log("amfi", oct15, true, "NAVs for 2026-10-15: matched 2 of 2 funds")
+        val prices = buildInvest(runBlocking { ledger.snapshot().first() }, runBlocking { invest.snapshot().first() }, today, rules, zone = ZoneOffset.UTC).prices
+
+        val nse = prices.sources.first { it.name == "NSE" }
+        assertEquals(Tone.Negative, nse.tone)
+        assertEquals("✕ Failing since 19 Oct", nse.headline)
+        assertEquals("Last success 15 Oct · File not found (404): the source has moved, or there was no trading that day.", nse.detail)
+
+        val amfi = prices.sources.first { it.name == "AMFI" }
+        assertEquals(Tone.Positive, amfi.tone)
+        assertEquals("✓ Updated 15 Oct", amfi.headline)
+    }
+
+    @Test fun `a source never downloaded, and one that has never succeeded, say so`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000)
+        log("amfi", oct19, false, "Blocked (403): the source refused the request.")
+        val prices = buildInvest(runBlocking { ledger.snapshot().first() }, runBlocking { invest.snapshot().first() }, today, rules, zone = ZoneOffset.UTC).prices
+        assertEquals("Not downloaded yet", prices.sources.first { it.name == "NSE" }.headline)
+        assertEquals("Never succeeded · Blocked (403): the source refused the request.", prices.sources.first { it.name == "AMFI" }.detail)
+    }
+
+    @Test fun `the log lists the newest attempts first, with plain times`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000)
+        log("nse", oct15, true, "ok one")
+        log("amfi", oct19, false, "bad two")
+        val rows = buildInvest(runBlocking { ledger.snapshot().first() }, runBlocking { invest.snapshot().first() }, today, rules, zone = ZoneOffset.UTC).prices.log
+        assertEquals(listOf("bad two", "ok one"), rows.map { it.message })
+        assertEquals("19 Oct, 00:00", rows.first().whenLabel)
+        assertEquals("AMFI", rows.first().source)
+    }
+
+    @Test fun `prices needing a look sort first and are counted, and an old price shows as stale in the portfolio too`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000)
+        price(120, LocalDate.of(2026, 10, 1)) // 19 days old: stale whoever entered it
+        val s = state()
+        assertEquals("⚠ Stale", s.holdings.single().priceTag.text)
+        assertEquals(1, s.prices.attentionCount)
+        val row = s.prices.rows.single()
+        assertEquals(PriceStatus.Stale, row.status)
+        assertEquals("₹120.00", row.priceLabel)
+        assertEquals("1 Oct 2026 · manual", row.detailLabel)
+
+        price(125, LocalDate.of(2026, 10, 20))
+        val fresh = state()
+        assertEquals(0, fresh.prices.attentionCount)
+        assertEquals("✍ Manual", fresh.holdings.single().priceTag.text)
+    }
+
+    @Test fun `a holding with no price needs attention`() {
+        buy(LocalDate.of(2025, 1, 10), 10, 1_000)
+        val row = state().prices.rows.single()
+        assertEquals("No price", row.tag.text)
+        assertTrue(row.needsAttention)
+    }
 }

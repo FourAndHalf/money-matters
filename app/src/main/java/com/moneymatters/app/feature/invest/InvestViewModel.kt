@@ -10,7 +10,10 @@ import com.moneymatters.app.core.invest.InsufficientUnitsException
 import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.LockedUnitsException
 import com.moneymatters.app.core.invest.InvestRepository
+import com.moneymatters.app.core.invest.PriceSourcePrefs
+import com.moneymatters.app.core.invest.PriceSources
 import com.moneymatters.app.core.invest.PriceStatus
+import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.invest.TradeParse
 import com.moneymatters.app.core.invest.TradePreview
@@ -51,6 +54,8 @@ class InvestViewModel(
     private val today: () -> LocalDate = LocalDate::now,
     /** The wealth goal SIP shortfalls are measured against, if the investor has one. */
     private val goal: () -> SipGoal? = { null },
+    private val priceUpdater: PriceUpdater? = null,
+    private val sourcePrefs: PriceSourcePrefs? = null,
 ) : ViewModel() {
 
     val state: StateFlow<InvestState?> = combine(ledger.snapshot(), invest.snapshot()) { l, i -> buildInvest(l, i, today(), rules, goal()) }
@@ -110,6 +115,54 @@ class InvestViewModel(
                 error = "Couldn't save the trade. Nothing was changed."
             } finally {
                 isSaving = false
+            }
+        }
+    }
+
+    // ---- Prices (P15) ----
+    var isRefreshing by mutableStateOf(false)
+        private set
+
+    /** The source addresses as currently saved; editing them goes through [saveSources]. */
+    var sources by mutableStateOf(sourcePrefs?.sources() ?: PriceSources.Default)
+        private set
+
+    /** Downloads prices now (the weekly job does the same on a schedule). Each source reports itself in the log. */
+    fun refreshPrices() {
+        val updater = priceUpdater ?: return
+        if (isRefreshing) return
+        viewModelScope.launch {
+            isRefreshing = true
+            try {
+                updater.refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "The price download stopped unexpectedly."
+            } finally {
+                isRefreshing = false
+            }
+        }
+    }
+
+    fun saveSources(newSources: PriceSources) {
+        sourcePrefs?.save(newSources)
+        sources = newSources
+    }
+
+    fun confirmPrice(priceId: Long) = launchPrices { invest.confirmPrice(priceId) }
+
+    fun resolveMismatch(holdingId: String, dateIso: String, keepDownloaded: Boolean) =
+        launchPrices { invest.resolveMismatch(holdingId, LocalDate.parse(dateIso), keepDownloaded) }
+
+    private fun launchPrices(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't update that price."
             }
         }
     }
