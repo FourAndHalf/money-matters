@@ -30,6 +30,8 @@ object LedgerDatabaseProvider {
     fun databaseFile(context: Context): File = context.getDatabasePath(DB_NAME)
 
     private fun build(context: Context): MoneyMattersDatabase {
+        // sqlcipher-android doesn't load its native library itself; opening the database without this throws UnsatisfiedLinkError.
+        System.loadLibrary("sqlcipher")
         val factory = SupportOpenHelperFactory(passphrase(context))
         return Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB_NAME)
             .openHelperFactory(factory)
