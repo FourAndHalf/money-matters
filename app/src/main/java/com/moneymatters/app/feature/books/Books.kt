@@ -45,6 +45,7 @@ private val DayMonth = DateTimeFormatter.ofPattern("d MMM")
 private val DayMonthYear = DateTimeFormatter.ofPattern("d MMM yyyy")
 private val Time = DateTimeFormatter.ofPattern("HH:mm")
 private const val ALL_TIME = "All time"
+const val NOT_IN_NET_WORTH = "Not in net worth"
 
 /** The open period's first day: the latest [monthStartDay] on or before [today] (payday-to-payday months). */
 fun periodStart(today: LocalDate, monthStartDay: Int): LocalDate {
@@ -131,10 +132,14 @@ fun buildBooks(
         "Investments" to setOf(AccountKind.Investment),
         "Loans" to setOf(AccountKind.Loan),
     )
-    val rows = realAccounts.map(::summaryRow)
+    // Accounts flagged out of net worth (EPF) are still listed, in their own group, but never summed.
+    val rows = realAccounts.filter { it.inNetWorth }.map(::summaryRow)
+    val excludedRows = realAccounts.filter { !it.inNetWorth }.map(::summaryRow)
     val groups = groupOrder.mapNotNull { (title, kinds) ->
         rows.filter { it.kind in kinds }.sortedBy { it.name.lowercase() }.takeIf { it.isNotEmpty() }?.let { AccountGroup(title, it) }
-    }
+    } + listOfNotNull(
+        excludedRows.sortedBy { it.name.lowercase() }.takeIf { it.isNotEmpty() }?.let { AccountGroup(NOT_IN_NET_WORTH, it) },
+    )
     val assets = Paise(rows.filter { !it.isLiability }.sumOf { it.balance.value })
     val liabilities = Paise(rows.filter { it.isLiability }.sumOf { it.balance.value })
     val accountsState = AccountsState(

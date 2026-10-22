@@ -2,6 +2,8 @@ package com.moneymatters.app.core.ledger
 
 import androidx.room.withTransaction
 import com.moneymatters.app.core.money.Paise
+import com.moneymatters.app.core.money.UnitPrice
+import com.moneymatters.app.core.money.Units
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -20,8 +22,17 @@ data class LedgerSnapshot(
 /** The optional P04 tags on a transaction; none affect balances. */
 data class TransactionTags(val decision: DecisionKind? = null, val plan: PlanKind? = null, val paymentMethod: PaymentMethod? = null)
 
-/** One leg of a transaction as given by a caller, before it has an id. */
-data class PostingLine(val accountId: String, val debit: Paise? = null, val credit: Paise? = null)
+/**
+ * One leg of a transaction as given by a caller, before it has an id. [units] and [unitPrice] are
+ * set only on a holding's leg of an investment buy or sell; they never affect balancing.
+ */
+data class PostingLine(
+    val accountId: String,
+    val debit: Paise? = null,
+    val credit: Paise? = null,
+    val units: Units? = null,
+    val unitPrice: UnitPrice? = null,
+)
 
 /**
  * The real double-entry ledger: every write here enforces plan.html's non-negotiable rules
@@ -50,9 +61,9 @@ class LedgerRepository(
             }
         }
 
-    suspend fun createAccount(name: String, type: AccountType, parentId: String? = null, kind: AccountKind? = null): String {
+    suspend fun createAccount(name: String, type: AccountType, parentId: String? = null, kind: AccountKind? = null, inNetWorth: Boolean = true): String {
         val id = newId()
-        dao.insertAccount(AccountEntity(id, name, type, parentId, kind = kind))
+        dao.insertAccount(AccountEntity(id, name, type, parentId, kind = kind, inNetWorth = inNetWorth))
         return id
     }
 
@@ -122,6 +133,9 @@ class LedgerRepository(
         if (existing.status != TransactionStatus.Draft && existing.status != TransactionStatus.Posted) {
             throw IllegalLifecycleTransitionException("Cannot edit a ${existing.status} transaction; use reverse or a prior-period adjustment")
         }
+        if (isInvestmentEntry(transactionId)) {
+            throw IllegalLifecycleTransitionException("An investment entry's units and lots can't be edited in place; reverse it and enter it again")
+        }
         validateBalanced(postings)
         database.withTransaction {
             dao.updateTransaction(
@@ -148,9 +162,20 @@ class LedgerRepository(
         if (original.status != TransactionStatus.Reconciled) {
             throw IllegalLifecycleTransitionException("Cannot reverse a ${original.status} transaction; only Reconciled entries can be")
         }
+        val invest = database.investDao()
+        val createdLots = invest.lotsFromTransaction(transactionId)
+        if (createdLots.any { invest.consumptionCountForLot(it.id) > 0 }) {
+            throw IllegalLifecycleTransitionException("Cannot reverse this purchase while later sales have used its lots; reverse those sales first")
+        }
         val originalPostings = dao.getPostingsForTransaction(transactionId)
         val inverted = originalPostings.map {
-            PostingLine(it.accountId, debit = it.creditPaise?.let(::Paise), credit = it.debitPaise?.let(::Paise))
+            PostingLine(
+                it.accountId,
+                debit = it.creditPaise?.let(::Paise),
+                credit = it.debitPaise?.let(::Paise),
+                units = it.units?.let(::Units),
+                unitPrice = it.unitPrice?.let(::UnitPrice),
+            )
         }
         val reversalId = newId()
         database.withTransaction {
@@ -158,6 +183,9 @@ class LedgerRepository(
                 TransactionEntity(reversalId, original.date, original.payee, "Reversal of $transactionId: $reason", TransactionStatus.Posted),
             )
             dao.insertPostings(inverted.toEntities(reversalId))
+            // A reversed sale gives its lots their units back; a reversed purchase takes its (unused) lots away.
+            invest.deleteConsumptionsForSale(transactionId)
+            createdLots.forEach { invest.deleteLot(it.id) }
             audit(reversalId, "Reversal", "Reverses $transactionId: $reason")
             audit(transactionId, "Reversed", "Reversed by $reversalId: $reason")
         }
@@ -200,6 +228,11 @@ class LedgerRepository(
         }
     }
 
+    private suspend fun isInvestmentEntry(transactionId: String): Boolean {
+        val invest = database.investDao()
+        return invest.lotsFromTransaction(transactionId).isNotEmpty() || invest.consumptionCountForSale(transactionId) > 0
+    }
+
     private suspend fun requireTransaction(id: String) =
         dao.getTransaction(id) ?: throw NoSuchElementException("No transaction with id $id")
 
@@ -218,7 +251,10 @@ class LedgerRepository(
     }
 
     private fun List<PostingLine>.toEntities(transactionId: String) = map {
-        PostingEntity(transactionId = transactionId, accountId = it.accountId, debitPaise = it.debit?.value, creditPaise = it.credit?.value)
+        PostingEntity(
+            transactionId = transactionId, accountId = it.accountId, debitPaise = it.debit?.value, creditPaise = it.credit?.value,
+            units = it.units?.micro, unitPrice = it.unitPrice?.tenThousandths,
+        )
     }
 
     private suspend fun audit(transactionId: String, action: String, summary: String, before: String? = null, after: String? = null) {

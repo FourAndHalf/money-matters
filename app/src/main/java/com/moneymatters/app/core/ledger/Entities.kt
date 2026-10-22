@@ -1,5 +1,6 @@
 package com.moneymatters.app.core.ledger
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -23,6 +24,8 @@ data class AccountEntity(
     val isArchived: Boolean = false,
     /** Null for Income, Expense and Equity accounts, which have no real-world kind. */
     val kind: AccountKind? = null,
+    /** False for assets tracked but kept out of net worth, like EPF. Defaults to counted. */
+    @ColumnInfo(defaultValue = "1") val inNetWorth: Boolean = true,
 )
 
 /** Mirrors `TxnAction`'s lifecycle in feature/transactions, one level down (DB, not UI). */
@@ -66,6 +69,9 @@ data class PostingEntity(
     val accountId: String,
     val debitPaise: Long? = null,
     val creditPaise: Long? = null,
+    /** Set on the holding's leg of a buy or sell: shares/fund units in micro-units, and the price in 1/10,000 rupee. Detail only; money is the debit/credit. */
+    val units: Long? = null,
+    val unitPrice: Long? = null,
 )
 
 /** Every ledger mutation, append-only (plan.html → "audit log" is non-negotiable, never edited or deleted). */
