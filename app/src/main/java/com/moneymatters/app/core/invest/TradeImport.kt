@@ -25,6 +25,8 @@ data class TradeRow(
     val side: TradeSide,
     val units: Units,
     val amount: Paise,
+    val instrument: Instrument = Instrument.Stock,
+    val fundClass: FundClass? = null,
 )
 
 data class RowError(val line: Int, val message: String)
@@ -66,11 +68,19 @@ fun parseTrades(csv: String): TradeParse {
             "bonus" -> TradeSide.Bonus
             else -> null
         }
+        val instrument = when (cell("instrument")?.lowercase()) {
+            null, "stock", "share", "equity" -> Instrument.Stock
+            "mf", "fund", "mutual fund", "mutualfund" -> Instrument.MutualFund
+            else -> null
+        }
+        val fundClass = cell("class")?.let { text -> parseFundClass(text) }
         val corporateAction = side == TradeSide.Split || side == TradeSide.Bonus
         val units = cell("units")?.let(::parseUnits)?.takeIf { it.micro > 0 }
         val amount = if (corporateAction) Paise.Zero else cell("amount")?.let(::parseRupees)?.takeIf { it.value > 0 }
         val problem = when {
             date == null -> "Date isn't valid (use yyyy-MM-dd or dd-MM-yyyy)"
+            instrument == null -> "Instrument must be stock or mf"
+            cell("class") != null && fundClass == null -> "Class must be equity, equity-hybrid, hybrid, debt or elss"
             symbol == null -> "Symbol is missing"
             side == null -> "Type must be buy, sell, split or bonus"
             units == null -> "Units (or the split/bonus ratio) must be a positive number with at most 6 decimals"
@@ -78,9 +88,18 @@ fun parseTrades(csv: String): TradeParse {
             else -> null
         }
         if (problem != null) errors += RowError(lineNo, problem)
-        else rows += TradeRow(lineNo, date!!, symbol!!, cell("isin")?.uppercase(), cell("name"), side!!, units!!, amount!!)
+        else rows += TradeRow(lineNo, date!!, symbol!!, cell("isin")?.uppercase(), cell("name"), side!!, units!!, amount!!, instrument!!, fundClass)
     }
     return TradeParse(rows, errors)
+}
+
+private fun parseFundClass(text: String): FundClass? = when (text.lowercase().replace(" ", "-")) {
+    "equity" -> FundClass.Equity
+    "equity-hybrid", "equityhybrid" -> FundClass.EquityHybrid
+    "hybrid" -> FundClass.Hybrid
+    "debt" -> FundClass.Debt
+    "elss" -> FundClass.Elss
+    else -> null
 }
 
 private fun parseDate(text: String): LocalDate? = DATE_FORMATS.firstNotNullOfOrNull {

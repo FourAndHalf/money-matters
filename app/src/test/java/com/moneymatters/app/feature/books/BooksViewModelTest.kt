@@ -27,7 +27,7 @@ class BooksViewModelTest {
     @Test fun `screens rebuild after every ledger write`() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), MoneyMattersDatabase::class.java).build()
         val repo = LedgerRepository(db)
-        val books = BooksViewModel(repo, InvestRepository(db, repo), monthStartDay = { 1 }, today = { LocalDate.of(2026, 10, 20) }).books
+        val books = BooksViewModel(repo, InvestRepository(db, repo, com.moneymatters.app.core.invest.CapitalGainsRules(listOf(com.moneymatters.app.core.invest.CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))), monthStartDay = { 1 }, today = { LocalDate.of(2026, 10, 20) }).books
 
         withTimeout(10_000) {
             assertEquals(0, books.filterNotNull().first().accounts.groups.size)

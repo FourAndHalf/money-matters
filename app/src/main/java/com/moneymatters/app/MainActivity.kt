@@ -52,14 +52,15 @@ class MainActivity : ComponentActivity() {
     private val profiles by lazy { ProfileStore.encrypted(applicationContext) }
     private val passcodes by lazy { PasscodeStore.encrypted(applicationContext) }
     private val ledgerRepo by lazy { LedgerRepository(LedgerDatabaseProvider.get(applicationContext)) }
-    private val investRepo by lazy { InvestRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo) }
+    private val capitalGainsRules by lazy { CapitalGainsRules.load(applicationContext) }
+    private val investRepo by lazy { InvestRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo, capitalGainsRules) }
     private val booksModel: BooksViewModel by viewModels {
         viewModelFactory {
             initializer { BooksViewModel(ledgerRepo, investRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) }
         }
     }
     private val investModel: InvestViewModel by viewModels {
-        viewModelFactory { initializer { InvestViewModel(ledgerRepo, investRepo, CapitalGainsRules.load(applicationContext)) } }
+        viewModelFactory { initializer { InvestViewModel(ledgerRepo, investRepo, capitalGainsRules) } }
     }
     private val appLock: AppLock by viewModels {
         viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet()) } }

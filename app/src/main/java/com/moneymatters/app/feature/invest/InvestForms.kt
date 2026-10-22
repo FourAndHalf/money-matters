@@ -1,5 +1,7 @@
 package com.moneymatters.app.feature.invest
 
+import com.moneymatters.app.core.invest.FundClass
+import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.money.Paise
@@ -19,6 +21,9 @@ data class TradeForm(
     val side: TradeSide,
     val date: LocalDate,
     val holdingId: String? = null,
+    val instrument: Instrument = Instrument.Stock,
+    val fundClass: FundClass = FundClass.Equity,
+    val exitLoadDaysText: String = "",
     val symbol: String = "",
     val name: String = "",
     val isin: String = "",
@@ -30,11 +35,19 @@ data class TradeForm(
     val units: Units? get() = parseUnits(unitsText)?.takeIf { it.micro > 0 }
     val amount: Paise? get() = parseRupees(amountText)?.takeIf { it.value > 0 }
 
+    val isFund: Boolean get() = instrument == Instrument.MutualFund
+
+    /** A fund purchase with no units yet is sent In Transit and allotted later. */
+    val inTransit: Boolean get() = isFund && side == TradeSide.Buy && unitsText.isBlank()
+
+    private val hasIdentity: Boolean get() = holdingId != null || if (isFund) name.isNotBlank() else symbol.isNotBlank()
+
     /** True once everything a save needs is present and valid. */
-    val canSave: Boolean get() = (holdingId != null || symbol.isNotBlank()) && units != null && amount != null && accountId != null
+    val canSave: Boolean get() = hasIdentity && (units != null || inTransit) && amount != null && accountId != null
 
     companion object {
-        fun empty(side: TradeSide, today: LocalDate, holdingId: String? = null) = TradeForm(side, today, holdingId)
+        fun empty(side: TradeSide, today: LocalDate, holdingId: String? = null, instrument: Instrument = Instrument.Stock) =
+            TradeForm(side, today, holdingId, instrument)
     }
 }
 
@@ -66,4 +79,11 @@ data class ActionForm(
 ) {
     val ratio: Units? get() = parseUnits(ratioText)?.takeIf { it.micro > 0 }
     val canSave: Boolean get() = ratio != null
+}
+
+/** Units arriving for an order that was waiting In Transit. [navText] is optional; the price is worked out from the amount otherwise. */
+data class AllotForm(val pendingId: String, val date: LocalDate, val unitsText: String = "", val navText: String = "") {
+    val units: Units? get() = parseUnits(unitsText)?.takeIf { it.micro > 0 }
+    val nav: UnitPrice? get() = if (navText.isBlank()) UnitPrice(0) else parseUnitPrice(navText)
+    val canSave: Boolean get() = units != null && nav != null
 }

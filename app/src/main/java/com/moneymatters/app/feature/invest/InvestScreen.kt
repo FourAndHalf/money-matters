@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.AmountWithBadge
@@ -41,6 +42,8 @@ fun InvestScreen(
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
+    onAllot: (pendingId: String) -> Unit = {},
+    onCancelOrder: (pendingId: String) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -65,18 +68,46 @@ fun InvestScreen(
                 }
             }
         }
-        if (state.holdings.isEmpty()) {
+        if (state.holdings.isEmpty() && state.pending.isEmpty()) {
             item("empty") {
                 Module(Modifier.padding(horizontal = margin)) {
-                    ModuleHeader("No stocks yet", subtitle = "Buy one, or import your trade history from a CSV to rebuild your holdings exactly.")
+                    ModuleHeader("No stocks yet", subtitle = "Buy a stock or fund, or import your trade history from a CSV to rebuild your holdings exactly.")
                 }
             }
         } else {
-            item("summary") { SummaryModule(state, Modifier.padding(horizontal = margin)) }
-            item("holdings") {
-                Module(Modifier.padding(horizontal = margin)) {
-                    ModuleHeader("Stocks", subtitle = "${state.holdings.size} ${if (state.holdings.size == 1) "holding" else "holdings"}")
-                    state.holdings.forEachIndexed { i, row -> HoldingListRow(row, divider = i < state.holdings.lastIndex, onClick = { onOpenHolding(row.id) }) }
+            if (state.holdings.isNotEmpty()) item("summary") { SummaryModule(state, Modifier.padding(horizontal = margin)) }
+            if (state.pending.isNotEmpty()) {
+                item("in-transit") {
+                    Module(Modifier.padding(horizontal = margin)) {
+                        ModuleHeader("In transit", subtitle = "Paid for, waiting for units to be allotted")
+                        state.pending.forEachIndexed { i, p ->
+                            ListRow(
+                                title = p.holdingName,
+                                subtitle = "Ordered ${p.dateLabel}",
+                                divider = i < state.pending.lastIndex,
+                                trailing = {
+                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(p.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Pill("Cancel", { onCancelOrder(p.id) }, height = 26.dp)
+                                            Pill("Allot", { onAllot(p.id) }, style = PillStyle.Primary, height = 26.dp)
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            listOf(Instrument.Stock to "Stocks", Instrument.MutualFund to "Mutual funds").forEach { (instrument, title) ->
+                val rows = state.holdings.filter { it.instrument == instrument }
+                if (rows.isNotEmpty()) {
+                    item(title) {
+                        Module(Modifier.padding(horizontal = margin)) {
+                            ModuleHeader(title, subtitle = "${rows.size} ${if (rows.size == 1) "holding" else "holdings"}")
+                            rows.forEachIndexed { i, row -> HoldingListRow(row, divider = i < rows.lastIndex, onClick = { onOpenHolding(row.id) }) }
+                        }
+                    }
                 }
             }
         }
@@ -128,7 +159,7 @@ internal fun GainLine(gain: Paise?, percent: Double?, modifier: Modifier = Modif
 private fun HoldingListRow(row: HoldingRow, divider: Boolean, onClick: () -> Unit) {
     ListRow(
         title = row.name,
-        subtitle = "${row.unitsLabel} units · avg ${row.avgCostLabel}",
+        subtitle = "${row.unitsLabel} units · avg ${row.avgCostLabel}" + (row.classLabel?.let { " · $it" } ?: ""),
         divider = divider,
         modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open ${row.name}", onClick = onClick),
         leading = { GlyphChip(text = row.symbol.take(1)) },

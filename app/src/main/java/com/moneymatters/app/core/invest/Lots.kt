@@ -6,12 +6,22 @@ import java.math.BigInteger
 import java.time.LocalDate
 
 /** A purchase lot with what is still unsold: units and the cost that goes with them. */
-data class OpenLot(val id: String, val acquiredOn: LocalDate, val remainingUnits: Units, val remainingCost: Paise)
+data class OpenLot(
+    val id: String,
+    val acquiredOn: LocalDate,
+    val remainingUnits: Units,
+    val remainingCost: Paise,
+    /** Units can't be sold before this date (ELSS: three years after each instalment). */
+    val lockUntil: LocalDate? = null,
+)
 
 /** How much of one lot a sale used, and the cost that moved out of the holding with it. */
 data class Consumption(val lotId: String, val units: Units, val cost: Paise)
 
 class InsufficientUnitsException(message: String) : IllegalStateException(message)
+
+/** Enough units are held, but some are locked (ELSS) and can't be sold yet. */
+class LockedUnitsException(message: String) : IllegalStateException(message)
 
 /**
  * Sells [units] from the oldest lots first. A lot's cost follows its units pro rata, rounded

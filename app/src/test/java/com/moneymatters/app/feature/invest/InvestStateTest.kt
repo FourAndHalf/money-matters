@@ -34,7 +34,7 @@ import org.robolectric.annotation.Config
 class InvestStateTest {
 
     private val today = LocalDate.of(2026, 10, 20)
-    private val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
+    private val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24, LocalDate.of(2023, 4, 1))))
     private lateinit var ledger: LedgerRepository
     private lateinit var invest: InvestRepository
     private lateinit var bank: String
@@ -43,7 +43,7 @@ class InvestStateTest {
     @Before fun setUp() {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), MoneyMattersDatabase::class.java).allowMainThreadQueries().build()
         ledger = LedgerRepository(db)
-        invest = InvestRepository(db, ledger)
+        invest = InvestRepository(db, ledger, rules)
         runBlocking {
             bank = ledger.createAccount("HDFC Bank", AccountType.Asset, kind = AccountKind.Bank)
             val account = ledger.createAccount("Infosys (INFY)", AccountType.Asset, kind = AccountKind.Investment)
@@ -103,7 +103,7 @@ class InvestStateTest {
     @Test fun `a part sale leaves the unsold lot's cost and counts the proceeds in the return`() {
         buy(LocalDate.of(2025, 1, 10), 10, 1_000)
         runBlocking {
-            invest.sell(holding, LocalDate.of(2026, 3, 1), Units.whole(4), UnitPrice.rupees(150), 600.rupees, bank, "Sell INFY", rules.listedEquity(today))
+            invest.sell(holding, LocalDate.of(2026, 3, 1), Units.whole(4), UnitPrice.rupees(150), 600.rupees, bank, "Sell INFY")
         }
         price(150)
         val s = state()
@@ -125,7 +125,7 @@ class InvestStateTest {
     @Test fun `a fully sold holding leaves the list but keeps its detail and realised return`() {
         buy(LocalDate.of(2025, 1, 10), 10, 1_000)
         runBlocking {
-            invest.sell(holding, LocalDate.of(2026, 3, 1), Units.whole(10), UnitPrice.rupees(130), 1_300.rupees, bank, "Sell INFY", rules.listedEquity(today))
+            invest.sell(holding, LocalDate.of(2026, 3, 1), Units.whole(10), UnitPrice.rupees(130), 1_300.rupees, bank, "Sell INFY")
         }
         val s = state()
         assertTrue(s.holdings.isEmpty())
@@ -182,5 +182,49 @@ class InvestStateTest {
         assertEquals(200.rupees, detail.actions.last().amount)
         assertTrue("a 20% dividend should raise a flat-price return", detail.xirr!! > (withoutDividend ?: 0.0))
         assertEquals("20", s.holdings.single().unitsLabel)
+    }
+
+    @Test fun `funds show their class, an In Transit order, lock and exit-load notes and slab tax`() {
+        val (equityFund, elss, debt) = runBlocking {
+            Triple(
+                invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity, exitLoadDays = 365),
+                invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Axis ELSS", fundClass = com.moneymatters.app.core.invest.FundClass.Elss),
+                invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Short Debt", fundClass = com.moneymatters.app.core.invest.FundClass.Debt),
+            )
+        }
+        runBlocking {
+            invest.buy(equityFund, LocalDate.of(2026, 5, 1), Units.whole(10), UnitPrice.rupees(100), 1_000.rupees, bank, "Buy")
+            invest.buy(elss, LocalDate.of(2025, 5, 1), Units.whole(10), UnitPrice.rupees(100), 1_000.rupees, bank, "Buy")
+            invest.buy(debt, LocalDate.of(2025, 5, 1), Units.whole(10), UnitPrice.rupees(100), 1_000.rupees, bank, "Buy")
+            invest.orderFund(equityFund, LocalDate.of(2026, 10, 19), 2_000.rupees, bank, "Buy Flexi Cap (in transit)")
+        }
+        val s = state()
+        val byName = s.holdings.associateBy { it.name }
+        assertEquals("Equity", byName.getValue("Flexi Cap").classLabel)
+        assertEquals("ELSS", byName.getValue("Axis ELSS").classLabel)
+        assertEquals(Instrument.MutualFund, byName.getValue("Short Debt").instrument)
+
+        val pending = s.pending.single()
+        assertEquals("Flexi Cap", pending.holdingName)
+        assertEquals(2_000.rupees, pending.amount)
+
+        assertEquals("Exit load until 1 May 2027", s.details.getValue(equityFund).lots.single().note)
+        assertEquals("Locked until 1 May 2028", s.details.getValue(elss).lots.single().note)
+        assertEquals("Slab rate", s.details.getValue(debt).lots.single().termLabel)
+        assertEquals("Short-term", s.details.getValue(equityFund).lots.single().termLabel)
+    }
+
+    @Test fun `money in transit still counts in net worth`() {
+        val equity = runBlocking { ledger.createAccount("Equity:Opening", AccountType.Equity) }
+        val fund = runBlocking { invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity) }
+        runBlocking {
+            ledger.postTransaction(
+                LocalDate.of(2026, 1, 1), "Opening: bank",
+                listOf(com.moneymatters.app.core.ledger.PostingLine(bank, debit = 5_000.rupees), com.moneymatters.app.core.ledger.PostingLine(equity, credit = 5_000.rupees)),
+            )
+            invest.orderFund(fund, LocalDate.of(2026, 10, 19), 2_000.rupees, bank, "Buy (in transit)")
+        }
+        val books = buildBooks(runBlocking { ledger.snapshot().first() }, today, zone = ZoneOffset.UTC, invest = runBlocking { invest.snapshot().first() })
+        assertEquals(5_000.rupees, books.accounts.netWorth)
     }
 }

@@ -4,14 +4,17 @@ import androidx.compose.runtime.Immutable
 import com.moneymatters.app.core.invest.CapitalGainsRules
 import com.moneymatters.app.core.invest.CashFlow
 import com.moneymatters.app.core.invest.CorporateActionKind
+import com.moneymatters.app.core.invest.FundClass
 import com.moneymatters.app.core.invest.GainTerm
 import com.moneymatters.app.core.invest.HoldingValuation
+import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.InvestSnapshot
 import com.moneymatters.app.core.invest.PriceEntity
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.formatUnits
 import com.moneymatters.app.core.invest.gainTerm
 import com.moneymatters.app.core.invest.holdingFlows
+import com.moneymatters.app.core.invest.isEquityOriented
 import com.moneymatters.app.core.invest.valuations
 import com.moneymatters.app.core.invest.xirr
 import com.moneymatters.app.core.ledger.LedgerSnapshot
@@ -45,10 +48,21 @@ data class HoldingRow(
     val priceLabel: String?,
     val priceTag: PriceTag,
     val hasUnits: Boolean,
+    val instrument: Instrument = Instrument.Stock,
+    /** For a fund, e.g. "Equity" or "Debt"; null for a stock. */
+    val classLabel: String? = null,
 )
 
 @Immutable
-data class LotRow(val dateLabel: String, val unitsLabel: String, val cost: Paise, val termLabel: String, val isLongTerm: Boolean)
+data class LotRow(
+    val dateLabel: String,
+    val unitsLabel: String,
+    val cost: Paise,
+    val termLabel: String,
+    val isLongTerm: Boolean,
+    /** A lock or exit-load window still running on this lot, if any. */
+    val note: String? = null,
+)
 
 @Immutable
 data class HoldingTxn(val id: String, val dateLabel: String, val isBuy: Boolean, val unitsLabel: String, val amount: Paise)
@@ -71,6 +85,10 @@ data class HoldingDetail(
     val dividendTotal: Paise = Paise.Zero,
 )
 
+/** A fund purchase paid for but not yet allotted units. */
+@Immutable
+data class PendingRow(val id: String, val holdingName: String, val dateLabel: String, val amount: Paise)
+
 /** Everything the Invest tab (P13) and holding detail (P14) render, built from the same snapshots as the rest of the app. */
 @Immutable
 data class InvestState(
@@ -83,6 +101,7 @@ data class InvestState(
     val xirr: Double?,
     val unpricedCount: Int,
     val details: Map<String, HoldingDetail>,
+    val pending: List<PendingRow> = emptyList(),
 )
 
 fun formatPercent(fraction: Double): String = String.format(Locale.ROOT, "%+.2f%%", fraction * 100)
@@ -137,6 +156,9 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
         xirr = if (allPriced) xirr(flows + CashFlow(today, value)) else null,
         unpricedCount = held.count { it.marketValue == null },
         details = details,
+        pending = invest.pending.filter { it.isOpen }.sortedBy { it.orderDate }.map { p ->
+            PendingRow(p.id, rowsById[p.holdingId]?.name.orEmpty(), LocalDate.parse(p.orderDate).format(DayMonthYear), Paise(p.amountPaise))
+        },
     )
 }
 
@@ -156,6 +178,8 @@ private fun rowFor(v: HoldingValuation, accountName: String): HoldingRow {
         priceLabel = v.price?.let { formatUnitPrice(it.price) },
         priceTag = v.price?.status?.tag() ?: NoPrice,
         hasUnits = v.units.micro > 0,
+        instrument = v.holding.instrument,
+        classLabel = v.holding.fundClass?.label(),
     )
 }
 
@@ -170,19 +194,28 @@ private fun detailFor(
     rules: CapitalGainsRules,
 ): HoldingDetail {
     val used = invest.consumptions.groupBy { it.lotId }
-    val rule = rules.listedEquity(today)
+    val rule = if (v.holding.isEquityOriented) rules.listedEquity(today) else rules.other(today)
+    val slabFrom = if (v.holding.fundClass == FundClass.Debt) rules.debtSlabFrom(today) else null
     val lots = invest.lots.filter { it.holdingId == v.holding.id }.sortedBy { it.acquiredOn }.mapNotNull { lot ->
         val consumed = used[lot.id].orEmpty()
         val units = lot.units - consumed.sumOf { it.units }
         if (units <= 0) return@mapNotNull null
         val acquired = LocalDate.parse(lot.acquiredOn)
-        val long = gainTerm(acquired, today, rule) == GainTerm.Long
+        val slab = slabFrom != null && !acquired.isBefore(slabFrom)
+        val long = !slab && gainTerm(acquired, today, rule) == GainTerm.Long
+        val lock = lot.lockUntil?.let(LocalDate::parse)?.takeIf { it.isAfter(today) }
+        val exitLoad = v.holding.exitLoadDays?.let { acquired.plusDays(it.toLong()) }?.takeIf { it.isAfter(today) }
         LotRow(
             dateLabel = acquired.format(DayMonthYear),
             unitsLabel = formatUnits(Units(units)),
             cost = Paise(lot.costPaise - consumed.sumOf { it.costPaise }),
-            termLabel = if (long) "Long-term" else "Short-term",
+            termLabel = if (slab) "Slab rate" else if (long) "Long-term" else "Short-term",
             isLongTerm = long,
+            note = when {
+                lock != null -> "Locked until ${lock.format(DayMonthYear)}"
+                exitLoad != null -> "Exit load until ${exitLoad.format(DayMonthYear)}"
+                else -> null
+            },
         )
     }
     val postingsByTxn = ledger.postings.groupBy { it.transactionId }
@@ -222,3 +255,11 @@ private fun dividendFlows(invest: InvestSnapshot, holdingId: String): List<CashF
     invest.corporateActions
         .filter { it.holdingId == holdingId && it.kind == CorporateActionKind.Dividend }
         .map { CashFlow(LocalDate.parse(it.date), Paise(it.amountPaise ?: 0)) }
+
+internal fun FundClass.label(): String = when (this) {
+    FundClass.Equity -> "Equity"
+    FundClass.EquityHybrid -> "Equity hybrid"
+    FundClass.Hybrid -> "Hybrid"
+    FundClass.Debt -> "Debt"
+    FundClass.Elss -> "ELSS"
+}

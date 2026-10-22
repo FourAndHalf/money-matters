@@ -4,7 +4,8 @@ import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.Units
 import java.time.LocalDate
 
-enum class GainTerm { Short, Long }
+/** [Slab] is a gain taxed at the investor's slab rate with no long/short distinction (debt funds bought after the cutoff). */
+enum class GainTerm { Short, Long, Slab }
 
 /**
  * How long a holding must be kept before a gain counts as long-term. The number of months is tax
@@ -24,9 +25,15 @@ data class DatedConsumption(val consumption: Consumption, val acquiredOn: LocalD
 /**
  * Splits a sale's gain (proceeds − cost) into short- and long-term buckets. Proceeds are shared
  * across the consumed lots by units, the last lot taking the rounding remainder, so the buckets always
- * add up to exactly proceeds − total cost. Buckets with a zero gain are omitted.
+ * add up to exactly proceeds − total cost. Lots bought on or after [slabFrom] (debt funds) go to the [GainTerm.Slab] bucket. Buckets with a zero gain are omitted.
  */
-fun splitGain(proceeds: Paise, consumed: List<DatedConsumption>, soldOn: LocalDate, rule: HoldingPeriodRule): List<GainBucket> {
+fun splitGain(
+    proceeds: Paise,
+    consumed: List<DatedConsumption>,
+    soldOn: LocalDate,
+    rule: HoldingPeriodRule,
+    slabFrom: LocalDate? = null,
+): List<GainBucket> {
     require(consumed.isNotEmpty()) { "A sale consumes at least one lot" }
     val totalUnits = consumed.fold(Units.Zero) { acc, c -> acc + c.consumption.units }
     var allocated = Paise.Zero
@@ -34,7 +41,7 @@ fun splitGain(proceeds: Paise, consumed: List<DatedConsumption>, soldOn: LocalDa
     consumed.forEachIndexed { index, dated ->
         val share = if (index == consumed.lastIndex) proceeds - allocated else proRata(proceeds, dated.consumption.units, totalUnits)
         allocated += share
-        val term = gainTerm(dated.acquiredOn, soldOn, rule)
+        val term = if (slabFrom != null && !dated.acquiredOn.isBefore(slabFrom)) GainTerm.Slab else gainTerm(dated.acquiredOn, soldOn, rule)
         gains[term] = (gains[term] ?: 0) + (share - dated.consumption.cost).value
     }
     return GainTerm.entries.mapNotNull { term -> gains[term]?.takeIf { it != 0L }?.let { GainBucket(term, Paise(it)) } }

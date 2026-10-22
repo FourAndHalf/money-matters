@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.invest.RestateKind
 import com.moneymatters.app.core.ledger.AccountEntity
+import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.Module
@@ -145,6 +146,49 @@ internal fun ActionContent(
         }
         Column(Modifier.padding(horizontal = margin, vertical = 12.dp)) {
             Pill("Save", { if (form.canSave) onSave() }, style = PillStyle.Primary, height = 44.dp, modifier = Modifier.fillMaxWidth().alpha(if (form.canSave) 1f else 0.4f))
+        }
+    }
+}
+
+/** Give an order that was waiting In Transit its units. */
+@Composable
+fun AllotScreen(viewModel: InvestViewModel, order: PendingRow, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val form = viewModel.allotForm ?: return
+    AllotContent(order, form, viewModel.error, { viewModel.allotForm = it }, { viewModel.saveAllot(onSaved = onClose) }, onClose, modifier)
+}
+
+@Composable
+internal fun AllotContent(
+    order: PendingRow,
+    form: AllotForm,
+    error: String?,
+    onChange: (AllotForm) -> Unit,
+    onSave: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var dateText by remember { mutableStateOf(form.date.toString()) }
+    val margin = MoneyTheme.spacing.margin
+    val status = WindowInsets.statusBars.asPaddingValues()
+    Column(modifier.fillMaxSize()) {
+        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = "Allot units", subtitle = "${order.holdingName} · ${order.amount.formatInr()}", onBack = onClose) }
+        Column(Modifier.weight(1f).padding(horizontal = margin, vertical = MoneyTheme.spacing.sm), verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter)) {
+            Module {
+                FormField(
+                    "Allotment date", dateText,
+                    { text ->
+                        dateText = text
+                        try { onChange(form.copy(date = LocalDate.parse(text))) } catch (_: DateTimeParseException) { /* keep typing */ }
+                    },
+                    placeholder = "yyyy-MM-dd",
+                )
+                Column(Modifier.padding(top = 10.dp)) { FormField("Units allotted", form.unitsText, { onChange(form.copy(unitsText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 123.456") }
+                Column(Modifier.padding(top = 10.dp)) { FormField("NAV (optional)", form.navText, { onChange(form.copy(navText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "worked out from the amount if blank") }
+            }
+            if (error != null) Text(error, style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.negative)
+        }
+        Column(Modifier.padding(horizontal = margin, vertical = 12.dp)) {
+            Pill("Allot units", { if (form.canSave) onSave() }, style = PillStyle.Primary, height = 44.dp, modifier = Modifier.fillMaxWidth().alpha(if (form.canSave) 1f else 0.4f))
         }
     }
 }

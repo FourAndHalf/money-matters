@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface InvestDao {
@@ -71,6 +72,20 @@ interface InvestDao {
     @Insert suspend fun insertSipPlan(plan: SipPlanEntity)
 
     @Insert suspend fun insertCorporateAction(action: CorporateActionEntity)
+
+    @Insert suspend fun insertPending(pending: PendingAllotmentEntity)
+
+    @Update suspend fun updatePending(pending: PendingAllotmentEntity)
+
+    @Query("SELECT * FROM pending_allotments WHERE id = :id")
+    suspend fun getPending(id: String): PendingAllotmentEntity?
+
+    @Query("SELECT * FROM pending_allotments ORDER BY orderDate, id")
+    suspend fun getAllPending(): List<PendingAllotmentEntity>
+
+    /** An allotment that was reversed puts its order back In Transit. */
+    @Query("UPDATE pending_allotments SET allotmentTransactionId = NULL WHERE allotmentTransactionId = :transactionId")
+    suspend fun reopenPendingForAllotment(transactionId: String)
 
     @Query("SELECT * FROM corporate_actions ORDER BY date, id")
     suspend fun getAllCorporateActions(): List<CorporateActionEntity>

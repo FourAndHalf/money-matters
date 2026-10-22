@@ -189,4 +189,47 @@ class InvestScreensTest {
         compose.onNodeWithText("Split ×5").assertIsDisplayed()
         compose.onNodeWithText("₹2,000 received so far").assertIsDisplayed()
     }
+
+    @Test fun `the portfolio groups stocks and funds and lists orders In Transit with their actions`() {
+        val fund = row("h9", "PPFAS Flexi Cap", "", "123.456", 10_000, 11_000).copy(instrument = com.moneymatters.app.core.invest.Instrument.MutualFund, classLabel = "Equity")
+        val withFund = state.copy(holdings = state.holdings + fund, pending = listOf(PendingRow("p1", "PPFAS Flexi Cap", "19 Oct 2026", 5_000.rupees)))
+        var allotted: String? = null
+        var cancelled: String? = null
+        compose.setContent {
+            MoneyMattersTheme { InvestScreen(withFund, onOpenHolding = {}, onBuy = {}, onImport = {}, onAllot = { allotted = it }, onCancelOrder = { cancelled = it }) }
+        }
+        compose.onNodeWithText("Stocks").assertIsDisplayed()
+        compose.onNodeWithText("Mutual funds").assertIsDisplayed()
+        compose.onNodeWithText("In transit").assertIsDisplayed()
+        compose.onNodeWithText("Allot").performClick()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals("p1", allotted)
+        assertEquals("p1", cancelled)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_funds_portfolio.png")
+    }
+
+    @Test fun `the fund buy form asks for a name and a type, and says when it goes In Transit`() {
+        val form = TradeForm(TradeSide.Buy, LocalDate.of(2026, 10, 20), instrument = com.moneymatters.app.core.invest.Instrument.MutualFund, name = "PPFAS Flexi Cap", amountText = "10,000", accountId = "bank")
+        compose.setContent { MoneyMattersTheme { TradeContent(form, emptyList(), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("Buy fund").assertIsDisplayed()
+        compose.onNodeWithText("Fund name").assertIsDisplayed()
+        compose.onNodeWithText("ELSS").assertIsDisplayed()
+        compose.onNodeWithText("The money moves to In Transit until the units are allotted.").assertIsDisplayed()
+        compose.onNodeWithText("Send to In Transit").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_fund_buy_form.png")
+    }
+
+    @Test fun `the allot form renders`() {
+        compose.setContent {
+            MoneyMattersTheme { AllotContent(PendingRow("p1", "PPFAS Flexi Cap", "19 Oct 2026", 5_000.rupees), AllotForm("p1", LocalDate.of(2026, 10, 20), "61.5"), null, {}, {}, {}) }
+        }
+        compose.onNodeWithText("Units allotted").assertIsDisplayed()
+        assertEquals(2, compose.onAllNodesWithText("Allot units").fetchSemanticsNodes().size) // the title and the button
+    }
+
+    @Test fun `a lot shows its lock note`() {
+        val locked = detail.copy(lots = listOf(LotRow("10 Jan 2025", "10", 40_000.rupees, "Long-term", true, note = "Locked until 10 Jan 2028")))
+        compose.setContent { MoneyMattersTheme { HoldingDetailScreen(locked, onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {}) } }
+        compose.onNodeWithText("10 Jan 2025 · Locked until 10 Jan 2028").assertIsDisplayed()
+    }
 }

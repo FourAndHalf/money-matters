@@ -55,7 +55,7 @@ class MoneyMattersAppNavigationTest {
         val db = Room.inMemoryDatabaseBuilder(context, MoneyMattersDatabase::class.java).allowMainThreadQueries().build()
         val ledger = LedgerRepository(db)
         val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
-        return InvestViewModel(ledger, InvestRepository(db, ledger), rules)
+        return InvestViewModel(ledger, InvestRepository(db, ledger, rules), rules)
     }
 
     private fun settingsModel(): SettingsViewModel {

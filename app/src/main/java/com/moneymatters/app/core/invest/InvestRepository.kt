@@ -24,28 +24,45 @@ import kotlinx.coroutines.flow.map
 class InvestRepository(
     private val database: MoneyMattersDatabase,
     private val ledger: LedgerRepository,
+    private val rules: CapitalGainsRules,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val dao get() = database.investDao()
 
     /** Every holding, lot, sale and price at one moment, re-read after any investment write. */
     fun snapshot(): Flow<InvestSnapshot> =
-        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions").map {
+        database.invalidationTracker.createFlow("holdings", "lots", "lot_consumptions", "prices", "corporate_actions", "pending_allotments").map {
             database.withTransaction {
-                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions())
+                InvestSnapshot(dao.getAllHoldings(), dao.getAllLots(), dao.getAllConsumptions(), dao.getAllPrices(), dao.getAllCorporateActions(), dao.getAllPending())
             }
         }
 
     /**
-     * Finds a stock by ISIN, then symbol, or creates it with its own asset account. The account is
-     * named for the company when given, else the symbol, and is an Investment-kind asset.
+     * Finds a holding by ISIN, then symbol (then, for a fund with no symbol, by its name), or creates it
+     * with its own Investment-kind asset account. The account is named for the company or fund when
+     * given, with the symbol in brackets for a stock.
      */
-    suspend fun findOrCreateStock(symbol: String, isin: String? = null, name: String? = null): String = ledger.inTransaction {
-        val existing = isin?.let { dao.holdingByIsin(it) } ?: dao.holdingBySymbol(symbol)
+    suspend fun findOrCreateHolding(
+        instrument: Instrument,
+        symbol: String?,
+        isin: String? = null,
+        name: String? = null,
+        fundClass: FundClass? = null,
+        exitLoadDays: Int? = null,
+        exitLoadBps: Int? = null,
+    ): String = ledger.inTransaction {
+        require(!symbol.isNullOrBlank() || !name.isNullOrBlank()) { "A holding needs a symbol or a name" }
+        val accountName = when {
+            name.isNullOrBlank() -> symbol!!
+            instrument == Instrument.Stock && !symbol.isNullOrBlank() -> "$name ($symbol)"
+            else -> name
+        }
+        val existing = isin?.let { dao.holdingByIsin(it) }
+            ?: symbol?.takeIf { it.isNotBlank() }?.let { dao.holdingBySymbol(it) }
+            ?: ledger.accountIdByName(accountName)?.let { dao.holdingForAccount(it) }
         if (existing != null) return@inTransaction existing.id
-        val accountName = if (name.isNullOrBlank()) symbol else "$name ($symbol)"
         val accountId = ledger.createAccount(accountName, AccountType.Asset, kind = AccountKind.Investment)
-        addHolding(accountId, Instrument.Stock, isin = isin, symbol = symbol)
+        addHolding(accountId, instrument, isin = isin, symbol = symbol?.takeIf { it.isNotBlank() }, fundClass = fundClass, exitLoadDays = exitLoadDays, exitLoadBps = exitLoadBps)
     }
 
     /**
@@ -53,9 +70,9 @@ class InvestRepository(
      * [settlementAccountId] (for history, `Equity:Opening`, so no bank balance moves). Sales are replayed
      * in date order against FIFO lots; one that exceeds the units held on its date aborts the whole import.
      */
-    suspend fun importTrades(rows: List<TradeRow>, settlementAccountId: String, rules: CapitalGainsRules): Int = ledger.inTransaction {
+    suspend fun importTrades(rows: List<TradeRow>, settlementAccountId: String): Int = ledger.inTransaction {
         for (row in rows.inLedgerOrder()) {
-            val holdingId = findOrCreateStock(row.symbol, row.isin, row.name)
+            val holdingId = findOrCreateHolding(row.instrument, row.symbol, row.isin, row.name, row.fundClass)
             when (row.side) {
                 TradeSide.Split -> { applyCorporateAction(holdingId, RestateKind.Split, row.units, row.date); continue }
                 TradeSide.Bonus -> { applyCorporateAction(holdingId, RestateKind.Bonus, row.units, row.date); continue }
@@ -64,7 +81,7 @@ class InvestRepository(
             val price = impliedPrice(row.units, row.amount)
             when (row.side) {
                 TradeSide.Buy -> buy(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Buy ${row.symbol}")
-                TradeSide.Sell -> sell(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Sell ${row.symbol}", rules.listedEquity(row.date))
+                TradeSide.Sell -> sell(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Sell ${row.symbol}")
                 TradeSide.Split, TradeSide.Bonus -> Unit
             }
         }
@@ -161,6 +178,7 @@ class InvestRepository(
                 acquiredOn = LocalDate.parse(lot.acquiredOn),
                 remainingUnits = Units(lot.units - consumed.sumOf { it.units }),
                 remainingCost = Paise(lot.costPaise - consumed.sumOf { it.costPaise }),
+                lockUntil = lot.lockUntil?.let(LocalDate::parse),
             )
         }.filter { it.remainingUnits.micro > 0 }
     }
@@ -192,7 +210,7 @@ class InvestRepository(
                 ),
                 memo = memo, tags = tags,
             )
-            dao.insertLot(LotEntity(newId(), holdingId, date.toString(), units.micro, amount.value, lockUntil?.toString(), sourceTransactionId = id))
+            dao.insertLot(LotEntity(newId(), holdingId, date.toString(), units.micro, amount.value, (lockUntil ?: defaultLock(holding, date))?.toString(), sourceTransactionId = id))
             id
         }
     }
@@ -200,7 +218,8 @@ class InvestRepository(
     /**
      * Sells [units] first-in-first-out from lots bought on or before [date], paying [proceeds]
      * (net of every charge) into [toAccountId]. The gain or loss is posted to a capital-gains account
-     * per term, split by each lot's own holding period. [rule] is the holding-period tax data.
+     * per term, split by each lot's own holding period, which comes from the tax rules for the holding's
+     * kind. Locked units (ELSS) can't be sold, and debt fund units bought after the cutoff are slab-taxed.
      */
     suspend fun sell(
         holdingId: String,
@@ -210,7 +229,6 @@ class InvestRepository(
         proceeds: Paise,
         toAccountId: String,
         payee: String,
-        rule: HoldingPeriodRule,
         memo: String? = null,
         tags: TransactionTags = TransactionTags(),
     ): String {
@@ -218,11 +236,18 @@ class InvestRepository(
         val holding = requireHolding(holdingId)
         requireNoLaterRestatement(holdingId, date)
         return ledger.inTransaction {
-            val eligible = openLots(holdingId).filter { !it.acquiredOn.isAfter(date) }
+            val bought = openLots(holdingId).filter { !it.acquiredOn.isAfter(date) }
+            val eligible = bought.filter { it.lockUntil == null || !it.lockUntil.isAfter(date) }
+            if (eligible.sumOf { it.remainingUnits.micro } < units.micro && bought.sumOf { it.remainingUnits.micro } >= units.micro) {
+                val next = bought.mapNotNull { it.lockUntil }.filter { it.isAfter(date) }.min()
+                throw LockedUnitsException("Some of those units are locked until $next")
+            }
             val consumed = allocateFifo(eligible, units)
             val cost = Paise(consumed.sumOf { it.cost.value })
             val acquired = eligible.associate { it.id to it.acquiredOn }
-            val buckets = splitGain(proceeds, consumed.map { DatedConsumption(it, acquired.getValue(it.lotId)) }, date, rule)
+            val rule = if (holding.isEquityOriented) rules.listedEquity(date) else rules.other(date)
+            val slabFrom = if (holding.fundClass == FundClass.Debt) rules.debtSlabFrom(date) else null
+            val buckets = splitGain(proceeds, consumed.map { DatedConsumption(it, acquired.getValue(it.lotId)) }, date, rule, slabFrom)
 
             val postings = mutableListOf(
                 PostingLine(toAccountId, debit = proceeds),
@@ -238,6 +263,58 @@ class InvestRepository(
         }
     }
 
+    // ---- Fund purchases waiting for units (In Transit) ----
+
+    /** Sends [amount] for a fund purchase: it leaves [fromAccountId] and waits In Transit until [allot] gives it units. */
+    suspend fun orderFund(holdingId: String, date: LocalDate, amount: Paise, fromAccountId: String, payee: String, sipPlanId: String? = null): String {
+        require(amount.value > 0) { "The amount must be positive" }
+        val holding = requireHolding(holdingId)
+        check(holding.instrument == Instrument.MutualFund) { "Only fund purchases go through In Transit" }
+        return ledger.inTransaction {
+            val inTransit = ledger.createAccountIfAbsent(IN_TRANSIT, AccountType.Asset, kind = AccountKind.Investment)
+            val txn = ledger.postTransaction(date, payee, listOf(PostingLine(inTransit, debit = amount), PostingLine(fromAccountId, credit = amount)))
+            val id = newId()
+            dao.insertPending(PendingAllotmentEntity(id, holdingId, date.toString(), amount.value, txn, sipPlanId = sipPlanId))
+            id
+        }
+    }
+
+    /** Turns an open order into units: the In Transit money becomes [units] of the fund at [price] (implied by default), on [date]. */
+    suspend fun allot(pendingId: String, date: LocalDate, units: Units, price: UnitPrice = UnitPrice(0)): String {
+        require(units.micro > 0) { "Units allotted must be positive" }
+        val pending = dao.getPending(pendingId) ?: throw NoSuchElementException("No order with id $pendingId")
+        check(pending.isOpen) { "That order has already been allotted or cancelled" }
+        require(!date.isBefore(LocalDate.parse(pending.orderDate))) { "Units can't be allotted before the order date" }
+        val holding = requireHolding(pending.holdingId)
+        requireNoLaterRestatement(holding.id, date)
+        val amount = Paise(pending.amountPaise)
+        val nav = if (price.tenThousandths > 0) price else impliedPrice(units, amount)
+        return ledger.inTransaction {
+            val inTransit = ledger.createAccountIfAbsent(IN_TRANSIT, AccountType.Asset, kind = AccountKind.Investment)
+            val txn = ledger.postTransaction(
+                date, "Allotment ${holding.symbol ?: ""}".trim(),
+                listOf(PostingLine(holding.accountId, debit = amount, units = units, unitPrice = nav), PostingLine(inTransit, credit = amount)),
+            )
+            dao.insertLot(LotEntity(newId(), holding.id, date.toString(), units.micro, amount.value, defaultLock(holding, date)?.toString(), sourceTransactionId = txn))
+            dao.updatePending(pending.copy(allotmentTransactionId = txn))
+            txn
+        }
+    }
+
+    /** Gives an open order's money back: it leaves In Transit and returns to the account it came from. */
+    suspend fun cancelPending(pendingId: String, date: LocalDate): String {
+        val pending = dao.getPending(pendingId) ?: throw NoSuchElementException("No order with id $pendingId")
+        check(pending.isOpen) { "That order has already been allotted or cancelled" }
+        return ledger.inTransaction {
+            val inTransit = ledger.createAccountIfAbsent(IN_TRANSIT, AccountType.Asset, kind = AccountKind.Investment)
+            val source = database.ledgerDao().getPostingsForTransaction(pending.orderTransactionId).first { it.creditPaise != null }.accountId
+            val amount = Paise(pending.amountPaise)
+            val txn = ledger.postTransaction(date, "Order cancelled", listOf(PostingLine(source, debit = amount), PostingLine(inTransit, credit = amount)))
+            dao.updatePending(pending.copy(cancelTransactionId = txn))
+            txn
+        }
+    }
+
     suspend fun recordPrice(holdingId: String, date: LocalDate, price: UnitPrice, source: String, status: PriceStatus, fetchedAt: Long = System.currentTimeMillis()) {
         requireHolding(holdingId)
         dao.insertPrice(PriceEntity(holdingId = holdingId, date = date.toString(), price = price.tenThousandths, source = source, status = status, fetchedAt = fetchedAt))
@@ -247,10 +324,14 @@ class InvestRepository(
 
     private suspend fun requireHolding(id: String) = dao.getHolding(id) ?: throw NoSuchElementException("No holding with id $id")
 
-    private fun gainAccountName(holding: HoldingEntity, term: GainTerm): String {
-        val equity = holding.instrument == Instrument.Stock || holding.fundClass == FundClass.Equity || holding.fundClass == FundClass.Elss
-        return "Income:Capital Gains:${if (term == GainTerm.Short) "STCG" else "LTCG"}:${if (equity) "Equity" else "Other"}"
+    private fun gainAccountName(holding: HoldingEntity, term: GainTerm): String = when (term) {
+        GainTerm.Slab -> "Income:Capital Gains:Slab"
+        else -> "Income:Capital Gains:${if (term == GainTerm.Short) "STCG" else "LTCG"}:${if (holding.isEquityOriented) "Equity" else "Other"}"
     }
+
+    /** ELSS units are locked for three years from each purchase or allotment. */
+    private fun defaultLock(holding: HoldingEntity, date: LocalDate): LocalDate? =
+        if (holding.fundClass == FundClass.Elss) date.plusYears(ELSS_LOCK_YEARS) else null
 }
 
 /** Everything the Invest tab reads, in one consistent view. */
@@ -260,9 +341,15 @@ data class InvestSnapshot(
     val consumptions: List<LotConsumptionEntity>,
     val prices: List<PriceEntity>,
     val corporateActions: List<CorporateActionEntity> = emptyList(),
+    val pending: List<PendingAllotmentEntity> = emptyList(),
 ) {
     companion object { val Empty = InvestSnapshot(emptyList(), emptyList(), emptyList(), emptyList()) }
 }
 
 /** Where tax withheld at source waits until it is claimed (plan.html: TDS receivable). */
 const val TDS_RECEIVABLE = "Assets:TDS Receivable"
+
+/** Where fund purchases wait between payment and allotment (plan.html: "SIP via In Transit"). */
+const val IN_TRANSIT = "Assets:Investments:In Transit"
+
+private const val ELSS_LOCK_YEARS = 3L

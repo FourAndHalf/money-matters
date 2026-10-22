@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.moneymatters.app.core.invest.CapitalGainsRules
+import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.InvestRepository
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.TradeSide
@@ -43,8 +44,9 @@ class InvestViewModelTest {
         db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), MoneyMattersDatabase::class.java)
             .allowMainThreadQueries().setQueryExecutor { it.run() }.setTransactionExecutor { it.run() }.build()
         ledger = LedgerRepository(db)
-        invest = InvestRepository(db, ledger)
-        model = InvestViewModel(ledger, invest, CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24))), today = { today })
+        val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24, LocalDate.of(2023, 4, 1))))
+        invest = InvestRepository(db, ledger, rules)
+        model = InvestViewModel(ledger, invest, rules, today = { today })
         runBlocking { bank = ledger.createAccount("HDFC Bank", AccountType.Asset) }
     }
 
@@ -165,5 +167,66 @@ class InvestViewModelTest {
         idle()
         assertEquals(listOf("Cash", "HDFC Bank"), settlementAccountsIn(ledger.snapshot().first()).map { it.name })
         assertNotNull(cash)
+    }
+
+    @Test fun `a fund buy with no units goes In Transit and can then be allotted from the form`() = runBlocking {
+        model.startTrade(TradeSide.Buy, instrument = Instrument.MutualFund)
+        model.tradeForm = model.tradeForm.copy(name = "PPFAS Flexi Cap", date = LocalDate.of(2026, 10, 19), amountText = "10,000", accountId = bank)
+        assertTrue(model.tradeForm.inTransit)
+        assertTrue(model.tradeForm.canSave)
+        model.saveTrade {}
+        idle()
+        assertEquals((-10_000).rupees, ledger.accountBalance(bank))
+        val pending = db.investDao().getAllPending().single()
+        assertTrue(pending.isOpen)
+
+        model.startAllot(pending.id)
+        assertFalse(model.allotForm!!.canSave)
+        model.allotForm = model.allotForm!!.copy(date = LocalDate.of(2026, 10, 20), unitsText = "123.456")
+        var saved = false
+        model.saveAllot { saved = true }
+        idle()
+        assertTrue(saved)
+        val holding = db.investDao().getAllHoldings().single()
+        assertEquals(com.moneymatters.app.core.money.parseUnits("123.456"), invest.unitsHeld(holding.id))
+        assertNull(model.allotForm)
+    }
+
+    @Test fun `a fund buy with units is allotted straight away, and a fund needs a name`() = runBlocking {
+        model.startTrade(TradeSide.Buy, instrument = Instrument.MutualFund)
+        model.tradeForm = model.tradeForm.copy(date = LocalDate.of(2026, 10, 19), unitsText = "10", amountText = "1000", accountId = bank)
+        assertFalse(model.tradeForm.canSave) // no name yet
+        model.tradeForm = model.tradeForm.copy(name = "Index Fund", fundClass = com.moneymatters.app.core.invest.FundClass.Equity)
+        assertFalse(model.tradeForm.inTransit)
+        model.saveTrade {}
+        idle()
+        assertEquals(0, db.investDao().getAllPending().size)
+        assertEquals(Units.whole(10), invest.unitsHeld(db.investDao().getAllHoldings().single().id))
+    }
+
+    @Test fun `selling locked ELSS units explains the lock`() = runBlocking {
+        model.startTrade(TradeSide.Buy, instrument = Instrument.MutualFund)
+        model.tradeForm = model.tradeForm.copy(
+            name = "Axis ELSS", fundClass = com.moneymatters.app.core.invest.FundClass.Elss, date = LocalDate.of(2026, 1, 1),
+            unitsText = "10", amountText = "1000", accountId = bank,
+        )
+        model.saveTrade {}
+        idle()
+        val holding = db.investDao().getAllHoldings().single()
+        model.startTrade(TradeSide.Sell, holding.id, Instrument.MutualFund)
+        model.tradeForm = model.tradeForm.copy(date = LocalDate.of(2027, 1, 1), unitsText = "5", amountText = "600", accountId = bank)
+        model.saveTrade {}
+        idle()
+        assertEquals("Some of those units are locked until 2029-01-01.", model.error)
+        assertEquals(Units.whole(10), invest.unitsHeld(holding.id))
+    }
+
+    @Test fun `cancelling an order from the portfolio returns the money`() = runBlocking {
+        val fund = invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Flexi Cap", fundClass = com.moneymatters.app.core.invest.FundClass.Equity)
+        val pending = invest.orderFund(fund, LocalDate.of(2026, 10, 19), 3_000.rupees, bank, "Buy (in transit)")
+        model.cancelOrder(pending)
+        idle()
+        assertEquals(0.rupees, ledger.accountBalance(bank))
+        assertFalse(db.investDao().getPending(pending)!!.isOpen)
     }
 }

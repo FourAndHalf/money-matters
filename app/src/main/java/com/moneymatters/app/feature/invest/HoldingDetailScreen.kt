@@ -87,7 +87,7 @@ fun HoldingDetailScreen(
                         detail.lots.forEachIndexed { i, lot ->
                             ListRow(
                                 title = "${lot.unitsLabel} units",
-                                subtitle = lot.dateLabel,
+                                subtitle = lot.dateLabel + (lot.note?.let { " · $it" } ?: ""),
                                 divider = i < detail.lots.lastIndex,
                                 trailing = {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
