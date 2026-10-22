@@ -1,6 +1,6 @@
 # Invest tab: build plan
 
-Extends plan.html (P13 Portfolio, P14 Holding detail, P15 Prices; Phase 2). It adds no new product decisions; it says how to build what plan.html already decided, in what order, and what has to change in the code that exists today. Covers fixed deposits (FD), stocks, mutual funds (MF) and SIPs.
+Extends plan.html (P13 Portfolio, P14 Holding detail, P15 Prices; Phase 2). It adds no new product decisions; it says how to build what plan.html already decided, in what order, and what has to change in the code that exists today. Covers stocks, mutual funds (MF), fixed deposits (FD) and SIPs, built in that order. Decisions in section 8 are settled.
 
 ## 1. Where the code is today
 
@@ -18,7 +18,9 @@ Extends plan.html (P13 Portfolio, P14 Holding detail, P15 Prices; Phase 2). It a
 - Lots are never edited. A sale writes `lot_consumption` rows (lot, units, cost); remaining units = lot units - consumed. Reversing a sale removes its consumption rows, which is how reversal restores lots without mutating history.
 - Reconciled and closed-month entries stay immutable, including the lots they touched. Corrections are reversals or prior-period adjustments.
 - Tax thresholds, rates and the exemption limit live in versioned per-tax-year data, not code. Figures must be verified against the Income-tax Act 2025 text first (plan.html open item).
-- Market value is derived, never stored, until month-end close posts the revaluation entry (P17).
+- Market value is derived, never stored, until month-end close posts the revaluation entry (P17). Net worth on Home and Accounts uses market value: ledger balance + (market value - cost) per priced holding, cost where no price exists, labelled "as of last price". Price status badges show wherever a stale or unverified price feeds that number.
+- EPF stays out of net worth. `AccountEntity` gets `inNetWorth` (default true; EPF accounts false). `buildBooks` sums assets only over accounts with it set, and Accounts shows flagged accounts in their own "Not in net worth" group. EPF gets no other tracking in this plan.
+- Trades are one net rupee amount (proceeds or cost after all charges); brokerage, STT and stamp duty are not itemised. That amount is the posting; units and price are detail.
 
 ## 3. Data model: schema v3
 
@@ -34,7 +36,7 @@ New tables (Room auto-migration where possible, hand migration + `MigrationTest`
 | `sip_plan` | `holdingId`, `amountPaise`, `dayOfMonth`, `fromAccountId`, `startDate`, `endDate?`, `goalId?` |
 | `corporate_action` | `holdingId`, `kind` (Split, Bonus, Dividend), `date`, `ratioNum`, `ratioDen`, `amountPaise?` |
 
-`PostingEntity` gains nullable `units` and `unitPrice`. The existing account/transaction/audit tables are unchanged. `price_fetch_log` arrives with downloads (slice 5).
+`PostingEntity` gains nullable `units` and `unitPrice`; `AccountEntity` gains `inNetWorth`. The existing account/transaction/audit tables are unchanged. `price_fetch_log` arrives with downloads (slice 5).
 
 New code lives in `core/invest` (pure, tested math) and `feature/invest` (state + screens), mirroring `core/ledger` and `feature/books`. `BooksState` stays as is; a separate `InvestState` is built from the same `LedgerSnapshot` plus the new tables so pages never disagree.
 
@@ -69,27 +71,27 @@ New code lives in `core/invest` (pure, tested math) and `feature/invest` (state 
 
 ## 6. Build order (each slice is its own `feature/` branch, tested and merged)
 
-0. **Engine and schema v3.** Fixed-point units/price types; FIFO lot allocator; XIRR; holding-period and gain bucketing; FD accrual and break value. Migration v2 to v3. Property-style tests: every investment transaction balances, FIFO sums equal cost, sale then reverse restores lots, XIRR matches known cases. No UI.
-1. **Fixed deposits end to end.** Needs no prices or lots, so it proves the new tables, the Invest tab shell and the list-to-detail flow on real data. Open FD, accrual, maturity, break value.
-2. **Mutual funds, manual NAV.** Holdings, lots, lump-sum buy through In Transit, sell, "add existing holding", manual price entry, Portfolio and Holding detail with market value, gain and XIRR. ELSS lock and exit-load window.
-3. **SIPs.** `sip_plan`, monthly proposals, allotment confirmation, missed-SIP flag. Depends on the recurring/reminder work (P11); until it lands, proposals appear when you open the Invest tab.
-4. **Stocks.** Reuses the lot engine: buy with charges, sell, dividends with TDS, split/bonus.
-5. **Prices.** AMFI daily NAV file first (simple, stable), then NSE end-of-day; ISIN matching, status badges, failure messages, download log, weekly WorkManager job. Source URLs are settings.
+0. **Engine and schema v3.** Fixed-point units/price types; FIFO lot allocator; XIRR; holding-period and gain bucketing; FD accrual and break value; `inNetWorth` flag. Migration v2 to v3. Tests: every investment transaction balances, FIFO sums equal cost, sale then reverse restores lots, XIRR matches known cases, net worth excludes flagged accounts. No UI.
+1. **Stocks.** Holdings and lots, buy (net amount), sell with FIFO and gain buckets, dividends with TDS, split/bonus, manual price entry. Invest tab shell with Portfolio (P13) and Holding detail (P14), market-value net worth on Home/Accounts, EPF group. Opening history is loaded from your full purchase history: a trade CSV import (date, symbol/ISIN, buy/sell, units, net amount) so lots and past sales are rebuilt exactly, with a manual multi-lot form as the fallback. Quick Add investment types rerouted here.
+2. **Mutual funds.** Reuses the lot engine: fund class (equity/debt/hybrid/ELSS), lump-sum buy through In Transit and allotment, sell, ELSS 3-year lock per instalment, exit-load window, debt-fund slab-rate rule, NAV manual entry, same CSV import (CAMS/KFintech statement columns mapped).
+3. **Fixed deposits.** Open FD, monthly accrual, TDS, maturity, auto-renew, break-today value; FD rows in Portfolio and Holding detail.
+4. **SIPs.** `sip_plan`, monthly proposals, allotment confirmation, missed-SIP flag with goal-date effect. Needs MFs (slice 2); proposals appear on opening the Invest tab until recurring rules (P11) land.
+5. **Prices.** NSE end-of-day file first (stocks come first), then AMFI NAV; ISIN matching, status badges, failure messages, download log, weekly WorkManager job, source URLs as settings. Until now prices are manual.
 6. **Analytics and tax.** Allocation vs target and drift alert, concentration/overlap, tax-if-sold-today, capital-gains register feeding Tax (P20), month-end revaluation and accrual hooks into close (P17).
 
-Slices 1 and 2 give a useful tab early; 5 is deliberately late so manual prices prove the model before a network dependency lands.
+Stocks first means the lot engine, Portfolio and net worth change are proven on one instrument before MFs reuse them; FDs need none of the lot machinery, so they can slip without blocking anything. Downloads stay late so the model is proven on manual prices first.
 
 ## 7. Risks
 
-- Wrong holding periods from estimated opening-lot dates change tax. The add-holding flow warns when a lot date is approximate and tags those lots.
+- Trade-history import must be exact: a wrong date or unit count changes holding periods and tax. Import shows a preview with per-holding units and cost, and refuses a sale that exceeds units held on that date.
 - NSE changes its file format and location (plan.html). Downloads stay behind a source-URL setting, and a failure is shown, never hidden behind an old price.
 - AMFI rows for wound-up schemes freeze; the row date is always checked.
 - Rounding drift between unit x price and what the broker charged. Store the broker's actual rupee amount as the posting amount and the units/price as detail; never recompute money from them.
 
-## 8. Decisions needed from you
+## 8. Decisions (settled)
 
-1. **Net worth basis.** Home/Accounts today show book value. Once prices exist, should net worth use market value (recommended, labelled "as of last price") with the ledger revaluation still posted only at close, or stay at cost until close?
-2. **Recurring deposits (RD).** You listed FD, stocks, MFs and SIPs. Do you hold RDs, PPF, EPF, NPS or gold? plan.html says "stocks, MFs and FDs only"; RD is a small extension of the FD model.
-3. **Existing holdings.** Do you have full purchase history (broker/CAMS statements) or only current units and average cost? That decides whether statement import is needed in slice 2.
-4. **Order.** Is FD, then MF + SIP, then stocks the right priority for you, or do stocks matter most?
-5. **Brokerage and charges.** Enter the net rupee amount per trade (recommended) or itemise brokerage, STT and stamp duty?
+1. **Net worth** uses market value (cost where a holding has no price yet), labelled "as of last price".
+2. **Scope** is stocks, MFs and FDs, plus SIPs into MFs. **EPF** exists as an account but is excluded from net worth.
+3. **Existing holdings**: full purchase history is available, so lots and past sales are rebuilt exactly through trade import. No estimated dates are expected; the approximate-date warning only applies if something is entered by hand.
+4. **Order**: stocks, MFs, FDs, SIPs.
+5. **Charges**: one net rupee amount per trade.

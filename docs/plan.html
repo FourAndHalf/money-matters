@@ -166,7 +166,8 @@
         <tr><td>Locking</td><td>Entries lock once reconciled. Month-end close is explicit and permanent, with no reopen.</td></tr>
         <tr><td>Journal visibility</td><td>Three layers: simple everyday view → per-transaction journal toggle → accountant mode</td></tr>
         <tr><td>Income</td><td>Salary plus irregular income; optional income buffer that pays you a fixed amount monthly; conservative projections</td></tr>
-        <tr><td>Investments</td><td>Stocks, mutual funds and FDs only</td></tr>
+        <tr><td>Investments</td><td>Stocks, mutual funds (lump sum and SIP) and FDs only. Build order: stocks, then MFs, then FDs, then SIPs</td></tr>
+        <tr><td>Net worth basis</td><td>Market value: holdings count at their latest price (with its status badge), while the ledger itself keeps cost until the month-end revaluation entry. EPF is tracked as an account but kept out of net worth</td></tr>
         <tr><td>Unrealized gains</td><td>Posted to <code>Equity:Unrealized Gains</code>, so they never touch the income statement</td></tr>
         <tr><td>Prices</td><td>Weekly. AMFI (MF) and NSE (stocks) downloaded automatically; manual fallback; every price carries a status badge.</td></tr>
         <tr><td>Runway stress drops</td><td>Equity MF 30%, stocks 40%, cash/FD 0% (editable)</td></tr>
@@ -318,7 +319,9 @@ Daily allowance = Safe to spend ÷ days until next payday</code></pre>
       <ul>
         <li><strong>Holdings are asset accounts with a commodity</strong> (units). Postings carry the quantity, unit price and rupee amount.</li>
         <li><strong>Every purchase is a lot</strong> (date, units, cost including stamp duty and brokerage, lock-in date, 31 Jan 2018 value for grandfathering). Sales use lots FIFO.</li>
-        <li><strong>Book value</strong> (cost) lives in the ledger. <strong>Market value</strong> comes from weekly prices. The official revaluation entry is posted once a month at close.</li>
+        <li><strong>Book value</strong> (cost) lives in the ledger. <strong>Market value</strong> comes from weekly prices. Net worth on Home and Accounts uses market value (cost for any holding with no price yet), labelled "as of last price". The official revaluation entry is still posted once a month at close.</li>
+        <li><strong>Trade entry:</strong> one net rupee amount per trade (brokerage, STT and stamp duty are not itemised).</li>
+        <li><strong>EPF</strong> is an asset account flagged "not in net worth"; it is shown in its own group and excluded from net worth, the wealth goal and runway.</li>
         <li><strong>Investing is not spending.</strong> Savings rate and investment rate are reported separately.</li>
       </ul>
       <div class="table-wrap"><table>
