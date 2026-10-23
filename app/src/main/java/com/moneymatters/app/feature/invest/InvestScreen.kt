@@ -38,13 +38,11 @@ import com.moneymatters.app.ui.theme.MoneyTheme
 fun InvestScreen(
     state: InvestState,
     onOpenHolding: (holdingId: String) -> Unit,
-    onBuy: () -> Unit,
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     onAllot: (pendingId: String) -> Unit = {},
     onCancelOrder: (pendingId: String) -> Unit = {},
-    onNewDeposit: () -> Unit = {},
     onOpenDeposit: (accountId: String) -> Unit = {},
     onNewSip: () -> Unit = {},
     onOpenSip: (planId: String) -> Unit = {},
@@ -71,8 +69,6 @@ fun InvestScreen(
                 Text("Invest", style = MoneyTheme.type.headlineXlMobile, color = MoneyTheme.colors.ink)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Pill("Import", onImport)
-                    Pill("+ FD", onNewDeposit)
-                    Pill("+ Buy", onBuy, style = PillStyle.Primary)
                 }
             }
         }

@@ -54,7 +54,7 @@ class InvestScreensTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun `portfolio shows value, return, each stock with its price status and a warning for unpriced ones`() {
-        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = {}, onBuy = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = {}, onImport = {}) } }
         compose.onNodeWithText("Portfolio value").assertIsDisplayed()
         compose.onNodeWithText("Infosys (INFY)").assertIsDisplayed()
         compose.onNodeWithText("Wipro (WIPRO)").assertIsDisplayed()
@@ -65,25 +65,23 @@ class InvestScreensTest {
     }
 
     @Test fun `portfolio renders in dark`() {
-        compose.setContent { MoneyMattersTheme(darkTheme = true) { InvestScreen(state, onOpenHolding = {}, onBuy = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme(darkTheme = true) { InvestScreen(state, onOpenHolding = {}, onImport = {}) } }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_portfolio_dark.png")
     }
 
-    @Test fun `an empty portfolio invites a buy or an import`() {
+    @Test fun `an empty portfolio invites an import`() {
         val empty = InvestState(emptyList(), 0.rupees, 0.rupees, 0.rupees, null, null, 0, emptyMap())
-        var bought = false
         var imported = false
-        compose.setContent { MoneyMattersTheme { InvestScreen(empty, onOpenHolding = {}, onBuy = { bought = true }, onImport = { imported = true }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(empty, onOpenHolding = {}, onImport = { imported = true }) } }
         compose.onNodeWithText("No stocks yet").assertIsDisplayed()
-        compose.onNodeWithText("+ Buy").performClick()
         compose.onNodeWithText("Import").performClick()
-        assertTrue(bought && imported)
+        assertTrue(imported)
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_empty.png")
     }
 
     @Test fun `tapping a stock opens it`() {
         var opened: String? = null
-        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = { opened = it }, onBuy = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = { opened = it }, onImport = {}) } }
         compose.onNodeWithText("Tata Consultancy (TCS)").performClick()
         assertEquals("h2", opened)
     }
@@ -196,7 +194,7 @@ class InvestScreensTest {
         var allotted: String? = null
         var cancelled: String? = null
         compose.setContent {
-            MoneyMattersTheme { InvestScreen(withFund, onOpenHolding = {}, onBuy = {}, onImport = {}, onAllot = { allotted = it }, onCancelOrder = { cancelled = it }) }
+            MoneyMattersTheme { InvestScreen(withFund, onOpenHolding = {}, onImport = {}, onAllot = { allotted = it }, onCancelOrder = { cancelled = it }) }
         }
         compose.onNodeWithText("Stocks").assertIsDisplayed()
         compose.onNodeWithText("Mutual funds").assertIsDisplayed()
@@ -244,19 +242,16 @@ class InvestScreensTest {
     @Test fun `the portfolio lists fixed deposits and opens one`() {
         val withDeposit = state.copy(deposits = listOf(depositRow))
         var opened: String? = null
-        var added = false
-        compose.setContent { MoneyMattersTheme { InvestScreen(withDeposit, onOpenHolding = {}, onBuy = {}, onImport = {}, onNewDeposit = { added = true }, onOpenDeposit = { opened = it }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(withDeposit, onOpenHolding = {}, onImport = {}, onOpenDeposit = { opened = it }) } }
         compose.onNodeWithText("Fixed deposits").assertIsDisplayed()
         compose.onNodeWithText("Matures in 21 days").assertIsDisplayed()
         compose.onNodeWithText("HDFC FD 1").performClick()
-        compose.onNodeWithText("+ FD").performClick()
         assertEquals("d1", opened)
-        assertTrue(added)
     }
 
     @Test fun `a portfolio with only a deposit still shows its summary`() {
         val onlyDeposit = InvestState(emptyList(), 1_00_000.rupees, 1_03_500.rupees, 3_500.rupees, 0.035, 0.07, 0, emptyMap(), deposits = listOf(depositRow))
-        compose.setContent { MoneyMattersTheme { InvestScreen(onlyDeposit, onOpenHolding = {}, onBuy = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(onlyDeposit, onOpenHolding = {}, onImport = {}) } }
         compose.onNodeWithText("Portfolio value").assertIsDisplayed()
     }
 
@@ -319,7 +314,7 @@ class InvestScreensTest {
         var opened: String? = null
         var added = false
         val withSip = state.copy(sips = listOf(sipRow, sipRow.copy(planId = "s2", fundName = "Index Fund", missedCount = 0, dueCount = 0)), hasFunds = true)
-        compose.setContent { MoneyMattersTheme { InvestScreen(withSip, onOpenHolding = {}, onBuy = {}, onImport = {}, onNewSip = { added = true }, onOpenSip = { opened = it }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(withSip, onOpenHolding = {}, onImport = {}, onNewSip = { added = true }, onOpenSip = { opened = it }) } }
         compose.onNodeWithText("SIPs").assertIsDisplayed()
         compose.onNodeWithText("1 missed").assertIsDisplayed()
         compose.onNodeWithText("On track").assertIsDisplayed()
@@ -330,7 +325,7 @@ class InvestScreensTest {
     }
 
     @Test fun `a portfolio with a fund but no SIP invites starting one`() {
-        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(hasFunds = true), onOpenHolding = {}, onBuy = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(hasFunds = true), onOpenHolding = {}, onImport = {}) } }
         compose.onNodeWithText("Monthly investments into a fund").assertIsDisplayed()
     }
 
@@ -451,7 +446,7 @@ class InvestScreensTest {
     @Test fun `the portfolio links to prices and counts what needs review`() {
         var opened = false
         val withPrices = state.copy(prices = pricesState)
-        compose.setContent { MoneyMattersTheme { InvestScreen(withPrices, onOpenHolding = {}, onBuy = {}, onImport = {}, onOpenPrices = { opened = true }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(withPrices, onOpenHolding = {}, onImport = {}, onOpenPrices = { opened = true }) } }
         compose.onNodeWithText("2 to review").assertIsDisplayed()
         compose.onNodeWithText("Prices").performClick()
         assertTrue(opened)
@@ -467,7 +462,7 @@ class InvestScreensTest {
         var nudged = 0
         compose.setContent {
             MoneyMattersTheme {
-                InvestScreen(state.copy(analytics = analytics), onOpenHolding = {}, onBuy = {}, onImport = {}, onNudgeTarget = { nudged += it })
+                InvestScreen(state.copy(analytics = analytics), onOpenHolding = {}, onImport = {}, onNudgeTarget = { nudged += it })
             }
         }
         compose.onNodeWithText("Equity target 60%").assertIsDisplayed()

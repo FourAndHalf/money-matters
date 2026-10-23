@@ -22,8 +22,6 @@ import com.moneymatters.app.ui.components.AccountRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.NetWorthCard
-import com.moneymatters.app.ui.components.Pill
-import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.ProgressTrack
 import com.moneymatters.app.ui.components.RowDivider
 import com.moneymatters.app.ui.components.StatusBadge
@@ -37,7 +35,6 @@ fun AccountsScreen(
     state: AccountsState,
     onOpenAccount: (accountId: String) -> Unit,
     modifier: Modifier = Modifier,
-    onAddAccount: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val margin = MoneyTheme.spacing.margin
@@ -59,7 +56,6 @@ fun AccountsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Accounts", style = MoneyTheme.type.headlineXlMobile, color = MoneyTheme.colors.ink)
-                Pill("+ Add", onAddAccount, style = PillStyle.Primary)
             }
         }
         item("net-worth") {
