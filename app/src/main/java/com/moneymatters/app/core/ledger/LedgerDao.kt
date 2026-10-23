@@ -83,6 +83,8 @@ interface LedgerDao {
 
     @Insert suspend fun insertCreditCard(card: CreditCardEntity)
 
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE) suspend fun upsertCreditCard(card: CreditCardEntity)
+
     @Query("SELECT * FROM credit_cards")
     suspend fun getAllCreditCards(): List<CreditCardEntity>
 }

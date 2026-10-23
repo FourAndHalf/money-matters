@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.moneymatters.app.feature.transactions.plainRupees
 import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
@@ -124,6 +125,38 @@ class SettingsViewModel(
                 onSaved()
             } catch (e: IllegalArgumentException) {
                 newAccountError = e.message
+            } finally {
+                isSavingAccount = false
+            }
+        }
+    }
+
+    /** A credit card's limit and statement day being changed; null when no card is open for editing. */
+    var cardEdit by mutableStateOf<com.moneymatters.app.feature.accounts.CardEditForm?>(null)
+    var cardEditError by mutableStateOf<String?>(null)
+        private set
+
+    fun startEditCard(accountId: String, name: String, limit: com.moneymatters.app.core.money.Paise?, statementDay: Int?) {
+        cardEditError = null
+        cardEdit = com.moneymatters.app.feature.accounts.CardEditForm(accountId, name, limit?.plainRupees().orEmpty(), statementDay?.toString().orEmpty())
+    }
+
+    fun cancelEditCard() { cardEdit = null; cardEditError = null }
+
+    fun saveCardEdit(onSaved: () -> Unit) {
+        val form = cardEdit ?: return
+        val limit = form.limit ?: return
+        val day = form.day ?: return
+        if (isSavingAccount) return
+        viewModelScope.launch {
+            isSavingAccount = true
+            cardEditError = null
+            try {
+                repo.updateCreditCardDetails(form.accountId, limit, day)
+                cardEdit = null
+                onSaved()
+            } catch (e: IllegalArgumentException) {
+                cardEditError = e.message
             } finally {
                 isSavingAccount = false
             }

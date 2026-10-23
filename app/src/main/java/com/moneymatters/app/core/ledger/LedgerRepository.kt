@@ -84,6 +84,18 @@ class LedgerRepository(
         dao.insertCreditCard(CreditCardEntity(accountId, limit.value, statementDay))
     }
 
+    /**
+     * Changes a card's limit and statement day, or sets them for a card that was added without. Balances and entries are untouched.
+     * Refused for an account that isn't a credit card.
+     */
+    suspend fun updateCreditCardDetails(accountId: String, limit: Paise, statementDay: Int) {
+        require(limit.value > 0) { "A card needs a limit" }
+        require(statementDay in 1..28) { "The statement day must be from 1 to 28" }
+        val account = dao.getAccount(accountId) ?: throw NoSuchElementException("No account with id $accountId")
+        require(account.kind == AccountKind.CreditCard) { "${account.name} isn't a credit card" }
+        dao.upsertCreditCard(CreditCardEntity(accountId, limit.value, statementDay))
+    }
+
     suspend fun accountIdByName(name: String): String? = dao.findAccountByName(name)?.id
 
     /** Hides an account from pickers and the Accounts page without touching its history (Settings → account editor). */
