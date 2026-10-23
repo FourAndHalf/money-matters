@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.feature.accounts.AccountStack
 import com.moneymatters.app.feature.accounts.AccountSummary
 import com.moneymatters.app.feature.transactions.SummaryRow
 import com.moneymatters.app.feature.transactions.TransactionSummary
@@ -33,7 +34,6 @@ import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
 
-private const val HOME_ACCOUNT_ROWS = 5
 
 /** Simple Home (plan.html → P03, Phase 1): balances and the open period's totals, straight from the ledger. */
 @Immutable
@@ -104,13 +104,9 @@ fun HomeScreen(
             }
         }
         padded(margin, "accounts") {
-            Module {
-                ModuleHeader("Accounts", action = { Pill("View all", onOpenAccounts) })
-                val shown = state.accounts.take(HOME_ACCOUNT_ROWS)
-                shown.forEachIndexed { i, a ->
-                    AccountRow(a.name, a.subtitle, a.kind, a.balance, a.isLiability, onClick = { onOpenAccount(a.id) }, divider = i < shown.lastIndex)
-                }
-                if (shown.isEmpty()) EmptyLine("No accounts yet.")
+            Column {
+                ModuleHeader("Accounts", subtitle = if (state.accounts.size > 1) "Swipe the stack" else null, modifier = Modifier.padding(start = 2.dp, top = 8.dp), action = { Pill("View all", onOpenAccounts) })
+                if (state.accounts.isEmpty()) Module { EmptyLine("No accounts yet.") } else AccountStack(state.accounts, onOpenAccount)
             }
         }
         padded(margin, "recent") {

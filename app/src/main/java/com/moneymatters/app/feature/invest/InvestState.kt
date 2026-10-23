@@ -96,6 +96,8 @@ data class HoldingDetail(
     val dividendTotal: Paise = Paise.Zero,
     /** What selling everything sellable today would realise; null without a price or units. */
     val taxPreview: TaxPreviewRow? = null,
+    /** Price per unit in rupees, oldest first (up to the last 24 prices), for the trend line. */
+    val priceTrend: List<Float> = emptyList(),
 )
 
 /** A fund purchase paid for but not yet allotted units. */
@@ -346,7 +348,8 @@ private fun detailFor(
             CorporateActionKind.Bonus -> ActionRow(date, "Bonus ${formatUnits(Units(it.ratioMicro ?: 0))} per unit", null)
         }
     }
-    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }))
+    val trend = invest.prices.filter { it.holdingId == v.holding.id }.sortedWith(compareBy({ it.date }, { it.id })).takeLast(24).map { it.price / 10_000f }
+    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }), priceTrend = trend)
 }
 
 /** A dividend is money the holding paid out, so it counts as an inflow on its date (gross: net received plus TDS to be claimed). */

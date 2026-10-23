@@ -19,12 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.ui.components.BarSegment
 import com.moneymatters.app.ui.components.DetailTopBar
+import com.moneymatters.app.ui.components.GlyphChip
 import com.moneymatters.app.ui.components.KeyValueRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.Pill
+import com.moneymatters.app.ui.components.SegmentBar
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -41,9 +44,17 @@ fun AllocationModule(
     val c = MoneyTheme.colors
     Module(modifier) {
         ModuleHeader("Allocation", subtitle = analytics.targetEquityPercent?.let { "Equity target $it%" } ?: "Set an equity target to track drift")
+        val shades = listOf(c.anchor, c.champagne, c.muted)
+        SegmentBar(
+            analytics.allocation.mapIndexed { i, slice -> BarSegment(slice.fraction.toFloat(), shades[i % shades.size]) },
+            modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+            height = 12.dp, gap = 2.dp,
+            marker = analytics.targetEquityPercent?.let { it / 100f },
+        )
         analytics.allocation.forEachIndexed { i, slice ->
             ListRow(
                 title = slice.label,
+                leading = { GlyphChip(text = "●", content = shades[i % shades.size]) },
                 subtitle = String.format(Locale.ROOT, "%.1f%%", slice.fraction * 100),
                 divider = i < analytics.allocation.lastIndex,
                 trailing = { Text(slice.value.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink) },
