@@ -28,6 +28,10 @@ data class AccountSummary(
     val balance: Paise,
     val isLiability: Boolean = false,
     val badge: AccountBadge? = null,
+    val entryCount: Int = 0,
+    /** Credit cards with details only: the limit and the day the statement is cut. */
+    val cardLimit: Paise? = null,
+    val statementDay: Int? = null,
 )
 
 @Immutable

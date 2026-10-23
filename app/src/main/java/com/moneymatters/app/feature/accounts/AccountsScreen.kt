@@ -61,6 +61,10 @@ fun AccountsScreen(
         item("net-worth") {
             NetWorthCard(state.netWorth, state.assetsTotal, state.liabilitiesTotal, Modifier.padding(horizontal = margin))
         }
+        val stack = state.groups.flatMap { it.items }
+        if (stack.isNotEmpty()) {
+            item("stack") { AccountStack(stack, onOpenAccount, Modifier.padding(horizontal = margin)) }
+        }
         state.groups.forEach { group ->
             item(group.title) {
                 Column(Modifier.padding(horizontal = margin)) {

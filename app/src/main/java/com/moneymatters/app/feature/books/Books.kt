@@ -155,6 +155,9 @@ fun buildBooks(
                 if (a.id in marketByAccount) " · at market" else if ((unpostedByAccount[a.id]?.value ?: 0) > 0) " · with accrued interest" else "",
             balance = marketByAccount[a.id] ?: (Paise(balances[a.id] ?: 0) + (unpostedByAccount[a.id] ?: Paise.Zero)),
             isLiability = a.type == AccountType.Liability,
+            entryCount = count,
+            cardLimit = cardsById[a.id]?.let { Paise(it.limitPaise) },
+            statementDay = cardsById[a.id]?.statementDay,
         )
     }
     val groupOrder = listOf(
