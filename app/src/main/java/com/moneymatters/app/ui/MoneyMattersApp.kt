@@ -40,6 +40,7 @@ import com.moneymatters.app.feature.invest.InvestScreen
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.PriceScreen
 import com.moneymatters.app.feature.accounts.AddAccountScreen
+import com.moneymatters.app.feature.accounts.EditCardScreen
 import com.moneymatters.app.feature.close.CloseScreen
 import com.moneymatters.app.feature.invest.AddInvestmentScreen
 import com.moneymatters.app.feature.close.CloseViewModel
@@ -114,6 +115,13 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
         val openSip = openSipId?.let { investState?.sipDetails?.get(it) }
         LaunchedEffect(openHoldingId, openDepositId, openSipId) { invest.clearManageError() }
         when {
+            settings.cardEdit != null -> {
+                BackHandler { settings.cancelEditCard() }
+                EditCardScreen(
+                    settings.cardEdit!!, settings.cardEditError, settings.isSavingAccount,
+                    onChange = { settings.cardEdit = it }, onSave = { settings.saveCardEdit(onSaved = {}) }, onClose = settings::cancelEditCard,
+                )
+            }
             showAddAccount -> {
                 BackHandler { showAddAccount = false; settings.resetNewAccount() }
                 AddAccountScreen(
@@ -279,6 +287,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         books.home,
                         onOpenAccounts = { tab = ACCOUNTS_TAB },
                         onOpenAccount = { id -> openAccountId = id },
+                        onEditCard = { settings.startEditCard(it.id, it.name, it.cardLimit, it.statementDay) },
                         onOpenTransactions = { tab = TXNS_TAB },
                         onOpenTransaction = { id -> openTransactionId = id },
                         // Clears the floating bar and Quick Add.
@@ -292,6 +301,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     ACCOUNTS_TAB -> AccountsScreen(
                         accounts,
                         onOpenAccount = { id -> openAccountId = id },
+                        onEditCard = { settings.startEditCard(it.id, it.name, it.cardLimit, it.statementDay) },
                         contentPadding = PaddingValues(bottom = 132.dp),
                     )
                     INVEST_TAB -> investState?.let {

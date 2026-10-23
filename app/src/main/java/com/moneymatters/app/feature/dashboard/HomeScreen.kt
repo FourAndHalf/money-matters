@@ -60,6 +60,7 @@ fun HomeScreen(
     state: HomeState,
     onOpenAccounts: () -> Unit,
     onOpenAccount: (accountId: String) -> Unit,
+    onEditCard: (AccountSummary) -> Unit = {},
     onOpenTransactions: () -> Unit,
     onOpenTransaction: (id: String) -> Unit,
     modifier: Modifier = Modifier,
@@ -106,7 +107,7 @@ fun HomeScreen(
         padded(margin, "accounts") {
             Column {
                 ModuleHeader("Accounts", subtitle = if (state.accounts.size > 1) "Swipe the stack" else null, modifier = Modifier.padding(start = 2.dp, top = 8.dp), action = { Pill("View all", onOpenAccounts) })
-                if (state.accounts.isEmpty()) Module { EmptyLine("No accounts yet.") } else AccountStack(state.accounts, onOpenAccount)
+                if (state.accounts.isEmpty()) Module { EmptyLine("No accounts yet.") } else AccountStack(state.accounts, onOpenAccount, onEditCard = onEditCard)
             }
         }
         padded(margin, "recent") {

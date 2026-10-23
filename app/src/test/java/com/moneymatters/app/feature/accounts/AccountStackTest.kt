@@ -55,4 +55,34 @@ class AccountStackTest {
         compose.onNodeWithText("Statement 22").assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/add_account_card.png")
     }
+
+    @Test fun `only a card's panel offers to edit it, and a card without a limit offers to add one`() {
+        var edited: AccountSummary? = null
+        compose.setContent { MoneyMattersTheme { AccountStack(listOf(card), onOpenAccount = {}, onEditCard = { edited = it }) } }
+        compose.onNodeWithText("Edit card").performClick()
+        assertEquals("c", edited?.id)
+    }
+
+    @Test fun `a bank account has no edit card button`() {
+        compose.setContent { MoneyMattersTheme { AccountStack(listOf(bank), onOpenAccount = {}) } }
+        compose.onNodeWithText("Edit card").assertDoesNotExist()
+    }
+
+    @Test fun `a card added without a limit says Add limit`() {
+        compose.setContent { MoneyMattersTheme { AccountStack(listOf(card.copy(cardLimit = null, statementDay = null)), onOpenAccount = {}) } }
+        compose.onNodeWithText("Add limit").assertIsDisplayed()
+    }
+
+    @Test fun `the edit card screen needs a limit above zero and a day from 1 to 28`() {
+        assertEquals(true, CardEditForm("c", "HDFC", "1,50,000", "5").canSave)
+        assertEquals(false, CardEditForm("c", "HDFC", "0", "5").canSave)
+        assertEquals(false, CardEditForm("c", "HDFC", "1,50,000", "29").canSave)
+        assertEquals(false, CardEditForm("c", "HDFC", "", "").canSave)
+        var saved = false
+        compose.setContent { MoneyMattersTheme { EditCardScreen(CardEditForm("c", "HDFC Regalia", "1,50,000", "5"), null, false, {}, { saved = true }, {}) } }
+        compose.onNodeWithText("Edit card").assertIsDisplayed()
+        compose.onNodeWithText("Save changes").performClick()
+        assertEquals(true, saved)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/edit_card.png")
+    }
 }

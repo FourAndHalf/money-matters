@@ -36,6 +36,7 @@ fun AccountsScreen(
     onOpenAccount: (accountId: String) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
+    onEditCard: (AccountSummary) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -63,7 +64,7 @@ fun AccountsScreen(
         }
         val stack = state.groups.flatMap { it.items }
         if (stack.isNotEmpty()) {
-            item("stack") { AccountStack(stack, onOpenAccount, Modifier.padding(horizontal = margin)) }
+            item("stack") { AccountStack(stack, onOpenAccount, Modifier.padding(horizontal = margin), onEditCard) }
         }
         state.groups.forEach { group ->
             item(group.title) {

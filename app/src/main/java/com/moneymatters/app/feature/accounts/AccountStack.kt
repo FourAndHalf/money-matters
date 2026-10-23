@@ -64,7 +64,7 @@ internal fun AccountSummary.utilisation(): Float? = cardLimit?.takeIf { it.value
  * the panel under it shows that account's facts with a way into its ledger.
  */
 @Composable
-fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier) {
+fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}) {
     if (accounts.isEmpty()) return
     var front by rememberSaveable { mutableIntStateOf(0) }
     val index = front.coerceIn(0, accounts.lastIndex)
@@ -101,16 +101,24 @@ fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: Stri
                 targetState = accounts[index],
                 transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(140)) },
                 label = "account-panel",
-            ) { account -> AccountPanel(account, onOpen = { onOpenAccount(account.id) }) }
+            ) { account -> AccountPanel(account, onOpen = { onOpenAccount(account.id) }, onEditCard = { onEditCard(account) }) }
         }
     }
 }
 
 @Composable
-private fun AccountPanel(account: AccountSummary, onOpen: () -> Unit) {
+private fun AccountPanel(account: AccountSummary, onOpen: () -> Unit, onEditCard: () -> Unit) {
     val util = account.utilisation()
     Column {
-        ModuleHeader(account.name, subtitle = account.kind.label(), action = { Pill("Open ledger", onOpen) })
+        ModuleHeader(
+            account.name, subtitle = account.kind.label(),
+            action = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (account.kind == AccountKind.CreditCard) Pill(if (account.cardLimit == null) "Add limit" else "Edit card", onEditCard)
+                    Pill("Open ledger", onOpen)
+                }
+            },
+        )
         if (util != null && account.cardLimit != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Gauge(util, "of ${account.cardLimit.formatInr()}")
