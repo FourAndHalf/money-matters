@@ -36,6 +36,7 @@ import com.moneymatters.app.feature.books.displayName
 import com.moneymatters.app.feature.books.label
 import com.moneymatters.app.ui.components.AmountPad
 import com.moneymatters.app.ui.components.DetailTopBar
+import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.InnerPanel
 import com.moneymatters.app.ui.components.PostingLineRow
@@ -254,12 +255,7 @@ fun QuickAddScreen(
             }
             item("details") {
                 Module {
-                    FormField(
-                        "Date",
-                        form.date.toString(),
-                        onValueChange = { text -> runCatching { LocalDate.parse(text) }.getOrNull()?.let { date -> update { it.copy(date = date) } } },
-                        keyboardType = KeyboardType.Text,
-                    )
+                    DateField("Date", form.date, { date -> update { it.copy(date = date) } })
                     FormField("Note", form.note, onValueChange = { update { f -> f.copy(note = it) } }, modifier = Modifier.padding(top = 12.dp), placeholder = "Optional")
                 }
             }

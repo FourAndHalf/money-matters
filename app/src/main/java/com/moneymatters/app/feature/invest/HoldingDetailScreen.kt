@@ -13,6 +13,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import com.moneymatters.app.core.invest.Instrument
+import com.moneymatters.app.ui.components.ConfirmDialog
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
@@ -42,8 +49,17 @@ fun HoldingDetailScreen(
     modifier: Modifier = Modifier,
     onDividend: () -> Unit = {},
     onCorporateAction: () -> Unit = {},
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onEditTrade: (transactionId: String) -> Unit = {},
+    onDeleteTrade: (transactionId: String) -> Unit = {},
+    onDeleteIncome: (transactionId: String) -> Unit = {},
+    /** Why the last edit or delete was refused, if it was. */
+    error: String? = null,
 ) {
     val row = detail.row
+    val isBond = row.instrument == Instrument.Bond
+    var confirm by remember { mutableStateOf<DeleteTarget?>(null) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     Column(modifier.fillMaxSize()) {
@@ -54,6 +70,7 @@ fun HoldingDetailScreen(
             contentPadding = PaddingValues(start = margin, top = MoneyTheme.spacing.sm, end = margin, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
+            if (error != null) item("error") { Module { Text(error, style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.negative) } }
             item("summary") {
                 Module(shape = MoneyTheme.shapes.xl) {
                     Text("Current value", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted)
@@ -67,8 +84,8 @@ fun HoldingDetailScreen(
                         Pill("Update price", onUpdatePrice)
                     }
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Pill("Dividend", onDividend)
-                        Pill("Split / bonus", onCorporateAction)
+                        Pill(if (isBond) "Coupon" else "Dividend", onDividend)
+                        if (!isBond) Pill("Split / bonus", onCorporateAction)
                     }
                 }
             }
@@ -81,6 +98,10 @@ fun HoldingDetailScreen(
                     KeyValueRow("Latest price") {
                         Text(row.priceLabel ?: "—", style = MoneyTheme.type.ledgerMono, color = MoneyTheme.colors.ink)
                         StatusBadge(row.priceTag.text, row.priceTag.tone)
+                    }
+                    detail.bond?.let { bond ->
+                        KeyValueRow("Coupon", bond.couponLabel ?: "—")
+                        KeyValueRow("Matures", bond.maturityLabel ?: "—")
                     }
                     KeyValueRow("XIRR", detail.xirr?.let(::formatPercent) ?: "—", divider = false)
                 }
@@ -115,7 +136,12 @@ fun HoldingDetailScreen(
                                 title = a.label,
                                 subtitle = a.dateLabel,
                                 divider = i < detail.actions.lastIndex,
-                                trailing = { a.amount?.let { Text(it.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false) } },
+                                trailing = {
+                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        a.amount?.let { Text(it.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false) }
+                                        a.incomeTransactionId?.let { id -> Pill("Delete", { confirm = DeleteTarget.Income(id) }, height = 26.dp) }
+                                    }
+                                },
                             )
                         }
                     }
@@ -130,9 +156,28 @@ fun HoldingDetailScreen(
                                 title = "${if (t.isBuy) "Bought" else "Sold"} ${t.unitsLabel}",
                                 subtitle = t.dateLabel,
                                 divider = i < detail.transactions.lastIndex,
-                                trailing = { Text(t.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false) },
+                                trailing = {
+                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(t.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false)
+                                        if (t.canEdit || t.canDelete) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                if (t.canEdit) Pill("Edit", { onEditTrade(t.id) }, height = 26.dp)
+                                                if (t.canDelete) Pill("Delete", { confirm = DeleteTarget.Trade(t.id) }, height = 26.dp)
+                                            }
+                                        }
+                                    }
+                                },
                             )
                         }
+                    }
+                }
+            }
+            item("manage") {
+                Module {
+                    ModuleHeader("Manage", subtitle = "Correct what you entered, or remove it everywhere")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Pill("Edit details", onEdit)
+                        Pill("Delete ${if (isBond) "bond" else if (row.instrument == Instrument.MutualFund) "fund" else "stock"}", { confirm = DeleteTarget.Holding }, style = PillStyle.Destructive)
                     }
                 }
             }
@@ -153,6 +198,26 @@ fun HoldingDetailScreen(
             }
         }
     }
+
+    confirm?.let { target ->
+        when (target) {
+            DeleteTarget.Holding -> ConfirmDialog(
+                "Delete ${row.name}?",
+                "This removes it and every trade, dividend, price and SIP for it, along with their entries on the Transactions and Accountant pages. Balances and net worth are worked out again without it. It can't be undone.",
+                "Delete", onDelete, { confirm = null },
+            )
+            is DeleteTarget.Trade -> ConfirmDialog(
+                "Delete this trade?",
+                "The entry disappears from the Transactions and Accountant pages, and the units, cost and gains are worked out again without it.",
+                "Delete", { onDeleteTrade(target.id) }, { confirm = null },
+            )
+            is DeleteTarget.Income -> ConfirmDialog(
+                "Delete this ${if (isBond) "coupon" else "dividend"}?",
+                "Its income entry is removed from the Transactions and Accountant pages.",
+                "Delete", { onDeleteIncome(target.id) }, { confirm = null },
+            )
+        }
+    }
 }
 
 @Composable
@@ -169,4 +234,11 @@ private fun PriceChartModule(chart: PriceChartData) {
             Text("- - Your average cost $it", style = MoneyTheme.type.bodySm, color = c.champagne, modifier = Modifier.padding(top = 4.dp))
         }
     }
+}
+
+/** What a confirmed deletion on the holding page will remove. */
+private sealed interface DeleteTarget {
+    data object Holding : DeleteTarget
+    data class Trade(val id: String) : DeleteTarget
+    data class Income(val id: String) : DeleteTarget
 }

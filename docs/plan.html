@@ -254,7 +254,7 @@ Dr  Assets:Tax:TDS Receivable       10,000
       <h2>Transaction lifecycle &amp; month-end close</h2>
       <pre class="flow"><code>Draft  →  Posted  →  Reconciled (locked)  →  Month closed (locked, permanent)</code></pre>
       <ul>
-        <li><strong>Draft / Posted:</strong> editable. Every edit goes to the audit log.</li>
+        <li><strong>Draft / Posted:</strong> editable, and deletable (an investment, deposit or SIP delete removes its entries from every page and recalculates; see invest-plan.md section 12). Every edit and every deletion goes to the audit log.</li>
         <li><strong>Reconciled:</strong> locked. Corrections are a reversal plus a new entry.</li>
         <li><strong>Month closed:</strong> no create, edit or delete for anything dated in that month, enforced by SQLite triggers. No reopen.</li>
         <li><strong>Months close in order.</strong> A later month can't be closed before an earlier one.</li>

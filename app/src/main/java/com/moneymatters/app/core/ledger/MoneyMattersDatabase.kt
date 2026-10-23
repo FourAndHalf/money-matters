@@ -70,7 +70,7 @@ class CorporateActionsV4 : AutoMigrationSpec
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
         ClosedPeriodEntity::class, CreditCardEntity::class,
     ],
-    version = 10,
+    version = 11,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -90,6 +90,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 8, to = 9),
         // v10: credit card limit and statement day.
         AutoMigration(from = 9, to = 10),
+        // v11: bonds carry a coupon and a maturity date.
+        AutoMigration(from = 10, to = 11),
     ],
 )
 @TypeConverters(LedgerConverters::class)

@@ -76,14 +76,27 @@ data class LotRow(
 )
 
 @Immutable
-data class HoldingTxn(val id: String, val dateLabel: String, val isBuy: Boolean, val unitsLabel: String, val amount: Paise)
+data class HoldingTxn(
+    val id: String,
+    val dateLabel: String,
+    val isBuy: Boolean,
+    val unitsLabel: String,
+    val amount: Paise,
+    /** A real buy or sell can be deleted; an allotment can't be edited (delete it and allot again). */
+    val canDelete: Boolean = false,
+    val canEdit: Boolean = false,
+)
 
 @Immutable
 data class PricePoint(val dateLabel: String, val priceLabel: String, val source: String, val tag: PriceTag)
 
 /** A dividend, split or bonus on a holding; [amount] is the gross dividend, null for a split or bonus. */
 @Immutable
-data class ActionRow(val dateLabel: String, val label: String, val amount: Paise?)
+data class ActionRow(val dateLabel: String, val label: String, val amount: Paise?, /** Set for a dividend or coupon, which can be deleted. */ val incomeTransactionId: String? = null)
+
+/** What makes a bond a bond: its coupon and when it is redeemed. */
+@Immutable
+data class BondFacts(val couponLabel: String?, val maturityLabel: String?)
 
 @Immutable
 data class HoldingDetail(
@@ -98,6 +111,7 @@ data class HoldingDetail(
     val taxPreview: TaxPreviewRow? = null,
     /** The recorded prices drawn as a line; null until there are at least two. */
     val chart: PriceChartData? = null,
+    val bond: BondFacts? = null,
 )
 
 /** The price line (rupees per unit, oldest first, up to the last [CHART_POINTS] prices) with its range and, if units are held, your average cost. */
@@ -304,7 +318,7 @@ private fun rowFor(v: HoldingValuation, accountName: String, today: LocalDate): 
         priceTag = v.price?.effectiveStatus(today)?.tag() ?: NoPrice,
         hasUnits = v.units.micro > 0,
         instrument = v.holding.instrument,
-        classLabel = v.holding.fundClass?.label(),
+        classLabel = v.holding.fundClass?.label() ?: v.holding.couponBps?.let { "${formatBps(it)} coupon" }.takeIf { v.holding.instrument == Instrument.Bond },
     )
 }
 
@@ -344,6 +358,11 @@ private fun detailFor(
         )
     }
     val postingsByTxn = ledger.postings.groupBy { it.transactionId }
+    // A split or bonus moves units through the same tables a trade does; only real buys and sells can be edited or deleted.
+    val restatements = invest.corporateActions.mapNotNull { it.transactionId }.toSet()
+    val ownLots = invest.lots.filter { it.holdingId == v.holding.id }
+    val tradeIds = (ownLots.map { it.sourceTransactionId } + invest.consumptions.filter { c -> ownLots.any { it.id == c.lotId } }.map { it.saleTransactionId }).filter { it !in restatements }.toSet()
+    val allotmentIds = invest.pending.mapNotNull { it.allotmentTransactionId }.toSet()
     val txns = flows.sortedWith(compareByDescending<Pair<String, CashFlow>> { it.second.date }.thenByDescending { it.first }).map { (id, flow) ->
         val own = postingsByTxn[id].orEmpty().filter { it.accountId == v.holding.accountId }
         HoldingTxn(
@@ -352,6 +371,8 @@ private fun detailFor(
             isBuy = flow.amount.value < 0,
             unitsLabel = formatUnits(Units(own.sumOf { it.units ?: 0 })),
             amount = Paise(kotlin.math.abs(flow.amount.value)),
+            canDelete = id in tradeIds,
+            canEdit = id in tradeIds && id !in allotmentIds,
         )
     }
     val prices = invest.prices.filter { it.holdingId == v.holding.id }.sortedWith(compareByDescending<PriceEntity> { it.date }.thenByDescending { it.id }).map {
@@ -367,7 +388,8 @@ private fun detailFor(
     val actions = invest.corporateActions.filter { it.holdingId == v.holding.id }.sortedByDescending { it.date }.map {
         val date = LocalDate.parse(it.date).format(DayMonthYear)
         when (it.kind) {
-            CorporateActionKind.Dividend -> ActionRow(date, "Dividend", Paise(it.amountPaise ?: 0))
+            CorporateActionKind.Dividend -> ActionRow(date, "Dividend", Paise(it.amountPaise ?: 0), it.transactionId)
+            CorporateActionKind.Coupon -> ActionRow(date, "Coupon", Paise(it.amountPaise ?: 0), it.transactionId)
             CorporateActionKind.Split -> ActionRow(date, "Split ×${formatUnits(Units(it.ratioMicro ?: 0))}", null)
             CorporateActionKind.Bonus -> ActionRow(date, "Bonus ${formatUnits(Units(it.ratioMicro ?: 0))} per unit", null)
         }
@@ -385,13 +407,14 @@ private fun detailFor(
             averageCostLabel = avg?.let { perUnit(v.cost, v.units.micro) },
         )
     }
-    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }), chart = chart)
+    val bond = v.holding.takeIf { it.instrument == Instrument.Bond }?.let { BondFacts(it.couponBps?.let(::formatBps), it.maturityDate?.let { d -> LocalDate.parse(d).format(DayMonthYear) }) }
+    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }), chart = chart, bond = bond)
 }
 
 /** A dividend is money the holding paid out, so it counts as an inflow on its date (gross: net received plus TDS to be claimed). */
 private fun dividendFlows(invest: InvestSnapshot, holdingId: String): List<CashFlow> =
     invest.corporateActions
-        .filter { it.holdingId == holdingId && it.kind == CorporateActionKind.Dividend }
+        .filter { it.holdingId == holdingId && (it.kind == CorporateActionKind.Dividend || it.kind == CorporateActionKind.Coupon) }
         .map { CashFlow(LocalDate.parse(it.date), Paise(it.amountPaise ?: 0)) }
 
 internal fun FundClass.label(): String = when (this) {

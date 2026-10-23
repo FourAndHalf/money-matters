@@ -28,9 +28,11 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.invest.InstalmentState
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.CalendarLegend
+import com.moneymatters.app.ui.components.ConfirmDialog
 import com.moneymatters.app.ui.components.KeyValueRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
@@ -42,7 +44,6 @@ import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
 
 /** Start a monthly SIP into a fund you already hold. */
 @Composable
@@ -63,17 +64,16 @@ internal fun SipFormContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var startText by remember { mutableStateOf(form.start.toString()) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     Column(modifier.fillMaxSize()) {
-        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = "New SIP", onBack = onClose) }
+        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = if (form.editingPlanId != null) "Edit SIP" else "New SIP", onBack = onClose) }
         LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = margin, vertical = MoneyTheme.spacing.sm),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
-            item("fund") {
+            if (form.editingPlanId == null) item("fund") {
                 Module {
                     Text("Fund", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
                     if (funds.isEmpty()) {
@@ -89,15 +89,8 @@ internal fun SipFormContent(
                 Module {
                     FormField("Amount each month (₹)", form.amountText, { onChange(form.copy(amountText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 10,000")
                     Column(Modifier.padding(top = 10.dp)) { FormField("Day of the month", form.dayText, { onChange(form.copy(dayText = it)) }, keyboardType = KeyboardType.Number, placeholder = "1 to 31", error = if (form.day == null) "Use a day from 1 to 31" else null) }
-                    Column(Modifier.padding(top = 10.dp)) {
-                        FormField(
-                            "First instalment on or after", startText,
-                            { text ->
-                                startText = text
-                                try { onChange(form.copy(start = LocalDate.parse(text))) } catch (_: DateTimeParseException) { /* keep typing */ }
-                            },
-                            placeholder = "yyyy-MM-dd",
-                        )
+                    if (form.editingPlanId == null) Column(Modifier.padding(top = 10.dp)) {
+                        DateField("First instalment on or after", form.start, { onChange(form.copy(start = it)) })
                     }
                 }
             }
@@ -113,7 +106,7 @@ internal fun SipFormContent(
             if (error != null) item("error") { Text(error, style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.negative) }
         }
         Column(Modifier.padding(horizontal = margin, vertical = 12.dp)) {
-            Pill("Start SIP", { if (form.canSave) onSave() }, style = PillStyle.Primary, height = 44.dp, modifier = Modifier.fillMaxWidth().alpha(if (form.canSave) 1f else 0.4f))
+            Pill(if (form.editingPlanId != null) "Save changes" else "Start SIP", { if (form.canSave) onSave() }, style = PillStyle.Primary, height = 44.dp, modifier = Modifier.fillMaxWidth().alpha(if (form.canSave) 1f else 0.4f))
         }
     }
 }
@@ -127,9 +120,14 @@ fun SipDetailScreen(
     onSkip: (DueRow) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    /** Why the last edit or delete was refused, if it was. */
+    error: String? = null,
 ) {
     val row = detail.row
     var confirmStop by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     Column(modifier.fillMaxSize()) {
@@ -138,6 +136,7 @@ fun SipDetailScreen(
             contentPadding = PaddingValues(start = margin, top = MoneyTheme.spacing.sm, end = margin, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
+            if (error != null) item("error") { Module { Text(error, style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.negative) } }
             item("facts") {
                 Module {
                     KeyValueRow("Paid from", detail.fromAccountName)
@@ -180,6 +179,15 @@ fun SipDetailScreen(
                     }
                 }
             }
+            item("manage") {
+                Module {
+                    ModuleHeader("Manage", subtitle = "Change the amount or day, or remove the SIP. Instalments already paid stay.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!row.ended) Pill("Edit SIP", onEdit)
+                        Pill("Delete SIP", { confirmDelete = true }, style = PillStyle.Destructive)
+                    }
+                }
+            }
             if (!row.ended) {
                 // Stopping can't be undone (a new SIP would have to be set up), so it takes two taps.
                 item("stop") {
@@ -191,6 +199,14 @@ fun SipDetailScreen(
                 }
             }
         }
+    }
+
+    if (confirmDelete) {
+        ConfirmDialog(
+            "Delete this SIP?",
+            "The plan and its skipped instalments are removed. Orders already placed stay as ordinary orders, and no further instalments are proposed.",
+            "Delete", onDelete, { confirmDelete = false },
+        )
     }
 }
 

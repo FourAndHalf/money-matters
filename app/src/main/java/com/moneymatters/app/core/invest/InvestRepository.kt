@@ -3,6 +3,7 @@ package com.moneymatters.app.core.invest
 import androidx.room.withTransaction
 import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
+import com.moneymatters.app.core.ledger.IllegalLifecycleTransitionException
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
 import com.moneymatters.app.core.ledger.PostingLine
@@ -51,42 +52,23 @@ class InvestRepository(
         fundClass: FundClass? = null,
         exitLoadDays: Int? = null,
         exitLoadBps: Int? = null,
+        couponBps: Int? = null,
+        maturityDate: LocalDate? = null,
     ): String = ledger.inTransaction {
         require(!symbol.isNullOrBlank() || !name.isNullOrBlank()) { "A holding needs a symbol or a name" }
-        val accountName = when {
-            name.isNullOrBlank() -> symbol!!
-            instrument == Instrument.Stock && !symbol.isNullOrBlank() && !name.equals(symbol, ignoreCase = true) -> "$name ($symbol)"
-            else -> name
-        }
+        val accountName = holdingAccountName(instrument, symbol, name)
         val existing = isin?.let { dao.holdingByIsin(it) }
             ?: symbol?.takeIf { it.isNotBlank() }?.let { dao.holdingBySymbol(it) }
             ?: ledger.accountIdByName(accountName)?.let { dao.holdingForAccount(it) }
         if (existing != null) return@inTransaction existing.id
         val accountId = ledger.createAccount(accountName, AccountType.Asset, kind = AccountKind.Investment)
-        addHolding(accountId, instrument, isin = isin, symbol = symbol?.takeIf { it.isNotBlank() }, fundClass = fundClass, exitLoadDays = exitLoadDays, exitLoadBps = exitLoadBps)
+        addHolding(accountId, instrument, isin = isin, symbol = symbol?.takeIf { it.isNotBlank() }, fundClass = fundClass, exitLoadDays = exitLoadDays, exitLoadBps = exitLoadBps, couponBps = couponBps, maturityDate = maturityDate)
     }
 
-    /**
-     * Rebuilds lots and past sales from a trade history, all or nothing. Trades settle against
-     * [settlementAccountId] (for history, `Equity:Opening`, so no bank balance moves). Sales are replayed
-     * in date order against FIFO lots; one that exceeds the units held on its date aborts the whole import.
-     */
-    suspend fun importTrades(rows: List<TradeRow>, settlementAccountId: String): Int = ledger.inTransaction {
-        for (row in rows.inLedgerOrder()) {
-            val holdingId = findOrCreateHolding(row.instrument, row.symbol, row.isin, row.name, row.fundClass)
-            when (row.side) {
-                TradeSide.Split -> { applyCorporateAction(holdingId, RestateKind.Split, row.units, row.date); continue }
-                TradeSide.Bonus -> { applyCorporateAction(holdingId, RestateKind.Bonus, row.units, row.date); continue }
-                else -> Unit
-            }
-            val price = impliedPrice(row.units, row.amount)
-            when (row.side) {
-                TradeSide.Buy -> buy(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Buy ${row.symbol}")
-                TradeSide.Sell -> sell(holdingId, row.date, row.units, price, row.amount, settlementAccountId, "Sell ${row.symbol}")
-                TradeSide.Split, TradeSide.Bonus -> Unit
-            }
-        }
-        rows.size
+    private fun holdingAccountName(instrument: Instrument, symbol: String?, name: String?) = when {
+        name.isNullOrBlank() -> symbol!!
+        instrument == Instrument.Stock && !symbol.isNullOrBlank() && !name.equals(symbol, ignoreCase = true) -> "$name ($symbol)"
+        else -> name
     }
 
     suspend fun addHolding(
@@ -97,14 +79,13 @@ class InvestRepository(
         fundClass: FundClass? = null,
         exitLoadDays: Int? = null,
         exitLoadBps: Int? = null,
+        couponBps: Int? = null,
+        maturityDate: LocalDate? = null,
     ): String {
         val id = newId()
-        dao.insertHolding(HoldingEntity(id, accountId, instrument, isin, symbol, fundClass, exitLoadDays, exitLoadBps))
+        dao.insertHolding(HoldingEntity(id, accountId, instrument, isin, symbol, fundClass, exitLoadDays, exitLoadBps, couponBps, maturityDate?.toString()))
         return id
     }
-
-    /** (symbol, holding id) for every holding that has a symbol. */
-    suspend fun holdingSymbols(): List<Pair<String, String>> = dao.getAllHoldings().mapNotNull { h -> h.symbol?.let { it to h.id } }
 
     /**
      * Records a dividend: the net [amount] lands in [toAccountId], any [tds] withheld becomes a
@@ -117,16 +98,18 @@ class InvestRepository(
         tds: Paise,
         toAccountId: String,
         payee: String,
+        kind: CorporateActionKind = CorporateActionKind.Dividend,
     ): String {
-        require(amount.value > 0) { "A dividend's net amount must be positive" }
+        require(kind == CorporateActionKind.Dividend || kind == CorporateActionKind.Coupon) { "Only a dividend or a coupon is income" }
+        require(amount.value > 0) { "The net amount must be positive" }
         require(tds.value >= 0) { "TDS can't be negative" }
         requireHolding(holdingId)
         return ledger.inTransaction {
-            val income = ledger.createAccountIfAbsent("Income:Dividends", AccountType.Income)
+            val income = ledger.createAccountIfAbsent(if (kind == CorporateActionKind.Coupon) "Income:Interest" else "Income:Dividends", AccountType.Income)
             val postings = mutableListOf(PostingLine(toAccountId, debit = amount), PostingLine(income, credit = amount + tds))
             if (tds.value > 0) postings += PostingLine(ledger.createAccountIfAbsent(TDS_RECEIVABLE, AccountType.Asset), debit = tds)
             val id = ledger.postTransaction(date, payee, postings)
-            dao.insertCorporateAction(CorporateActionEntity(newId(), holdingId, CorporateActionKind.Dividend, date.toString(), amountPaise = (amount + tds).value, transactionId = id))
+            dao.insertCorporateAction(CorporateActionEntity(newId(), holdingId, kind, date.toString(), amountPaise = (amount + tds).value, transactionId = id))
             id
         }
     }
@@ -369,6 +352,177 @@ class InvestRepository(
         return delta
     }
 
+    // ---- Editing and deleting ----
+
+    /**
+     * Changes what a holding is called and how it is classified. The account is renamed to match, and the symbol and
+     * ISIN must not belong to another holding. Units, lots and the ledger are untouched.
+     */
+    suspend fun updateHolding(
+        holdingId: String,
+        name: String?,
+        symbol: String?,
+        isin: String?,
+        fundClass: FundClass?,
+        exitLoadDays: Int?,
+        couponBps: Int? = null,
+        maturityDate: LocalDate? = null,
+    ) = ledger.inTransaction {
+        val holding = requireHolding(holdingId)
+        val cleanSymbol = symbol?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+        val cleanIsin = isin?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+        val cleanName = name?.trim()?.takeIf { it.isNotEmpty() }
+        require(cleanSymbol != null || cleanName != null) { "A holding needs a symbol or a name" }
+        cleanSymbol?.let { s -> require(dao.holdingBySymbol(s)?.id.let { it == null || it == holdingId }) { "Another holding already uses the symbol $s" } }
+        cleanIsin?.let { i -> require(dao.holdingByIsin(i)?.id.let { it == null || it == holdingId }) { "Another holding already uses the ISIN $i" } }
+        ledger.renameAccount(holding.accountId, holdingAccountName(holding.instrument, cleanSymbol, cleanName))
+        dao.updateHolding(
+            holding.copy(
+                symbol = cleanSymbol, isin = cleanIsin,
+                fundClass = if (holding.instrument == Instrument.MutualFund) fundClass else holding.fundClass,
+                exitLoadDays = if (holding.instrument == Instrument.MutualFund) exitLoadDays else holding.exitLoadDays,
+                couponBps = if (holding.instrument == Instrument.Bond) couponBps else holding.couponBps,
+                maturityDate = if (holding.instrument == Instrument.Bond) maturityDate?.toString() else holding.maturityDate,
+            ),
+        )
+    }
+
+    /**
+     * Deletes a holding with everything that belongs to it: its trades, allotments, orders, dividends, splits, prices and
+     * SIPs, and the entries they wrote, so it vanishes from the Transactions and Accountant pages and every balance and
+     * total is worked out again without it. Refused, changing nothing, if any of those entries is reconciled or in a closed month.
+     */
+    suspend fun deleteHolding(holdingId: String) {
+        val holding = requireHolding(holdingId)
+        ledger.inTransaction {
+            val entries = linkedSetOf<String>()
+            entries += ledger.transactionIdsFor(holding.accountId)
+            dao.getAllCorporateActions().filter { it.holdingId == holdingId }.mapNotNullTo(entries) { it.transactionId }
+            for (order in dao.getAllPending().filter { it.holdingId == holdingId }) {
+                entries += order.orderTransactionId
+                order.allotmentTransactionId?.let(entries::add)
+                order.cancelTransactionId?.let(entries::add)
+            }
+            // Investment rows first: they point at the entries, which can't go while anything still refers to them.
+            dao.deleteConsumptionsForHolding(holdingId)
+            dao.deleteLotsForHolding(holdingId)
+            dao.deletePendingForHolding(holdingId)
+            dao.deleteSkipsForHolding(holdingId)
+            dao.deleteSipPlansForHolding(holdingId)
+            dao.deleteCorporateActionsForHolding(holdingId)
+            dao.deletePricesForHolding(holdingId)
+            ledger.deleteEntries(entries, "Deleted ${holding.symbol ?: "holding"}")
+            dao.deleteHolding(holdingId)
+            ledger.deleteEmptyAccount(holding.accountId)
+        }
+    }
+
+    /** The holding a buy or sell belongs to, found through the lots it made or used. */
+    private suspend fun holdingOfTrade(transactionId: String): String {
+        dao.lotsFromTransaction(transactionId).firstOrNull()?.let { return it.holdingId }
+        val lotId = dao.getAllConsumptions().firstOrNull { it.saleTransactionId == transactionId }?.lotId
+        return lotId?.let { dao.getLot(it)?.holdingId } ?: throw IllegalArgumentException("That entry isn't a trade")
+    }
+
+    private suspend fun removeTrade(transactionId: String, reason: String) {
+        val holdingId = holdingOfTrade(transactionId)
+        val lots = dao.lotsFromTransaction(transactionId)
+        if (lots.any { dao.consumptionCountForLot(it.id) > 0 }) {
+            throw IllegalLifecycleTransitionException("Later sales or a split have used these units; delete those first")
+        }
+        if (dao.consumptionCountForSale(transactionId) > 0) {
+            val date = ledger.transaction(transactionId)?.date.orEmpty()
+            val later = dao.consumptionsForHolding(holdingId).filter { it.saleTransactionId != transactionId }
+                .any { (ledger.transaction(it.saleTransactionId)?.date ?: "") > date }
+            if (later) throw IllegalLifecycleTransitionException("There are later sales or a split after this one; delete those first")
+        }
+        dao.deleteConsumptionsForSale(transactionId)
+        lots.forEach { dao.deleteLot(it.id) }
+        // Deleting an allotment puts its order back In Transit, to be allotted again.
+        dao.reopenPendingForAllotment(transactionId)
+        ledger.deleteEntries(listOf(transactionId), reason)
+    }
+
+    /** Deletes one buy or sell (or allotment) and its lot bookkeeping; the holding's units, cost and gains follow. */
+    suspend fun deleteTrade(transactionId: String) = ledger.inTransaction { removeTrade(transactionId, "Trade deleted") }
+
+    /**
+     * Changes a buy or sell's date, units, amount or the account it moved money through, as one step: the old entry goes
+     * and the new one is booked in its place, or nothing changes at all (say, if the new sale would exceed the units held).
+     */
+    suspend fun editTrade(transactionId: String, date: LocalDate, units: Units, amount: Paise, accountId: String) = ledger.inTransaction {
+        val old = ledger.transaction(transactionId) ?: throw NoSuchElementException("No transaction with id $transactionId")
+        if (dao.pendingCountForAllotment(transactionId) > 0) {
+            throw IllegalLifecycleTransitionException("Allotted units can't be edited; delete the allotment to put the order back In Transit, then allot again")
+        }
+        val holdingId = holdingOfTrade(transactionId)
+        val isBuy = dao.lotsFromTransaction(transactionId).isNotEmpty()
+        removeTrade(transactionId, "Replaced by an edit")
+        if (isBuy) buy(holdingId, date, units, impliedPrice(units, amount), amount, accountId, old.payee, memo = old.memo)
+        else sell(holdingId, date, units, impliedPrice(units, amount), amount, accountId, old.payee, memo = old.memo)
+    }
+
+    /** Deletes a dividend or coupon and the income entry it wrote. */
+    suspend fun deleteIncome(transactionId: String) = ledger.inTransaction {
+        val actions = dao.corporateActionsForTransaction(transactionId)
+        require(actions.isNotEmpty() && actions.all { it.kind == CorporateActionKind.Dividend || it.kind == CorporateActionKind.Coupon }) { "That entry isn't a dividend or coupon" }
+        dao.deleteCorporateActionsForTransaction(transactionId)
+        ledger.deleteEntries(listOf(transactionId), "Income deleted")
+    }
+
+    /**
+     * Changes a deposit's terms. Name, rate, compounding, maturity, renewal and penalty can always change. The principal and
+     * start date are the opening entry itself, so they can change only while no interest has been booked and it is still open.
+     */
+    suspend fun updateDeposit(
+        accountId: String,
+        name: String,
+        principal: Paise,
+        rateBps: Int,
+        compounding: Compounding,
+        start: LocalDate,
+        maturity: LocalDate,
+        autoRenew: Boolean,
+        penaltyBps: Int,
+    ) = ledger.inTransaction {
+        val deposit = requireOpenDeposit(accountId)
+        require(principal.value > 0) { "The principal must be positive" }
+        require(rateBps > 0) { "The rate must be positive" }
+        require(maturity.isAfter(start)) { "A deposit must mature after it starts" }
+        val moneyChanged = principal.value != deposit.principalPaise || start.toString() != deposit.startDate
+        if (moneyChanged) {
+            val openId = deposit.openTransactionId ?: throw IllegalLifecycleTransitionException("This deposit's opening entry isn't recorded, so its principal and start date can't change")
+            if (ledger.accountBalance(accountId).value != deposit.principalPaise) {
+                throw IllegalLifecycleTransitionException("Interest has been booked on this deposit, so its principal and start date can't change")
+            }
+            val other = ledger.accountIdsIn(openId).first { it != accountId }
+            val payee = ledger.transaction(openId)?.payee ?: "Open ${name.trim()}"
+            ledger.edit(openId, start, payee, listOf(PostingLine(accountId, debit = principal), PostingLine(other, credit = principal)))
+        }
+        ledger.renameAccount(accountId, name)
+        dao.updateFixedDeposit(
+            deposit.copy(principalPaise = principal.value, rateBps = rateBps, compounding = compounding, startDate = start.toString(), maturityDate = maturity.toString(), autoRenew = autoRenew, penaltyBps = penaltyBps),
+        )
+    }
+
+    /**
+     * Deletes a deposit, its opening and interest entries and its account. A deposit tied to another by a renewal is refused
+     * (delete the newer one first), as is one whose entries are reconciled or in a closed month.
+     */
+    suspend fun deleteDeposit(accountId: String) = ledger.inTransaction {
+        dao.getFixedDeposit(accountId) ?: throw NoSuchElementException("No deposit with account $accountId")
+        val entries = ledger.transactionIdsFor(accountId)
+        val linked = dao.getAllFixedDeposits().map { it.accountId }.toSet() - accountId
+        for (id in entries) {
+            if (ledger.accountIdsIn(id).any { it in linked }) {
+                throw IllegalLifecycleTransitionException("This deposit is linked to another by a renewal; delete the renewed deposit first")
+            }
+        }
+        dao.deleteFixedDeposit(accountId)
+        ledger.deleteEntries(entries, "Deposit deleted")
+        ledger.deleteEmptyAccount(accountId)
+    }
+
     // ---- SIPs ----
 
     /** Starts a monthly SIP into a fund. Instalments are proposed from [start]; each is confirmed with [payInstalment]. */
@@ -386,6 +540,22 @@ class InvestRepository(
     suspend fun stopSip(planId: String, lastDate: LocalDate) {
         val plan = dao.getSipPlan(planId) ?: throw NoSuchElementException("No SIP with id $planId")
         dao.updateSipPlan(plan.copy(endDate = lastDate.toString()))
+    }
+
+    /** Changes what a SIP pays and when. Instalments already paid keep the amount they were paid at. */
+    suspend fun updateSip(planId: String, amount: Paise, dayOfMonth: Int, fromAccountId: String) {
+        require(amount.value > 0) { "The SIP amount must be positive" }
+        require(dayOfMonth in 1..31) { "Day of month must be 1 to 31" }
+        val plan = dao.getSipPlan(planId) ?: throw NoSuchElementException("No SIP with id $planId")
+        dao.updateSipPlan(plan.copy(amountPaise = amount.value, dayOfMonth = dayOfMonth, fromAccountId = fromAccountId))
+    }
+
+    /** Deletes a SIP and its skipped instalments. Orders it already placed stay, as the plain orders they are. */
+    suspend fun deleteSip(planId: String) = ledger.inTransaction {
+        dao.getSipPlan(planId) ?: throw NoSuchElementException("No SIP with id $planId")
+        dao.detachOrdersFromPlan(planId)
+        dao.deleteSkipsForPlan(planId)
+        dao.deleteSipPlan(planId)
     }
 
     /**

@@ -10,11 +10,11 @@ import androidx.compose.ui.Modifier
 import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.ui.components.SegmentedControl
 
-private enum class InvestmentKind(val label: String) { Stock("Stock"), Fund("Mutual fund"), Deposit("FD") }
+private enum class InvestmentKind(val label: String) { Stock("Stock"), Fund("Fund"), Bond("Bond"), Deposit("FD") }
 
 /**
  * The page the + button opens on the Invest tab: one place to add a stock, a mutual fund or a fixed
- * deposit, switched with a toggle. The caller starts both forms before showing it.
+ * deposit (or a bond), switched with a toggle. The caller starts both forms before showing it.
  */
 @Composable
 fun AddInvestmentScreen(viewModel: InvestViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -26,6 +26,7 @@ fun AddInvestmentScreen(viewModel: InvestViewModel, onClose: () -> Unit, modifie
             when (it) {
                 InvestmentKind.Stock -> viewModel.tradeForm = viewModel.tradeForm.copy(instrument = Instrument.Stock)
                 InvestmentKind.Fund -> viewModel.tradeForm = viewModel.tradeForm.copy(instrument = Instrument.MutualFund)
+                InvestmentKind.Bond -> viewModel.tradeForm = viewModel.tradeForm.copy(instrument = Instrument.Bond)
                 InvestmentKind.Deposit -> Unit
             }
         }, { it.label })

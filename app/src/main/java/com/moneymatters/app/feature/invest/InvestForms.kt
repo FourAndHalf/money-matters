@@ -32,19 +32,27 @@ data class TradeForm(
     val amountText: String = "",
     /** Where the money comes from (buy) or goes (sale). */
     val accountId: String? = null,
+    /** Bonds: the yearly coupon as a percentage ("7.5") and the date the bond is redeemed. */
+    val couponText: String = "",
+    val maturity: LocalDate? = null,
+    /** Set when an existing buy or sell is being corrected rather than a new one entered. */
+    val editingTransactionId: String? = null,
 ) {
     val units: Units? get() = parseUnits(unitsText)?.takeIf { it.micro > 0 }
     val amount: Paise? get() = parseRupees(amountText)?.takeIf { it.value > 0 }
 
     val isFund: Boolean get() = instrument == Instrument.MutualFund
+    val isBond: Boolean get() = instrument == Instrument.Bond
+
+    val couponBps: Int? get() = percentToBps(couponText)
 
     /** A fund purchase with no units yet is sent In Transit and allotted later. */
     val inTransit: Boolean get() = isFund && side == TradeSide.Buy && unitsText.isBlank()
 
-    private val hasIdentity: Boolean get() = holdingId != null || if (isFund) name.isNotBlank() else symbol.isNotBlank()
+    private val hasIdentity: Boolean get() = holdingId != null || if (isFund || isBond) name.isNotBlank() else symbol.isNotBlank()
 
     /** True once everything a save needs is present and valid. */
-    val canSave: Boolean get() = hasIdentity && (units != null || inTransit) && amount != null && accountId != null
+    val canSave: Boolean get() = hasIdentity && (units != null || inTransit) && amount != null && accountId != null && (couponText.isBlank() || couponBps != null)
 
     companion object {
         fun empty(side: TradeSide, today: LocalDate, holdingId: String? = null, instrument: Instrument = Instrument.Stock) =
@@ -89,6 +97,8 @@ data class SipForm(
     val amountText: String = "",
     val dayText: String = "5",
     val accountId: String? = null,
+    /** Set when an existing SIP's amount, day or account is being changed. */
+    val editingPlanId: String? = null,
 ) {
     val amount: Paise? get() = parseRupees(amountText)?.takeIf { it.value > 0 }
     val day: Int? get() = dayText.trim().toIntOrNull()?.takeIf { it in 1..31 }
@@ -117,13 +127,15 @@ data class DepositForm(
     val autoRenew: Boolean = false,
     val existing: Boolean = false,
     val accountId: String? = null,
+    /** Set when an existing deposit's terms are being corrected. */
+    val editingAccountId: String? = null,
 ) {
     val principal: Paise? get() = parseRupees(principalText)?.takeIf { it.value > 0 }
     val rateBps: Int? get() = percentToBps(rateText)?.takeIf { it > 0 }
     val penaltyBps: Int? get() = if (penaltyText.isBlank()) 0 else percentToBps(penaltyText)
     val datesValid: Boolean get() = maturity.isAfter(start)
     val canSave: Boolean
-        get() = name.isNotBlank() && principal != null && rateBps != null && penaltyBps != null && datesValid && (existing || accountId != null)
+        get() = name.isNotBlank() && principal != null && rateBps != null && penaltyBps != null && datesValid && (existing || editingAccountId != null || accountId != null)
 }
 
 /** "7.25" → 725 basis points, with at most two decimals; null for anything else. */
@@ -143,4 +155,22 @@ data class DepositCloseForm(
 ) {
     val tds: Paise? get() = if (tdsText.isBlank()) Paise.Zero else parseRupees(tdsText)
     val canSave: Boolean get() = tds != null && (renew || toAccountId != null)
+}
+
+/** A holding's details being corrected: what it is called and, for a fund or bond, how it is classified. */
+data class HoldingEditForm(
+    val holdingId: String,
+    val instrument: Instrument,
+    val name: String,
+    val symbol: String = "",
+    val isin: String = "",
+    val fundClass: FundClass = FundClass.Equity,
+    val exitLoadDaysText: String = "",
+    val couponText: String = "",
+    val maturity: LocalDate? = null,
+) {
+    val couponBps: Int? get() = percentToBps(couponText)
+    val exitLoadDays: Int? get() = exitLoadDaysText.trim().toIntOrNull()?.takeIf { it > 0 }
+    val canSave: Boolean
+        get() = (name.isNotBlank() || symbol.isNotBlank()) && (couponText.isBlank() || couponBps != null) && (exitLoadDaysText.isBlank() || exitLoadDays != null)
 }

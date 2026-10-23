@@ -87,7 +87,7 @@ fun TransactionsScreen(
         }
         item("search") {
             Column(Modifier.padding(horizontal = margin), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SearchField(query, { query = it }, placeholder = "Search payee, category, account")
+                SearchField(query, { query = it })
                 StatusFilterRow(statusFilter) { statusFilter = it }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     AccountFilterPill(state.accounts, accountFilter) { accountFilter = it }

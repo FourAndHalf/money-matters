@@ -155,48 +155,6 @@ class InvestRepositoryTest {
         assertNotNull(db.investDao().holdingForAccount(stockAccount))
     }
 
-    private fun trades(vararg lines: String) = parseTrades("date,symbol,type,units,amount\n" + lines.joinToString("\n")).rows
-
-    @Test fun `an import creates holdings, lots and sales against opening equity without touching the bank`() = runBlocking {
-        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
-        val count = invest.importTrades(
-            trades("2025-01-10,TCS,buy,10,40000", "2025-06-01,TCS,buy,5,21000", "2026-03-01,TCS,sell,12,60000", "2025-02-01,WIPRO,buy,100,25000"),
-            equity,
-        )
-        assertEquals(4, count)
-        assertEquals(Paise.Zero, ledger.accountBalance(bank))
-        val tcs = db.investDao().holdingBySymbol("tcs")!!
-        assertEquals(Units.whole(3), invest.unitsHeld(tcs.id))
-        // 12 sold FIFO: 10 from the first lot (₹40,000) and 2 from the second (₹8,400): cost left on 3 units is ₹12,600.
-        assertEquals(12_600.rupees, ledger.accountBalance(tcs.accountId))
-        assertEquals(Units.whole(100), invest.unitsHeld(db.investDao().holdingBySymbol("WIPRO")!!.id))
-        val snapshot = ledger.snapshot().first()
-        snapshot.postings.groupBy { it.transactionId }.values.forEach { legs ->
-            assertEquals(legs.sumOf { it.debitPaise ?: 0 }, legs.sumOf { it.creditPaise ?: 0 })
-        }
-    }
-
-    @Test fun `importing again by ISIN or symbol reuses the holding instead of creating another`() = runBlocking {
-        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
-        invest.importTrades(trades("2025-01-10,TCS,buy,10,40000"), equity)
-        invest.importTrades(trades("2025-02-10,tcs,buy,5,21000"), equity)
-        assertEquals(1, db.investDao().getAllHoldings().count { it.symbol == "TCS" })
-        assertEquals(Units.whole(15), invest.unitsHeld(db.investDao().holdingBySymbol("TCS")!!.id))
-    }
-
-    @Test fun `an import with an impossible sale changes nothing at all`() = runBlocking {
-        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
-        val accountsBefore = ledger.snapshot().first().accounts.size
-        assertThrows(InsufficientUnitsException::class.java) {
-            runBlocking { invest.importTrades(trades("2025-01-10,TCS,buy,10,40000", "2025-03-01,TCS,sell,11,50000"), equity) }
-        }
-        val after = ledger.snapshot().first()
-        assertEquals(accountsBefore, after.accounts.size)
-        assertEquals(0, after.transactions.size)
-        assertEquals(0, db.investDao().getAllLots().size)
-        assertNull(db.investDao().holdingBySymbol("TCS"))
-    }
-
     @Test fun `a posting on a holding account without units is refused, so Quick Add cannot desync lots`() {
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking {
@@ -293,17 +251,6 @@ class InvestRepositoryTest {
         assertEquals(0, db.investDao().getAllCorporateActions().size)
         buy(LocalDate.of(2025, 3, 1), 1, 100.rupees)
         Unit
-    }
-
-    @Test fun `an import replays a split and a bonus in date order`() = runBlocking {
-        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
-        invest.importTrades(
-            trades("2025-01-10,TCS,buy,10,40000", "2025-06-01,TCS,split,5,", "2025-07-01,TCS,bonus,1,", "2026-03-01,TCS,sell,95,90000"),
-            equity,
-        )
-        val tcs = db.investDao().holdingBySymbol("TCS")!!
-        assertEquals(Units.whole(5), invest.unitsHeld(tcs.id))
-        assertEquals(listOf(CorporateActionKind.Split, CorporateActionKind.Bonus), db.investDao().getAllCorporateActions().map { it.kind })
     }
 
     // ---- mutual funds ----
@@ -441,19 +388,10 @@ class InvestRepositoryTest {
         Unit
     }
 
-    @Test fun `a trade import can carry funds with their class`() = runBlocking {
-        val equity = ledger.createAccount("Equity:Opening", AccountType.Equity)
-        val rows = parseTrades(
-            "date,symbol,type,units,amount,instrument,class,name\n" +
-                "2023-01-10,ELSS1,buy,100,10000,mf,elss,Axis ELSS\n" +
-                "2024-02-01,TCS,buy,5,20000,stock,,\n",
-        ).rows
-        invest.importTrades(rows, equity)
-        val elss = db.investDao().holdingBySymbol("ELSS1")!!
-        assertEquals(Instrument.MutualFund, elss.instrument)
-        assertEquals(FundClass.Elss, elss.fundClass)
-        assertEquals(LocalDate.of(2026, 1, 10), invest.openLots(elss.id).single().lockUntil)
-        assertEquals(Instrument.Stock, db.investDao().holdingBySymbol("TCS")!!.instrument)
+    @Test fun `an ELSS fund's units are locked for three years from the day they were bought`() = runBlocking {
+        val elss = invest.findOrCreateHolding(Instrument.MutualFund, "ELSS1", name = "Axis ELSS", fundClass = FundClass.Elss)
+        invest.buy(elss, LocalDate.of(2023, 1, 10), Units.whole(100), UnitPrice.rupees(100), 10_000.rupees, bank, "Buy ELSS1")
+        assertEquals(LocalDate.of(2026, 1, 10), invest.openLots(elss).single().lockUntil)
     }
 
     // ---- SIPs ----

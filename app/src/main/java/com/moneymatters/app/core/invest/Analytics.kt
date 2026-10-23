@@ -13,6 +13,7 @@ enum class AssetClass { Equity, Debt, Other }
 val HoldingEntity.assetClass: AssetClass
     get() = when {
         isEquityOriented -> AssetClass.Equity
+        instrument == Instrument.Bond -> AssetClass.Debt
         fundClass == FundClass.Debt -> AssetClass.Debt
         else -> AssetClass.Other
     }

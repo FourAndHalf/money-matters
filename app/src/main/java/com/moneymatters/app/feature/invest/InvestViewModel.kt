@@ -6,6 +6,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.moneymatters.app.core.invest.CapitalGainsRules
+import com.moneymatters.app.core.invest.CorporateActionKind
+import com.moneymatters.app.core.invest.FundClass
+import com.moneymatters.app.core.ledger.ClosedPeriodException
+import com.moneymatters.app.core.ledger.IllegalLifecycleTransitionException
+import com.moneymatters.app.feature.transactions.plainRupees
 import com.moneymatters.app.core.invest.InsufficientUnitsException
 import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.LockedUnitsException
@@ -16,12 +21,8 @@ import com.moneymatters.app.core.invest.PriceSources
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.RestateKind
-import com.moneymatters.app.core.invest.TradeParse
-import com.moneymatters.app.core.invest.TradePreview
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.invest.formatUnits
-import com.moneymatters.app.core.invest.parseTrades
-import com.moneymatters.app.core.invest.previewTrades
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
@@ -34,7 +35,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -73,6 +76,8 @@ class InvestViewModel(
 
     val state: StateFlow<InvestState?> = combine(ledger.snapshot(), invest.snapshot(), targetEquity) { l, i, target -> buildInvest(l, i, today(), rules, goal(), targetEquityPercent = target) }
         .flowOn(Dispatchers.Default)
+        // A failure building the screens' state is reported, never allowed to take the app down.
+        .catch { error = "Couldn't read your investments: ${it.message ?: it.javaClass.simpleName}" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Real accounts money can be paid from or received into: assets that aren't themselves holdings. */
@@ -103,11 +108,20 @@ class InvestViewModel(
             isSaving = true
             error = null
             try {
+                val editing = form.editingTransactionId
+                if (editing != null) {
+                    invest.editTrade(editing, form.date, form.units ?: return@launch, amount, accountId)
+                    tradeForm = TradeForm.empty(TradeSide.Buy, today())
+                    onSaved()
+                    return@launch
+                }
                 val symbol = form.symbol.trim().uppercase().ifBlank { null }
                 val holdingId = form.holdingId ?: invest.findOrCreateHolding(
                     form.instrument, symbol, form.isin.trim().uppercase().ifBlank { null }, form.name.trim().ifBlank { null },
                     fundClass = if (form.isFund) form.fundClass else null,
                     exitLoadDays = form.exitLoadDaysText.trim().toIntOrNull(),
+                    couponBps = if (form.isBond) form.couponBps else null,
+                    maturityDate = if (form.isBond) form.maturity else null,
                 )
                 val label = symbol ?: form.name.trim().ifBlank { "holding" }
                 val units = form.units
@@ -124,6 +138,10 @@ class InvestViewModel(
                 error = "That's more than you held on that date."
             } catch (e: LockedUnitsException) {
                 error = (e.message ?: "Some of those units are locked") + "."
+            } catch (e: IllegalLifecycleTransitionException) {
+                error = e.message
+            } catch (e: ClosedPeriodException) {
+                error = e.message
             } catch (_: Exception) {
                 error = "Couldn't save the trade. Nothing was changed."
             } finally {
@@ -196,7 +214,7 @@ class InvestViewModel(
         val accountId = form.accountId ?: return
         viewModelScope.launch {
             try {
-                invest.createSipPlan(holdingId, amount, day, accountId, form.start)
+                form.editingPlanId?.let { invest.updateSip(it, amount, day, accountId) } ?: invest.createSipPlan(holdingId, amount, day, accountId, form.start)
                 sipForm = null
                 onSaved()
             } catch (e: CancellationException) {
@@ -244,12 +262,21 @@ class InvestViewModel(
             isSaving = true
             error = null
             try {
-                val from = if (form.existing) ledger.createAccountIfAbsent(OPENING_EQUITY, AccountType.Equity) else form.accountId!!
-                invest.openDeposit(form.name, principal, rateBps, form.compounding, form.start, form.maturity, from, form.autoRenew, penaltyBps)
+                val editing = form.editingAccountId
+                if (editing != null) {
+                    invest.updateDeposit(editing, form.name, principal, rateBps, form.compounding, form.start, form.maturity, form.autoRenew, penaltyBps)
+                } else {
+                    val from = if (form.existing) ledger.createAccountIfAbsent(OPENING_EQUITY, AccountType.Equity) else form.accountId!!
+                    invest.openDeposit(form.name, principal, rateBps, form.compounding, form.start, form.maturity, from, form.autoRenew, penaltyBps)
+                }
                 depositForm = null
                 onSaved()
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: IllegalStateException) {
+                error = e.message
+            } catch (e: IllegalArgumentException) {
+                error = e.message
             } catch (_: Exception) {
                 error = "Couldn't save the deposit. Nothing was changed."
             } finally {
@@ -353,7 +380,8 @@ class InvestViewModel(
         val accountId = form.accountId ?: return
         viewModelScope.launch {
             try {
-                invest.recordDividend(form.holdingId, form.date, net, tds, accountId, "Dividend $symbol")
+                val coupon = invest.holdings().firstOrNull { it.id == form.holdingId }?.instrument == Instrument.Bond
+                invest.recordDividend(form.holdingId, form.date, net, tds, accountId, if (coupon) "Coupon $symbol" else "Dividend $symbol", if (coupon) CorporateActionKind.Coupon else CorporateActionKind.Dividend)
                 dividendForm = null
                 onSaved()
             } catch (e: CancellationException) {
@@ -414,57 +442,168 @@ class InvestViewModel(
         }
     }
 
-    // ---- Trade history import ----
-    var importParse by mutableStateOf<TradeParse?>(null)
-        private set
-    var importPreview by mutableStateOf<TradePreview?>(null)
-        private set
-    var importDone by mutableStateOf<Int?>(null)
-        private set
+    // ---- Editing and deleting what was entered ----
 
-    fun resetImport() {
-        importParse = null
-        importPreview = null
-        importDone = null
-        error = null
-    }
-
-    /** Parses [csv] and replays it against the current lots, so the preview shows exactly what an import would do or refuse. */
-    fun loadCsv(csv: String) {
+    /** Runs a write and reports a refusal in plain words (a reconciled entry, a closed month, a later sale) instead of crashing. */
+    private fun launchWrite(failure: String, onDone: () -> Unit = {}, block: suspend () -> Unit) {
         viewModelScope.launch {
-            val parsed = parseTrades(csv)
-            val existing = existingLotsBySymbol()
-            importParse = parsed
-            importPreview = previewTrades(parsed.rows, existing)
-            importDone = null
+            manageError = null
+            try {
+                block()
+                onDone()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IllegalStateException) {
+                manageError = e.message ?: failure
+            } catch (e: IllegalArgumentException) {
+                manageError = e.message ?: failure
+            } catch (_: Exception) {
+                manageError = failure
+            }
         }
     }
 
-    /** Whether the loaded file can be imported: it has trades and no bad row or impossible sale. */
-    val canImport: Boolean
-        get() = importParse?.let { it.rows.isNotEmpty() && it.errors.isEmpty() } == true && importPreview?.errors?.isEmpty() == true
+    /** Why the last delete from a detail page was refused; shown on that page only. */
+    var manageError by mutableStateOf<String?>(null)
+        private set
 
-    fun confirmImport() {
-        val rows = importParse?.rows ?: return
-        if (!canImport || isSaving) return
+    fun clearManageError() { manageError = null }
+
+    fun deleteHolding(holdingId: String, onDone: () -> Unit) = launchWrite("Couldn't delete it. Nothing was changed.", onDone) { invest.deleteHolding(holdingId) }
+
+    fun deleteTrade(transactionId: String) = launchWrite("Couldn't delete the trade. Nothing was changed.") { invest.deleteTrade(transactionId) }
+
+    fun deleteIncome(transactionId: String) = launchWrite("Couldn't delete it. Nothing was changed.") { invest.deleteIncome(transactionId) }
+
+    fun deleteDeposit(accountId: String, onDone: () -> Unit) = launchWrite("Couldn't delete the deposit. Nothing was changed.", onDone) { invest.deleteDeposit(accountId) }
+
+    fun deleteSip(planId: String, onDone: () -> Unit) = launchWrite("Couldn't delete the SIP. Nothing was changed.", onDone) { invest.deleteSip(planId) }
+
+    /** Opens a buy or sell for correction, with its date, units, amount and account filled in; [onReady] fires once the form is loaded. */
+    fun startEditTrade(transactionId: String, onReady: () -> Unit) {
+        error = null
+        viewModelScope.launch {
+            try {
+                val l = ledger.snapshot().first()
+                val i = invest.snapshot().first()
+                val txn = l.transactions.first { it.id == transactionId }
+                val legs = l.postings.filter { it.transactionId == transactionId }
+                val holdingAccounts = i.holdings.associateBy { it.accountId }
+                val holdingLeg = legs.first { it.accountId in holdingAccounts }
+                val holding = holdingAccounts.getValue(holdingLeg.accountId)
+                val isBuy = (holdingLeg.debitPaise ?: 0) > 0
+                val income = l.accounts.filter { it.type == AccountType.Income }.map { it.id }.toSet()
+                val money = legs.first { it.accountId !in holdingAccounts && it.accountId !in income }
+                tradeForm = TradeForm(
+                    side = if (isBuy) TradeSide.Buy else TradeSide.Sell,
+                    date = LocalDate.parse(txn.date),
+                    holdingId = holding.id,
+                    instrument = holding.instrument,
+                    unitsText = formatUnits(com.moneymatters.app.core.money.Units(kotlin.math.abs(holdingLeg.units ?: 0))),
+                    amountText = com.moneymatters.app.core.money.Paise(money.debitPaise ?: money.creditPaise ?: 0).plainRupees(),
+                    accountId = money.accountId,
+                    editingTransactionId = transactionId,
+                )
+                onReady()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't open that trade."
+            }
+        }
+    }
+
+    var holdingEditForm by mutableStateOf<HoldingEditForm?>(null)
+
+    fun startEditHolding(holdingId: String, onReady: () -> Unit) {
+        error = null
+        viewModelScope.launch {
+            try {
+                val holding = invest.holdings().first { it.id == holdingId }
+                val accountName = ledger.snapshot().first().accounts.first { it.id == holding.accountId }.name
+                holdingEditForm = HoldingEditForm(
+                    holdingId = holding.id,
+                    instrument = holding.instrument,
+                    name = if (holding.instrument == Instrument.Stock) accountName.substringBefore(" (").takeIf { holding.symbol != null && accountName != holding.symbol } ?: "" else accountName,
+                    symbol = holding.symbol.orEmpty(),
+                    isin = holding.isin.orEmpty(),
+                    fundClass = holding.fundClass ?: FundClass.Equity,
+                    exitLoadDaysText = holding.exitLoadDays?.toString().orEmpty(),
+                    couponText = holding.couponBps?.let { formatBps(it).removeSuffix("%") }.orEmpty(),
+                    maturity = holding.maturityDate?.let(LocalDate::parse),
+                )
+                onReady()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't open that holding."
+            }
+        }
+    }
+
+    fun saveHoldingEdit(onSaved: () -> Unit) {
+        val form = holdingEditForm ?: return
+        if (!form.canSave || isSaving) return
         viewModelScope.launch {
             isSaving = true
             error = null
             try {
-                val settlement = ledger.createAccountIfAbsent(OPENING_EQUITY, AccountType.Equity)
-                importDone = invest.importTrades(rows, settlement)
+                invest.updateHolding(form.holdingId, form.name, form.symbol, form.isin, form.fundClass, form.exitLoadDays, form.couponBps, form.maturity)
+                holdingEditForm = null
+                onSaved()
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: IllegalArgumentException) {
+                error = e.message
             } catch (_: Exception) {
-                error = "The import failed and nothing was changed."
+                error = "Couldn't save the changes. Nothing was changed."
             } finally {
                 isSaving = false
             }
         }
     }
 
-    private suspend fun existingLotsBySymbol() = buildMap {
-        for ((symbol, id) in invest.holdingSymbols()) put(symbol.uppercase(), invest.openLots(id))
+    /** Opens a deposit for correction with its current terms filled in. */
+    fun startEditDeposit(accountId: String, onReady: () -> Unit) {
+        error = null
+        viewModelScope.launch {
+            try {
+                val d = invest.snapshot().first().fixedDeposits.first { it.accountId == accountId }
+                val name = ledger.snapshot().first().accounts.first { it.id == accountId }.name
+                depositForm = DepositForm(
+                    name = name, start = LocalDate.parse(d.startDate), maturity = LocalDate.parse(d.maturityDate),
+                    principalText = com.moneymatters.app.core.money.Paise(d.principalPaise).plainRupees(),
+                    rateText = formatBps(d.rateBps).removeSuffix("%"), compounding = d.compounding,
+                    penaltyText = formatBps(d.penaltyBps).removeSuffix("%"), autoRenew = d.autoRenew,
+                    editingAccountId = accountId,
+                )
+                onReady()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't open that deposit."
+            }
+        }
+    }
+
+    /** Opens a SIP for correction with its current amount, day and account filled in. */
+    fun startEditSip(planId: String, onReady: () -> Unit) {
+        error = null
+        viewModelScope.launch {
+            try {
+                val p = invest.snapshot().first().sipPlans.first { it.id == planId }
+                sipForm = SipForm(
+                    start = LocalDate.parse(p.startDate), holdingId = p.holdingId,
+                    amountText = com.moneymatters.app.core.money.Paise(p.amountPaise).plainRupees(), dayText = p.dayOfMonth.toString(),
+                    accountId = p.fromAccountId, editingPlanId = planId,
+                )
+                onReady()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                error = "Couldn't open that SIP."
+            }
+        }
     }
 
     /** Units held, as shown on the sell form. */

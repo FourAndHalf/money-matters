@@ -34,6 +34,53 @@ interface InvestDao {
     @Query("SELECT * FROM holdings WHERE accountId = :accountId")
     suspend fun holdingForAccount(accountId: String): HoldingEntity?
 
+    @Update suspend fun updateHolding(holding: HoldingEntity)
+
+    @Query("DELETE FROM holdings WHERE id = :id")
+    suspend fun deleteHolding(id: String)
+
+    @Query("DELETE FROM lot_consumptions WHERE lotId IN (SELECT id FROM lots WHERE holdingId = :holdingId)")
+    suspend fun deleteConsumptionsForHolding(holdingId: String)
+
+    @Query("DELETE FROM lots WHERE holdingId = :holdingId")
+    suspend fun deleteLotsForHolding(holdingId: String)
+
+    @Query("DELETE FROM pending_allotments WHERE holdingId = :holdingId")
+    suspend fun deletePendingForHolding(holdingId: String)
+
+    @Query("DELETE FROM sip_skips WHERE planId IN (SELECT id FROM sip_plans WHERE holdingId = :holdingId)")
+    suspend fun deleteSkipsForHolding(holdingId: String)
+
+    @Query("DELETE FROM sip_plans WHERE holdingId = :holdingId")
+    suspend fun deleteSipPlansForHolding(holdingId: String)
+
+    @Query("DELETE FROM corporate_actions WHERE holdingId = :holdingId")
+    suspend fun deleteCorporateActionsForHolding(holdingId: String)
+
+    @Query("DELETE FROM prices WHERE holdingId = :holdingId")
+    suspend fun deletePricesForHolding(holdingId: String)
+
+    @Query("SELECT * FROM lots WHERE id = :lotId")
+    suspend fun getLot(lotId: String): LotEntity?
+
+    @Query("DELETE FROM fixed_deposits WHERE accountId = :accountId")
+    suspend fun deleteFixedDeposit(accountId: String)
+
+    @Query("DELETE FROM sip_skips WHERE planId = :planId")
+    suspend fun deleteSkipsForPlan(planId: String)
+
+    @Query("DELETE FROM sip_plans WHERE id = :planId")
+    suspend fun deleteSipPlan(planId: String)
+
+    @Query("UPDATE pending_allotments SET sipPlanId = NULL WHERE sipPlanId = :planId")
+    suspend fun detachOrdersFromPlan(planId: String)
+
+    @Query("SELECT * FROM corporate_actions WHERE transactionId = :transactionId")
+    suspend fun corporateActionsForTransaction(transactionId: String): List<CorporateActionEntity>
+
+    @Query("SELECT COUNT(*) FROM pending_allotments WHERE allotmentTransactionId = :transactionId")
+    suspend fun pendingCountForAllotment(transactionId: String): Int
+
     @Insert suspend fun insertLot(lot: LotEntity)
 
     @Query("SELECT * FROM lots WHERE holdingId = :holdingId ORDER BY acquiredOn, id")

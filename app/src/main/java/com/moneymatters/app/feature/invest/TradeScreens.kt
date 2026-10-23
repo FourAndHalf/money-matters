@@ -29,6 +29,7 @@ import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.money.impliedPrice
+import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.Module
@@ -37,7 +38,6 @@ import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.SegmentedControl
 import com.moneymatters.app.ui.theme.MoneyTheme
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
 
 /** Buy or sell a stock (P04's investment types, now with units and lots). Holding accounts never appear as the money side. */
 @Composable
@@ -69,13 +69,15 @@ internal fun TradeContent(
     header: (@Composable () -> Unit)? = null,
 ) {
     val isBuy = form.side == TradeSide.Buy
-    var dateText by remember { mutableStateOf(form.date.toString()) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     val canSave = form.canSave && !isSaving
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(top = status.calculateTopPadding())) {
-            DetailTopBar(title = if (header != null) "Add investment" else (if (isBuy) "Buy " else "Sell ") + (if (form.isFund) "fund" else "stock"), onBack = onClose)
+            DetailTopBar(
+                title = if (form.editingTransactionId != null) "Edit trade" else if (header != null) "Add investment" else (if (isBuy) "Buy " else "Sell ") + (if (form.isFund) "fund" else if (form.isBond) "bond" else "stock"),
+                onBack = onClose,
+            )
         }
         LazyColumn(
             Modifier.weight(1f),
@@ -86,15 +88,25 @@ internal fun TradeContent(
                 Module {
                     if (header != null) Column(Modifier.padding(bottom = 12.dp)) { header() }
                     if (form.holdingId == null) {
-                        if (header == null) SegmentedControl(Instrument.entries, form.instrument, { onChange(form.copy(instrument = it)) }, { if (it == Instrument.Stock) "Stock" else "Mutual fund" })
+                        if (header == null) SegmentedControl(Instrument.entries, form.instrument, { onChange(form.copy(instrument = it)) }, { when (it) { Instrument.Stock -> "Stock"; Instrument.MutualFund -> "Mutual fund"; Instrument.Bond -> "Bond" } })
                         Column(Modifier.padding(top = 12.dp)) {
-                            if (!form.isFund) {
+                            if (!form.isFund && !form.isBond) {
                                 FormField("Symbol", form.symbol, { onChange(form.copy(symbol = it)) }, placeholder = "e.g. INFY")
                                 Column(Modifier.padding(top = 10.dp)) { FormField("Company (optional)", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. Infosys") }
+                            } else if (form.isBond) {
+                                FormField("Bond name", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. REC 7.5% 2030")
                             } else {
                                 FormField("Fund name", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. Parag Parikh Flexi Cap")
                             }
                             Column(Modifier.padding(top = 10.dp)) { FormField("ISIN (optional)", form.isin, { onChange(form.copy(isin = it)) }, placeholder = "e.g. INE009A01021") }
+                            if (form.isBond) {
+                                Column(Modifier.padding(top = 10.dp)) {
+                                    FormField("Coupon (% a year, optional)", form.couponText, { onChange(form.copy(couponText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 7.5", error = if (form.couponText.isNotBlank() && form.couponBps == null) "Use a percentage like 7.5" else null)
+                                }
+                                Column(Modifier.padding(top = 10.dp)) {
+                                    DateField("Maturity date (optional)", form.maturity, { onChange(form.copy(maturity = it)) })
+                                }
+                            }
                             if (form.isFund) {
                                 Text("Type", style = MoneyTheme.type.labelRegular, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
                                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -105,15 +117,7 @@ internal fun TradeContent(
                         }
                     }
                     Column(Modifier.padding(top = if (form.holdingId == null) 10.dp else 0.dp)) {
-                        FormField(
-                            "Date", dateText,
-                            { text ->
-                                dateText = text
-                                try { onChange(form.copy(date = LocalDate.parse(text))) } catch (_: DateTimeParseException) { /* keep typing */ }
-                            },
-                            placeholder = "yyyy-MM-dd",
-                            error = if (runCatching { LocalDate.parse(dateText) }.isFailure) "Use yyyy-MM-dd" else null,
-                        )
+                        DateField("Date", form.date, { onChange(form.copy(date = it)) })
                     }
                     Column(Modifier.padding(top = 10.dp)) {
                         FormField(
@@ -160,7 +164,7 @@ internal fun TradeContent(
         }
         Column(Modifier.padding(horizontal = margin, vertical = 12.dp)) {
             Pill(
-                if (isSaving) "Saving…" else if (form.inTransit) "Send to In Transit" else if (isBuy) "Save buy" else "Save sale",
+                if (isSaving) "Saving…" else if (form.editingTransactionId != null) "Save changes" else if (form.inTransit) "Send to In Transit" else if (isBuy) "Save buy" else "Save sale",
                 onClick = { if (canSave) onSave() },
                 style = PillStyle.Primary,
                 height = 44.dp,
@@ -195,7 +199,6 @@ internal fun PriceContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var dateText by remember { mutableStateOf(form.date.toString()) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     Column(modifier.fillMaxSize()) {
@@ -204,14 +207,7 @@ internal fun PriceContent(
         }
         Column(Modifier.weight(1f).padding(horizontal = margin, vertical = MoneyTheme.spacing.sm), verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter)) {
             Module {
-                FormField(
-                    "Price date", dateText,
-                    { text ->
-                        dateText = text
-                        try { onChange(form.copy(date = LocalDate.parse(text))) } catch (_: DateTimeParseException) { /* keep typing */ }
-                    },
-                    placeholder = "yyyy-MM-dd",
-                )
+                DateField("Price date", form.date, { onChange(form.copy(date = it)) })
                 Column(Modifier.padding(top = 10.dp)) {
                     FormField("Price per unit (₹)", form.priceText, { onChange(form.copy(priceText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 1,512.35")
                 }

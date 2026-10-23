@@ -30,6 +30,8 @@ import com.moneymatters.app.core.invest.Compounding
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.ui.components.ConfirmDialog
+import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.KeyValueRow
@@ -44,11 +46,6 @@ import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Toggle
 import com.moneymatters.app.ui.theme.MoneyTheme
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
-
-private fun dateField(onValid: (LocalDate) -> Unit): (String) -> Unit = { text ->
-    try { onValid(LocalDate.parse(text)) } catch (_: DateTimeParseException) { /* keep typing */ }
-}
 
 /** Open a fixed deposit, new or already running. */
 @Composable
@@ -71,13 +68,11 @@ internal fun DepositContent(
     /** The Add investment screen's kind toggle, shown above the fields. */
     header: (@Composable () -> Unit)? = null,
 ) {
-    var startText by remember { mutableStateOf(form.start.toString()) }
-    var maturityText by remember { mutableStateOf(form.maturity.toString()) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     val canSave = form.canSave && !isSaving
     Column(modifier.fillMaxSize()) {
-        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = if (header != null) "Add investment" else "New fixed deposit", onBack = onClose) }
+        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = if (form.editingAccountId != null) "Edit deposit" else if (header != null) "Add investment" else "New fixed deposit", onBack = onClose) }
         LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = margin, vertical = MoneyTheme.spacing.sm),
@@ -92,19 +87,10 @@ internal fun DepositContent(
                     Text("Interest paid", style = MoneyTheme.type.labelRegular, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
                     SegmentedControl(Compounding.entries, form.compounding, { onChange(form.copy(compounding = it)) }, { if (it == Compounding.Simple) "At maturity" else it.name })
                     Column(Modifier.padding(top = 10.dp)) {
-                        FormField(
-                            "Start date", startText,
-                            { startText = it; dateField { d -> onChange(form.copy(start = d)) }(it) },
-                            placeholder = "yyyy-MM-dd",
-                        )
+                        DateField("Start date", form.start, { onChange(form.copy(start = it)) })
                     }
                     Column(Modifier.padding(top = 10.dp)) {
-                        FormField(
-                            "Maturity date", maturityText,
-                            { maturityText = it; dateField { d -> onChange(form.copy(maturity = d)) }(it) },
-                            placeholder = "yyyy-MM-dd",
-                            error = if (!form.datesValid) "Must be after the start date" else null,
-                        )
+                        DateField("Maturity date", form.maturity, { onChange(form.copy(maturity = it)) }, error = if (!form.datesValid) "Must be after the start date" else null)
                     }
                     Column(Modifier.padding(top = 10.dp)) { FormField("Early-break penalty (% off the rate)", form.penaltyText, { onChange(form.copy(penaltyText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 1") }
                     Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -113,7 +99,7 @@ internal fun DepositContent(
                     }
                 }
             }
-            item("funding") {
+            if (form.editingAccountId == null) item("funding") {
                 Module {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Already running (don't move money)", style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.ink, modifier = Modifier.weight(1f))
@@ -132,7 +118,7 @@ internal fun DepositContent(
             if (error != null) item("error") { Text(error, style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.negative) }
         }
         Column(Modifier.padding(horizontal = margin, vertical = 12.dp)) {
-            Pill(if (isSaving) "Saving…" else "Save deposit", { if (canSave) onSave() }, style = PillStyle.Primary, height = 44.dp, modifier = Modifier.fillMaxWidth().alpha(if (canSave) 1f else 0.4f))
+            Pill(if (isSaving) "Saving…" else if (form.editingAccountId != null) "Save changes" else "Save deposit", { if (canSave) onSave() }, style = PillStyle.Primary, height = 44.dp, modifier = Modifier.fillMaxWidth().alpha(if (canSave) 1f else 0.4f))
         }
     }
 }
@@ -145,8 +131,13 @@ fun DepositDetailScreen(
     onPostInterest: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    /** Why the last edit or delete was refused, if it was. */
+    error: String? = null,
 ) {
     val row = detail.row
+    var confirmDelete by remember { mutableStateOf(false) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     Column(modifier.fillMaxSize()) {
@@ -155,6 +146,7 @@ fun DepositDetailScreen(
             contentPadding = PaddingValues(start = margin, top = MoneyTheme.spacing.sm, end = margin, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
+            if (error != null) item("error") { Module { Text(error, style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.negative) } }
             item("summary") {
                 Module(shape = MoneyTheme.shapes.xl) {
                     Text(if (detail.isClosed) "Paid out" else "Value today", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted)
@@ -183,12 +175,29 @@ fun DepositDetailScreen(
                     else KeyValueRow("If broken today", detail.breakProceeds.formatInr(showPaise = true), divider = false)
                 }
             }
+            item("manage") {
+                Module {
+                    ModuleHeader("Manage", subtitle = "Correct what you entered, or remove it everywhere")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!detail.isClosed) Pill("Edit deposit", onEdit)
+                        Pill("Delete deposit", { confirmDelete = true }, style = PillStyle.Destructive)
+                    }
+                }
+            }
             if (!detail.isClosed && detail.breakPenalty.value > 0) {
                 item("penalty") {
                     Module { ModuleHeader("Breaking early costs ${detail.breakPenalty.formatInr(showPaise = true)}", subtitle = "Interest is recalculated at the lower rate. There's no penalty within 30 days of maturity.") }
                 }
             }
         }
+    }
+
+    if (confirmDelete) {
+        ConfirmDialog(
+            "Delete ${row.name}?",
+            "This removes the deposit and its opening, interest and payout entries from the Transactions and Accountant pages. Balances and net worth are worked out again without it. It can't be undone.",
+            "Delete", onDelete, { confirmDelete = false },
+        )
     }
 }
 
@@ -212,7 +221,6 @@ internal fun DepositCloseContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var dateText by remember { mutableStateOf(form.date.toString()) }
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     val canSave = form.canSave && !isSaving
@@ -222,7 +230,7 @@ internal fun DepositCloseContent(
         }
         Column(Modifier.weight(1f).padding(horizontal = margin, vertical = MoneyTheme.spacing.sm), verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter)) {
             Module {
-                FormField("Date", dateText, { dateText = it; dateField { d -> onChange(form.copy(date = d)) }(it) }, placeholder = "yyyy-MM-dd")
+                DateField("Date", form.date, { onChange(form.copy(date = it)) })
                 Column(Modifier.padding(top = 10.dp)) { FormField("Tax deducted at source (₹, optional)", form.tdsText, { onChange(form.copy(tdsText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 1,200") }
                 Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Renew into a new deposit", style = MoneyTheme.type.bodyMd, color = MoneyTheme.colors.ink)

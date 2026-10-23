@@ -35,7 +35,7 @@ import com.moneymatters.app.feature.invest.DepositDetailScreen
 import com.moneymatters.app.feature.invest.DepositScreen
 import com.moneymatters.app.feature.invest.DividendScreen
 import com.moneymatters.app.feature.invest.HoldingDetailScreen
-import com.moneymatters.app.feature.invest.ImportScreen
+import com.moneymatters.app.feature.invest.HoldingEditScreen
 import com.moneymatters.app.feature.invest.InvestScreen
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.PriceScreen
@@ -75,7 +75,7 @@ private const val ACCOUNTS_TAB = 2
 private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
 
-private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot, NewDeposit, CloseDeposit, NewSip, Add }
+private enum class InvestOverlay { Trade, Price, Dividend, Action, Allot, NewDeposit, CloseDeposit, NewSip, Add, EditHolding, EditDeposit, EditSip }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
@@ -112,6 +112,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
         val openHolding = openHoldingId?.let { investState?.details?.get(it) }
         val openDeposit = openDepositId?.let { investState?.depositDetails?.get(it) }
         val openSip = openSipId?.let { investState?.sipDetails?.get(it) }
+        LaunchedEffect(openHoldingId, openDepositId, openSipId) { invest.clearManageError() }
         when {
             showAddAccount -> {
                 BackHandler { showAddAccount = false; settings.resetNewAccount() }
@@ -135,17 +136,25 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 val priceHolding = invest.priceForm?.holdingId
                 PriceScreen(invest, holdingName = investState?.details?.get(priceHolding)?.row?.name.orEmpty(), onClose = { investOverlay = null })
             }
-            investOverlay == InvestOverlay.Import -> {
-                BackHandler { investOverlay = null; invest.resetImport() }
-                ImportScreen(invest, onClose = { investOverlay = null; invest.resetImport() })
-            }
             investOverlay == InvestOverlay.Dividend -> {
                 BackHandler { investOverlay = null; invest.dividendForm = null }
-                DividendScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), symbol = openHolding?.row?.symbol.orEmpty(), onClose = { investOverlay = null })
+                DividendScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), symbol = openHolding?.row?.symbol.orEmpty(), onClose = { investOverlay = null }, isCoupon = openHolding?.row?.instrument == Instrument.Bond)
             }
             investOverlay == InvestOverlay.Action -> {
                 BackHandler { investOverlay = null; invest.actionForm = null }
                 ActionScreen(invest, holdingName = openHolding?.row?.name.orEmpty(), onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.EditHolding -> {
+                BackHandler { investOverlay = null; invest.holdingEditForm = null }
+                HoldingEditScreen(invest, onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.EditDeposit -> {
+                BackHandler { investOverlay = null; invest.depositForm = null }
+                DepositScreen(invest, onClose = { investOverlay = null })
+            }
+            investOverlay == InvestOverlay.EditSip -> {
+                BackHandler { investOverlay = null; invest.sipForm = null }
+                SipFormScreen(invest, funds = emptyList(), onClose = { investOverlay = null })
             }
             showGains && investState != null && openHolding == null -> {
                 BackHandler { showGains = false }
@@ -175,6 +184,9 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     onPay = { invest.payInstalment(openSip.row.planId, it.due) },
                     onSkip = { invest.skipInstalment(openSip.row.planId, it.due) },
                     onStop = { invest.stopSip(openSip.row.planId); openSipId = null },
+                    onEdit = { invest.startEditSip(openSip.row.planId) { investOverlay = InvestOverlay.EditSip } },
+                    onDelete = { invest.deleteSip(openSip.row.planId) { openSipId = null } },
+                    error = invest.manageError,
                 )
             }
             investOverlay == InvestOverlay.NewDeposit -> {
@@ -192,6 +204,9 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     onBack = { openDepositId = null },
                     onPostInterest = { invest.postInterest(openDeposit.row.accountId) },
                     onClose = { invest.startClose(openDeposit.row.accountId); investOverlay = InvestOverlay.CloseDeposit },
+                    onEdit = { invest.startEditDeposit(openDeposit.row.accountId) { investOverlay = InvestOverlay.EditDeposit } },
+                    onDelete = { invest.deleteDeposit(openDeposit.row.accountId) { openDepositId = null } },
+                    error = invest.manageError,
                 )
             }
             investOverlay == InvestOverlay.Allot -> {
@@ -209,6 +224,12 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     onUpdatePrice = { invest.startPrice(openHolding.row.id); investOverlay = InvestOverlay.Price },
                     onDividend = { invest.startDividend(openHolding.row.id); investOverlay = InvestOverlay.Dividend },
                     onCorporateAction = { invest.startAction(openHolding.row.id, RestateKind.Split); investOverlay = InvestOverlay.Action },
+                    onEdit = { invest.startEditHolding(openHolding.row.id) { investOverlay = InvestOverlay.EditHolding } },
+                    onDelete = { invest.deleteHolding(openHolding.row.id) { openHoldingId = null } },
+                    onEditTrade = { id -> invest.startEditTrade(id) { investOverlay = InvestOverlay.Trade } },
+                    onDeleteTrade = invest::deleteTrade,
+                    onDeleteIncome = invest::deleteIncome,
+                    error = invest.manageError,
                 )
             }
             // Drilling into an account, a transaction or Quick Add hides the tab bar.
@@ -277,7 +298,6 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         InvestScreen(
                             it,
                             onOpenHolding = { id -> openHoldingId = id },
-                            onImport = { invest.resetImport(); investOverlay = InvestOverlay.Import },
                             onAllot = { id -> invest.startAllot(id); investOverlay = InvestOverlay.Allot },
                             onNewSip = { invest.startSip(); investOverlay = InvestOverlay.NewSip },
                             onOpenPrices = { showPrices = true },
