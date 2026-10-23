@@ -17,6 +17,9 @@ import com.moneymatters.app.core.security.LockTimeout
 import com.moneymatters.app.core.security.PasscodeStore
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import com.moneymatters.app.feature.accounts.addAccountWithOpening
+import com.moneymatters.app.feature.onboarding.NewAccountDraft
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -98,6 +101,32 @@ class SettingsViewModel(
             newPasscode = ""
             confirmPasscode = ""
             passcodeChanged = true
+        }
+    }
+
+    var newAccount by mutableStateOf(NewAccountDraft())
+    var newAccountError by mutableStateOf<String?>(null)
+        private set
+    var isSavingAccount by mutableStateOf(false)
+        private set
+
+    fun resetNewAccount() { newAccount = NewAccountDraft(); newAccountError = null }
+
+    /** Adds the account from [newAccount] with its opening balance; [onSaved] runs once it is in the books. */
+    fun saveNewAccount(onSaved: () -> Unit) {
+        if (isSavingAccount) return
+        viewModelScope.launch {
+            isSavingAccount = true
+            newAccountError = null
+            try {
+                addAccountWithOpening(repo, newAccount, LocalDate.now())
+                resetNewAccount()
+                onSaved()
+            } catch (e: IllegalArgumentException) {
+                newAccountError = e.message
+            } finally {
+                isSavingAccount = false
+            }
         }
     }
 

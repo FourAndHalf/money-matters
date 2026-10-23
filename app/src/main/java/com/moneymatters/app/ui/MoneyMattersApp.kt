@@ -39,7 +39,9 @@ import com.moneymatters.app.feature.invest.ImportScreen
 import com.moneymatters.app.feature.invest.InvestScreen
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.PriceScreen
+import com.moneymatters.app.feature.accounts.AddAccountScreen
 import com.moneymatters.app.feature.close.CloseScreen
+import com.moneymatters.app.feature.invest.AddInvestmentScreen
 import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.feature.invest.GainsScreen
 import com.moneymatters.app.feature.invest.PricesScreen
@@ -72,7 +74,7 @@ private const val ACCOUNTS_TAB = 2
 private const val INVEST_TAB = 3
 private const val MORE_TAB = 4
 
-private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot, NewDeposit, CloseDeposit, NewSip }
+private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot, NewDeposit, CloseDeposit, NewSip, Add }
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
@@ -92,6 +94,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var showPrices by rememberSaveable { mutableStateOf(false) }
     var showGains by rememberSaveable { mutableStateOf(false) }
     var showClose by rememberSaveable { mutableStateOf(false) }
+    var showAddAccount by rememberSaveable { mutableStateOf(false) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
     val c = MoneyTheme.colors
@@ -109,6 +112,19 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
         val openDeposit = openDepositId?.let { investState?.depositDetails?.get(it) }
         val openSip = openSipId?.let { investState?.sipDetails?.get(it) }
         when {
+            showAddAccount -> {
+                BackHandler { showAddAccount = false; settings.resetNewAccount() }
+                AddAccountScreen(
+                    settings.newAccount, settings.newAccountError, settings.isSavingAccount,
+                    onChange = { settings.newAccount = it },
+                    onSave = { settings.saveNewAccount(onSaved = { showAddAccount = false }) },
+                    onClose = { showAddAccount = false; settings.resetNewAccount() },
+                )
+            }
+            investOverlay == InvestOverlay.Add -> {
+                BackHandler { investOverlay = null; invest.depositForm = null }
+                AddInvestmentScreen(invest, onClose = { investOverlay = null; invest.depositForm = null })
+            }
             investOverlay == InvestOverlay.Trade -> {
                 BackHandler { investOverlay = null }
                 TradeScreen(invest, onClose = { investOverlay = null })
@@ -247,6 +263,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     ACCOUNTS_TAB -> AccountsScreen(
                         accounts,
                         onOpenAccount = { id -> openAccountId = id },
+                        onAddAccount = { settings.resetNewAccount(); showAddAccount = true },
                         contentPadding = PaddingValues(bottom = 132.dp),
                     )
                     INVEST_TAB -> investState?.let {
@@ -283,7 +300,14 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     MoneyBottomBar(Tabs, tab, onSelect = { if (it == MORE_TAB) showSettings = true else tab = it })
                 }
                 QuickAddFab(
-                    onClick = { showQuickAdd = true },
+                    // The + does what the page it is on needs: add an account on Accounts, an investment on Invest, an entry elsewhere.
+                    onClick = {
+                        when (tab) {
+                            ACCOUNTS_TAB -> { settings.resetNewAccount(); showAddAccount = true }
+                            INVEST_TAB -> { invest.startTrade(TradeSide.Buy); invest.startDeposit(); investOverlay = InvestOverlay.Add }
+                            else -> showQuickAdd = true
+                        }
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
