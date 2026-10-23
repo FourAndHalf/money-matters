@@ -63,4 +63,12 @@ interface LedgerDao {
 
     @Query("SELECT * FROM audit_log WHERE transactionId = :transactionId ORDER BY whenMillis")
     fun auditLogForTransaction(transactionId: String): Flow<List<AuditLogEntity>>
+
+    @Insert suspend fun insertClosedPeriod(period: ClosedPeriodEntity)
+
+    @Query("SELECT * FROM closed_periods ORDER BY start")
+    suspend fun getAllClosedPeriods(): List<ClosedPeriodEntity>
+
+    @Query("SELECT COUNT(*) FROM closed_periods WHERE start <= :date AND end >= :date")
+    suspend fun closedPeriodsCovering(date: String): Int
 }

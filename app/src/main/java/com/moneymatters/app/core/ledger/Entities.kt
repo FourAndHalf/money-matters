@@ -85,3 +85,18 @@ data class AuditLogEntity(
     val before: String? = null,
     val after: String? = null,
 )
+
+/**
+ * A month-end close (plan.html → P17). Periods are stored as date ranges because the investor can change
+ * their month start day later. [hash] chains each close to the one before it, so any later edit to a closed
+ * period shows up when the chain is re-checked; [snapshot] is the price snapshot the hash covers.
+ */
+@Entity(tableName = "closed_periods")
+data class ClosedPeriodEntity(
+    @PrimaryKey val start: String,
+    val end: String,
+    val closedAtMillis: Long,
+    val prevHash: String,
+    val hash: String,
+    val snapshot: String,
+)
