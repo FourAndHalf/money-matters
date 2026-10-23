@@ -65,6 +65,8 @@ internal fun DepositContent(
     onSave: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The Add investment screen's kind toggle, shown above the fields. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     var startText by remember { mutableStateOf(form.start.toString()) }
     var maturityText by remember { mutableStateOf(form.maturity.toString()) }
@@ -72,7 +74,7 @@ internal fun DepositContent(
     val status = WindowInsets.statusBars.asPaddingValues()
     val canSave = form.canSave && !isSaving
     Column(modifier.fillMaxSize()) {
-        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = "New fixed deposit", onBack = onClose) }
+        Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = if (header != null) "Add investment" else "New fixed deposit", onBack = onClose) }
         LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = margin, vertical = MoneyTheme.spacing.sm),
@@ -80,6 +82,7 @@ internal fun DepositContent(
         ) {
             item("fields") {
                 Module {
+                    if (header != null) Column(Modifier.padding(bottom = 12.dp)) { header() }
                     FormField("Name", form.name, { onChange(form.copy(name = it)) }, placeholder = "e.g. HDFC FD 1")
                     Column(Modifier.padding(top = 10.dp)) { FormField("Principal (₹)", form.principalText, { onChange(form.copy(principalText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 1,00,000") }
                     Column(Modifier.padding(top = 10.dp)) { FormField("Interest rate (% a year)", form.rateText, { onChange(form.copy(rateText = it)) }, keyboardType = KeyboardType.Decimal, placeholder = "e.g. 7.25") }

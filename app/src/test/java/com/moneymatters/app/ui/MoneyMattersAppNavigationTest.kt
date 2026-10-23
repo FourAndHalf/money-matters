@@ -123,4 +123,52 @@ class MoneyMattersAppNavigationTest {
         compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasText("No stocks yet"), 5_000)
         compose.onNodeWithText("No stocks yet").assertIsDisplayed()
     }
+
+    @Test fun `the plus on Accounts adds an account, not an expense`() {
+        compose.setContent {
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
+        }
+        compose.onAllNodesWithText("View all")[0].performClick()
+        compose.onNodeWithContentDescription("Quick add").performClick()
+        compose.onNodeWithText("Add account").assertIsDisplayed()
+        compose.onNodeWithText("Card").performClick()
+        compose.onNodeWithText("Amount owed today (₹)").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Net worth").assertIsDisplayed()
+    }
+
+    @Test fun `the Add button on the Accounts page opens the same screen`() {
+        compose.setContent {
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
+        }
+        compose.onAllNodesWithText("View all")[0].performClick()
+        compose.onNodeWithText("+ Add").performClick()
+        compose.onNodeWithText("Add account").assertIsDisplayed()
+    }
+
+    @Test fun `the plus on Transactions still opens Quick add`() {
+        compose.setContent {
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
+        }
+        compose.onNodeWithText("Txns").performClick()
+        compose.onNodeWithContentDescription("Quick add").performClick()
+        compose.onAllNodesWithText("Quick add")[0].assertIsDisplayed()
+    }
+
+    @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+    @Test fun `the plus on Invest opens one page with a stock, fund and FD toggle`() {
+        compose.setContent {
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
+        }
+        compose.onNodeWithText("Invest").performClick()
+        compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasText("No stocks yet"), 5_000)
+        compose.onNodeWithContentDescription("Quick add").performClick()
+        compose.onNodeWithText("Add investment").assertIsDisplayed()
+        compose.onNodeWithText("Symbol").assertIsDisplayed()
+        compose.onNodeWithText("Mutual fund").performClick()
+        compose.onNodeWithText("Fund name").assertIsDisplayed()
+        compose.onNodeWithText("FD").performClick()
+        compose.onNodeWithText("Principal (₹)").assertIsDisplayed()
+        compose.onNodeWithText("Add investment").assertIsDisplayed()
+    }
 }

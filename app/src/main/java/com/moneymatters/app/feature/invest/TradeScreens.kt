@@ -65,6 +65,8 @@ internal fun TradeContent(
     onSave: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** When set, replaces the stock/fund toggle and the title: the Add investment screen picks the kind itself. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val isBuy = form.side == TradeSide.Buy
     var dateText by remember { mutableStateOf(form.date.toString()) }
@@ -73,7 +75,7 @@ internal fun TradeContent(
     val canSave = form.canSave && !isSaving
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(top = status.calculateTopPadding())) {
-            DetailTopBar(title = (if (isBuy) "Buy " else "Sell ") + (if (form.isFund) "fund" else "stock"), onBack = onClose)
+            DetailTopBar(title = if (header != null) "Add investment" else (if (isBuy) "Buy " else "Sell ") + (if (form.isFund) "fund" else "stock"), onBack = onClose)
         }
         LazyColumn(
             Modifier.weight(1f),
@@ -82,8 +84,9 @@ internal fun TradeContent(
         ) {
             item("fields") {
                 Module {
+                    if (header != null) Column(Modifier.padding(bottom = 12.dp)) { header() }
                     if (form.holdingId == null) {
-                        SegmentedControl(Instrument.entries, form.instrument, { onChange(form.copy(instrument = it)) }, { if (it == Instrument.Stock) "Stock" else "Mutual fund" })
+                        if (header == null) SegmentedControl(Instrument.entries, form.instrument, { onChange(form.copy(instrument = it)) }, { if (it == Instrument.Stock) "Stock" else "Mutual fund" })
                         Column(Modifier.padding(top = 12.dp)) {
                             if (!form.isFund) {
                                 FormField("Symbol", form.symbol, { onChange(form.copy(symbol = it)) }, placeholder = "e.g. INFY")
