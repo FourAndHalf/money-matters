@@ -190,3 +190,20 @@ data class PendingAllotmentEntity(
     foreignKeys = [ForeignKey(SipPlanEntity::class, ["id"], ["planId"])],
 )
 data class SipSkipEntity(val planId: String, val dueDate: String)
+
+/** One attempt to download a price file, kept so a failure is never hidden behind an old price (plan.html → P15). */
+@Entity(tableName = "price_fetch_log")
+data class PriceFetchLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** `nse` or `amfi`. */
+    val source: String,
+    val attemptedAt: Long,
+    val ok: Boolean,
+    val httpStatus: Int? = null,
+    val rowsParsed: Int = 0,
+    val rowsMatched: Int = 0,
+    /** A plain-language result or reason. */
+    val message: String,
+    /** The trading day the prices were for, when the download worked. */
+    val priceDate: String? = null,
+)

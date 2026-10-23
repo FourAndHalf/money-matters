@@ -64,6 +64,25 @@ interface InvestDao {
     @Query("SELECT * FROM prices WHERE holdingId = :holdingId ORDER BY date DESC, id DESC LIMIT 1")
     suspend fun latestPrice(holdingId: String): PriceEntity?
 
+    @Query("SELECT * FROM prices WHERE id = :id")
+    suspend fun getPrice(id: Long): PriceEntity?
+
+    @Query("SELECT * FROM prices WHERE holdingId = :holdingId AND date = :date")
+    suspend fun pricesFor(holdingId: String, date: String): List<PriceEntity>
+
+    @Query("SELECT * FROM prices WHERE holdingId = :holdingId AND date < :date ORDER BY date DESC, id DESC LIMIT 1")
+    suspend fun latestPriceBefore(holdingId: String, date: String): PriceEntity?
+
+    @Update suspend fun updatePrice(price: PriceEntity)
+
+    @Query("DELETE FROM prices WHERE id = :id")
+    suspend fun deletePrice(id: Long)
+
+    @Insert suspend fun insertFetchLog(entry: PriceFetchLogEntity)
+
+    @Query("SELECT * FROM price_fetch_log ORDER BY attemptedAt, id")
+    suspend fun getAllFetchLog(): List<PriceFetchLogEntity>
+
     @Insert suspend fun insertFixedDeposit(deposit: FixedDepositEntity)
 
     @Query("SELECT * FROM fixed_deposits WHERE accountId = :accountId")

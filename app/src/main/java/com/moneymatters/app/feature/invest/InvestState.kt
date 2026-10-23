@@ -16,6 +16,7 @@ import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.formatUnits
 import com.moneymatters.app.core.invest.gainTerm
 import com.moneymatters.app.core.invest.depositValuation
+import com.moneymatters.app.core.invest.effectiveStatus
 import com.moneymatters.app.core.invest.holdingFlows
 import com.moneymatters.app.core.invest.isEquityOriented
 import com.moneymatters.app.core.invest.valuations
@@ -27,6 +28,7 @@ import com.moneymatters.app.core.money.Units
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.Tone
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -109,6 +111,7 @@ data class InvestState(
     val depositDetails: Map<String, DepositDetail> = emptyMap(),
     val sips: List<SipRow> = emptyList(),
     val sipDetails: Map<String, SipDetail> = emptyMap(),
+    val prices: PricesState = PricesState(),
     /** Whether there is a fund to start a SIP in. */
     val hasFunds: Boolean = false,
 )
@@ -166,10 +169,17 @@ private fun perUnit(cost: Paise, units: Long): String =
     if (units <= 0) "—" else Paise((cost.value * 1_000_000 + units / 2) / units).formatInr(showPaise = true)
 
 /** Builds [InvestState]. Pure: same snapshots in, same state out. */
-fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate, rules: CapitalGainsRules, goal: SipGoal? = null): InvestState {
+fun buildInvest(
+    ledger: LedgerSnapshot,
+    invest: InvestSnapshot,
+    today: LocalDate,
+    rules: CapitalGainsRules,
+    goal: SipGoal? = null,
+    zone: ZoneId = ZoneId.systemDefault(),
+): InvestState {
     val accountsById = ledger.accounts.associateBy { it.id }
     val valued = valuations(invest)
-    val rowsById = valued.associate { v -> v.holding.id to rowFor(v, accountsById.getValue(v.holding.accountId).name) }
+    val rowsById = valued.associate { v -> v.holding.id to rowFor(v, accountsById.getValue(v.holding.accountId).name, today) }
     // Fully sold holdings stay reachable by id but drop off the list.
     val holdings = valued.filter { it.units.micro > 0 }.map { rowsById.getValue(it.holding.id) }.sortedByDescending { it.marketValue?.value ?: it.cost.value }
 
@@ -210,6 +220,7 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
         depositDetails = deposits.associate { v -> v.deposit.accountId to depositDetail(v, depositRows.getValue(v.deposit.accountId), today) },
         sips = sipRows,
         sipDetails = sipDetails,
+        prices = buildPrices(valued, rowsById, invest, today, zone),
         hasFunds = valued.any { it.holding.instrument == Instrument.MutualFund },
         unpricedCount = held.count { it.marketValue == null },
         details = details,
@@ -219,7 +230,7 @@ fun buildInvest(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate
     )
 }
 
-private fun rowFor(v: HoldingValuation, accountName: String): HoldingRow {
+private fun rowFor(v: HoldingValuation, accountName: String, today: LocalDate): HoldingRow {
     val symbol = v.holding.symbol ?: accountName
     val gain = v.gain
     return HoldingRow(
@@ -233,7 +244,7 @@ private fun rowFor(v: HoldingValuation, accountName: String): HoldingRow {
         gain = gain,
         gainPercent = if (gain != null && v.cost.value > 0) gain.value.toDouble() / v.cost.value else null,
         priceLabel = v.price?.let { formatUnitPrice(it.price) },
-        priceTag = v.price?.status?.tag() ?: NoPrice,
+        priceTag = v.price?.effectiveStatus(today)?.tag() ?: NoPrice,
         hasUnits = v.units.micro > 0,
         instrument = v.holding.instrument,
         classLabel = v.holding.fundClass?.label(),
@@ -287,7 +298,7 @@ private fun detailFor(
         )
     }
     val prices = invest.prices.filter { it.holdingId == v.holding.id }.sortedWith(compareByDescending<PriceEntity> { it.date }.thenByDescending { it.id }).map {
-        PricePoint(LocalDate.parse(it.date).format(DayMonthYear), formatUnitPrice(it.price), it.source, it.status.tag())
+        PricePoint(LocalDate.parse(it.date).format(DayMonthYear), formatUnitPrice(it.price), it.source, it.effectiveStatus(today).tag())
     }
     // A holding still held needs a price for today's value; one fully sold is measured on its flows alone.
     val allFlows = flows.map { it.second } + dividends

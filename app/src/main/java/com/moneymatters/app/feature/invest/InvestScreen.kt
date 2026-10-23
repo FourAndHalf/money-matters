@@ -48,6 +48,7 @@ fun InvestScreen(
     onOpenDeposit: (accountId: String) -> Unit = {},
     onNewSip: () -> Unit = {},
     onOpenSip: (planId: String) -> Unit = {},
+    onOpenPrices: () -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -142,6 +143,21 @@ fun InvestScreen(
                                 trailing = { AmountWithBadge(d.value.formatInr()) { StatusBadge(d.badge.text, d.badge.tone) } },
                             )
                         }
+                    }
+                }
+            }
+            if (state.holdings.isNotEmpty()) {
+                item("prices") {
+                    Module(Modifier.padding(horizontal = margin)) {
+                        ListRow(
+                            title = "Prices",
+                            subtitle = state.prices.sources.filter { it.tone != Tone.Neutral }.joinToString(" · ") { "${it.name} ${it.headline}" }.ifEmpty { "Not downloaded yet" },
+                            divider = false,
+                            modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open prices", onClick = onOpenPrices),
+                            trailing = {
+                                if (state.prices.attentionCount > 0) StatusBadge("${state.prices.attentionCount} to review", Tone.Warning) else StatusBadge("All set", Tone.Positive)
+                            },
+                        )
                     }
                 }
             }

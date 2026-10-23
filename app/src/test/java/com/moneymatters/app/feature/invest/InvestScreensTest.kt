@@ -376,4 +376,84 @@ class InvestScreensTest {
         compose.setContent { MoneyMattersTheme { SipFormContent(SipForm(LocalDate.of(2026, 10, 20)), emptyList(), emptyList(), null, {}, {}, {}) } }
         compose.onNodeWithText("Buy a mutual fund first, then set up its SIP.").assertIsDisplayed()
     }
+
+    private val pricesState = PricesState(
+        sources = listOf(
+            SourceStatus(com.moneymatters.app.core.invest.PriceSourceId.Nse, "NSE", Tone.Negative, "✕ Failing since 19 Oct", "Last success 15 Oct · File not found (404)"),
+            SourceStatus(com.moneymatters.app.core.invest.PriceSourceId.Amfi, "AMFI", Tone.Positive, "✓ Updated 22 Oct", "NAVs for 2026-10-22: matched 2 of 2 funds"),
+        ),
+        rows = listOf(
+            PriceRow("h1", "Infosys (INFY)", "₹1,168.00", "22 Oct 2026 · manual", PriceTag("⚠ Mismatch", Tone.Warning), 5, "2026-10-22", com.moneymatters.app.core.invest.PriceStatus.Mismatch, true),
+            PriceRow("h2", "Tata Consultancy (TCS)", "₹2,529.00", "22 Oct 2026 · nse", PriceTag("✕ Suspicious", Tone.Negative), 7, "2026-10-22", com.moneymatters.app.core.invest.PriceStatus.Suspicious, true),
+            PriceRow("h3", "PPFAS Flexi Cap", "₹81.2345", "22 Oct 2026 · amfi", PriceTag("✓ Verified", Tone.Positive), 9, "2026-10-22", com.moneymatters.app.core.invest.PriceStatus.Verified, false),
+        ),
+        log = listOf(LogRow("22 Oct, 09:00", "AMFI", true, "NAVs for 2026-10-22: matched 2 of 2 funds"), LogRow("19 Oct, 09:00", "NSE", false, "File not found (404)")),
+    )
+
+    @Test fun `the prices screen shows source health, statuses and the log, and its actions work`() {
+        var refreshed = false
+        var confirmed: Long? = null
+        var resolved: Triple<String, String, Boolean>? = null
+        var manual: String? = null
+        compose.setContent {
+            MoneyMattersTheme {
+                PricesScreen(
+                    pricesState, com.moneymatters.app.core.invest.PriceSources.Default, isRefreshing = false,
+                    onBack = {}, onRefresh = { refreshed = true }, onUpdateManual = { manual = it },
+                    onConfirm = { confirmed = it }, onResolve = { h, d, keep -> resolved = Triple(h, d, keep) }, onSaveSources = {},
+                )
+            }
+        }
+        compose.onNodeWithText("2 to review").assertIsDisplayed()
+        compose.onNodeWithText("✕ Failing since 19 Oct").assertIsDisplayed()
+        compose.onNodeWithText("Last success 15 Oct · File not found (404)").assertIsDisplayed()
+        compose.onNodeWithText("✓ Updated 22 Oct").assertIsDisplayed()
+        compose.onNodeWithText("Download log").assertIsDisplayed()
+        compose.onNodeWithText("Refresh").performClick()
+        compose.onNodeWithText("Use download").performClick()
+        compose.onNodeWithText("Confirm").performClick()
+        compose.onNodeWithText("Tata Consultancy (TCS)").performClick()
+        assertTrue(refreshed)
+        assertEquals(Triple("h1", "2026-10-22", true), resolved)
+        assertEquals(7L, confirmed)
+        assertEquals("h2", manual)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_prices.png")
+    }
+
+    @Test fun `keeping your own price resolves the other way`() {
+        var resolved: Triple<String, String, Boolean>? = null
+        compose.setContent {
+            MoneyMattersTheme {
+                PricesScreen(pricesState, com.moneymatters.app.core.invest.PriceSources.Default, false, {}, {}, {}, {}, { h, d, keep -> resolved = Triple(h, d, keep) }, {})
+            }
+        }
+        compose.onNodeWithText("Keep mine").performClick()
+        assertEquals(Triple("h1", "2026-10-22", false), resolved)
+    }
+
+    @Test fun `the prices screen says when everything is verified, and shows refreshing while it works`() {
+        val clean = pricesState.copy(rows = pricesState.rows.filter { !it.needsAttention })
+        compose.setContent { MoneyMattersTheme { PricesScreen(clean, com.moneymatters.app.core.invest.PriceSources.Default, true, {}, {}, {}, {}, { _, _, _ -> }, {}) } }
+        compose.onNodeWithText("All prices verified").assertIsDisplayed()
+        compose.onNodeWithText("Refreshing…").assertIsDisplayed()
+    }
+
+    @Test fun `source addresses can be edited, saved, and reset to the defaults`() {
+        var saved: com.moneymatters.app.core.invest.PriceSources? = null
+        val custom = com.moneymatters.app.core.invest.PriceSources("https://x/{yyyyMMdd}.zip", "https://y/nav.txt")
+        compose.setContent { MoneyMattersTheme { PricesScreen(pricesState, custom, false, {}, {}, {}, {}, { _, _, _ -> }, { saved = it }) } }
+        compose.onNodeWithText("Change addresses").performClick()
+        compose.onNodeWithText("Reset").performClick()
+        compose.onNodeWithText("Save").performClick()
+        assertEquals(com.moneymatters.app.core.invest.PriceSources.Default, saved)
+    }
+
+    @Test fun `the portfolio links to prices and counts what needs review`() {
+        var opened = false
+        val withPrices = state.copy(prices = pricesState)
+        compose.setContent { MoneyMattersTheme { InvestScreen(withPrices, onOpenHolding = {}, onBuy = {}, onImport = {}, onOpenPrices = { opened = true }) } }
+        compose.onNodeWithText("2 to review").assertIsDisplayed()
+        compose.onNodeWithText("Prices").performClick()
+        assertTrue(opened)
+    }
 }

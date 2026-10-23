@@ -358,7 +358,7 @@ Day 1   Dr  Assets:MF:PPFAS Flexi  (123.456 u @ ₹81.00)   10,000
         <li><strong>Mutual funds:</strong> AMFI's public daily NAV file (semicolon-separated: scheme code, ISINs, name, NAV, date). Wound-up schemes sit in the file frozen at their last NAV, so the <em>row date</em> is always checked.</li>
         <li><strong>Stocks:</strong> NSE's public end-of-day price file (UDiFF format). One file covers every stock, so it's one download a week. NSE has moved this file before (July 2024) and is changing distribution again in 2026, so the source URL is a <strong>setting</strong>. Downloads use browser-like headers, retries with backoff, and rate limiting.</li>
         <li><strong>FDs:</strong> no price needed. Value is calculated from the rate and compounding.</li>
-        <li><strong>Matching by ISIN</strong>, never by name.</li>
+        <li><strong>Matching by ISIN</strong>, never by name. A stock saved without an ISIN is matched on its exchange symbol instead (series EQ first); a fund with no ISIN can't be matched and is listed as such in the download log.</li>
         <li><strong>Schedule:</strong> Saturday morning, for the last trading day (NSE holiday calendar aware).</li>
       </ul>
       <h3>Price status badges</h3>
@@ -369,7 +369,7 @@ Day 1   Dr  Assets:MF:PPFAS Flexi  (123.456 u @ ₹81.00)   10,000
         <tr><td>⚠️ Mismatch</td><td>Manual price differs from a later download by more than 1%</td><td>No, until you pick one</td></tr>
         <tr><td>🟡 Stale</td><td>Newest available price is older than the expected date (frozen NAV, suspended stock)</td><td>No, until you confirm or override</td></tr>
         <tr><td>🔴 Download failed</td><td>Plain-language reason: 404 file moved, 403 blocked, format changed, ISIN missing</td><td>No. Enter manually.</td></tr>
-        <tr><td>🟣 Suspicious</td><td>Moved more than 20% in a week, zero or negative; possibly an unrecorded split or bonus</td><td>No, until confirmed or the corporate action is recorded</td></tr>
+        <tr><td>🟣 Suspicious</td><td>Moved more than 20% in a week; possibly an unrecorded split or bonus. A zero or negative price is never stored: it is skipped and reported in the download log</td><td>No, until confirmed or the corporate action is recorded</td></tr>
       </table></div>
       <div class="callout warn">A status bar at the top of the Prices screen always shows the health of each source, e.g. <em>"NSE: 🔴 failing since 12 Oct · last success 5 Oct · reason: file not found (404)"</em>. A failure is never hidden behind an old price.</div>
     </section>

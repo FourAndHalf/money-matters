@@ -76,7 +76,7 @@ New code lives in `core/invest` (pure, tested math) and `feature/invest` (state 
 2. **Mutual funds. (Done.)** Reuses the lot engine: fund class (equity/debt/hybrid/ELSS), lump-sum buy through In Transit and allotment, sell, ELSS 3-year lock per instalment, exit-load window, debt-fund slab-rate rule, NAV manual entry, same CSV import (CAMS/KFintech statement columns mapped).
 3. **Fixed deposits. (Done.)** Open FD, monthly accrual, TDS, maturity, auto-renew, break-today value; FD rows in Portfolio and Holding detail.
 4. **SIPs. (Done.)** `sip_plan`, monthly proposals, allotment confirmation, missed-SIP flag with goal-date effect. Needs MFs (slice 2); proposals appear on opening the Invest tab until recurring rules (P11) land.
-5. **Prices.** NSE end-of-day file first (stocks come first), then AMFI NAV; ISIN matching, status badges, failure messages, download log, weekly WorkManager job, source URLs as settings. Until now prices are manual.
+5. **Prices. (Done.)** NSE end-of-day file first (stocks come first), then AMFI NAV; ISIN matching, status badges, failure messages, download log, weekly WorkManager job, source URLs as settings. Until now prices are manual.
 6. **Analytics and tax.** Allocation vs target and drift alert, concentration/overlap, tax-if-sold-today, capital-gains register feeding Tax (P20), month-end revaluation and accrual hooks into close (P17).
 
 Stocks first means the lot engine, Portfolio and net worth change are proven on one instrument before MFs reuse them; FDs need none of the lot machinery, so they can slip without blocking anything. Downloads stay late so the model is proven on manual prices first.
@@ -95,3 +95,10 @@ Stocks first means the lot engine, Portfolio and net worth change are proven on 
 3. **Existing holdings**: full purchase history is available, so lots and past sales are rebuilt exactly through trade import. No estimated dates are expected; the approximate-date warning only applies if something is entered by hand.
 4. **Order**: stocks, MFs, FDs, SIPs.
 5. **Charges**: one net rupee amount per trade.
+
+## 9. Notes from building the price download (slice 5)
+
+- Formats were checked against the live files on 22 Oct 2026. AMFI's `NAVAll.txt` has eight columns (scheme code, ISIN payout/growth, ISIN reinvestment, name, plan, option, NAV, date), redirects from `www.amfiindia.com` to `portal.amfiindia.com`, carries frozen rows with old dates, zero NAVs and NAVs with up to eight decimals (rounded to four). NSE's `BhavCopy_NSE_CM_0_0_0_<yyyyMMdd>_F_0000.csv.zip` is found at `nsearchives.nseindia.com`, needs browser-like headers, and 404s on market holidays, so the downloader walks back up to seven weekdays.
+- Staleness is worked out when a price is read (older than eight days is shown as Stale, even a manual one) as well as when it is stored, so an old number is never passed off as current.
+- A download that disagrees with a manual price for the same day by more than 1% marks both as Mismatch; the Prices screen lets you keep either one.
+- The weekly job runs on Saturday at 09:00 with a network constraint (WorkManager). It only needs the INTERNET permission added for this slice; nothing else in the app uses the network.
