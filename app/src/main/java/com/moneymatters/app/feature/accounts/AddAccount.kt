@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.PostingLine
+import com.moneymatters.app.core.money.parseRupees
 import com.moneymatters.app.feature.onboarding.NewAccountDraft
 import com.moneymatters.app.feature.onboarding.OPENING_EQUITY_ACCOUNT
 import com.moneymatters.app.feature.onboarding.isValidOptionalAmount
@@ -45,10 +46,14 @@ suspend fun addAccountWithOpening(repo: LedgerRepository, draft: NewAccountDraft
     val name = draft.name.trim()
     require(name.isNotEmpty()) { "Give the account a name" }
     require(isValidOptionalAmount(draft.openingBalance)) { "Enter an amount like 12,500.50" }
+    val isCard = draft.kind == AccountKind.CreditCard
+    val limit = if (isCard) requireNotNull(parseRupees(draft.creditLimit)?.takeIf { it.value > 0 }) { "Enter the card's limit" } else null
+    val statementDay = if (isCard) requireNotNull(draft.statementDay.trim().toIntOrNull()?.takeIf { it in 1..28 }) { "Enter the statement day, from 1 to 28" } else null
     repo.inTransaction {
         require(repo.accountIdByName(name) == null) { "There is already an account called $name" }
         val type = draft.kind.toLedgerType()
         val accountId = repo.createAccount(name, type, kind = draft.kind)
+        if (limit != null && statementDay != null) repo.addCreditCardDetails(accountId, limit, statementDay)
         val amount = draft.openingPaise() ?: return@inTransaction
         val equityId = repo.createAccountIfAbsent(OPENING_EQUITY_ACCOUNT, AccountType.Equity)
         val postings = if (type == AccountType.Liability) {
@@ -74,7 +79,9 @@ fun AddAccountScreen(
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     val owed = draft.kind.toLedgerType() == AccountType.Liability
-    val canSave = draft.name.isNotBlank() && isValidOptionalAmount(draft.openingBalance) && !isSaving
+    val isCard = draft.kind == AccountKind.CreditCard
+    val cardReady = !isCard || (parseRupees(draft.creditLimit)?.value.let { it != null && it > 0 } && draft.statementDay.trim().toIntOrNull() in 1..28)
+    val canSave = draft.name.isNotBlank() && isValidOptionalAmount(draft.openingBalance) && cardReady && !isSaving
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(top = status.calculateTopPadding())) { DetailTopBar(title = "Add account", onBack = onClose) }
         LazyColumn(
@@ -98,6 +105,18 @@ fun AddAccountScreen(
                             error = if (isValidOptionalAmount(draft.openingBalance)) null else "Enter an amount like 12,500.50",
                             testTag = "opening-balance-field",
                         )
+                    }
+                    if (isCard) {
+                        Column(Modifier.padding(top = 10.dp)) {
+                            FormField("Credit limit (₹)", draft.creditLimit, { onChange(draft.copy(creditLimit = it)) }, placeholder = "e.g. 1,00,000", keyboardType = KeyboardType.Decimal, testTag = "card-limit-field")
+                        }
+                        Column(Modifier.padding(top = 10.dp)) {
+                            FormField(
+                                "Statement day of the month", draft.statementDay, { onChange(draft.copy(statementDay = it.filter(Char::isDigit).take(2))) },
+                                placeholder = "1 to 28", keyboardType = KeyboardType.Number, testTag = "card-statement-field",
+                                error = if (draft.statementDay.isNotEmpty() && draft.statementDay.toIntOrNull() !in 1..28) "Pick a day from 1 to 28" else null,
+                            )
+                        }
                     }
                 }
             }

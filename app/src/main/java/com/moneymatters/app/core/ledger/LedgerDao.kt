@@ -71,4 +71,9 @@ interface LedgerDao {
 
     @Query("SELECT COUNT(*) FROM closed_periods WHERE start <= :date AND end >= :date")
     suspend fun closedPeriodsCovering(date: String): Int
+
+    @Insert suspend fun insertCreditCard(card: CreditCardEntity)
+
+    @Query("SELECT * FROM credit_cards")
+    suspend fun getAllCreditCards(): List<CreditCardEntity>
 }

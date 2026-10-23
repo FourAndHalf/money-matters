@@ -20,6 +20,7 @@ data class LedgerSnapshot(
     /** Accounts that are stock/fund holdings; their postings must carry units, so Quick Add keeps them out of its pickers. */
     val holdingAccountIds: Set<String> = emptySet(),
     val closedPeriods: List<ClosedPeriodEntity> = emptyList(),
+    val creditCards: List<CreditCardEntity> = emptyList(),
 )
 
 /** The optional P04 tags on a transaction; none affect balances. */
@@ -58,12 +59,13 @@ class LedgerRepository(
      * a snapshot never holds a transaction without its postings. Fine at personal scale; page it if it ever isn't.
      */
     fun snapshot(): Flow<LedgerSnapshot> =
-        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log", "holdings", "closed_periods").map {
+        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log", "holdings", "closed_periods", "credit_cards").map {
             database.withTransaction {
                 LedgerSnapshot(
                     dao.getAllAccounts(), dao.getAllTransactions(), dao.getAllPostings(), dao.getAllAuditLog(),
                     database.investDao().getAllHoldings().map { it.accountId }.toSet(),
                     dao.getAllClosedPeriods(),
+                    dao.getAllCreditCards(),
                 )
             }
         }
@@ -72,6 +74,13 @@ class LedgerRepository(
         val id = newId()
         dao.insertAccount(AccountEntity(id, name, type, parentId, kind = kind, inNetWorth = inNetWorth))
         return id
+    }
+
+    /** Records a card's limit and statement day; [accountId] must be a credit card account. */
+    suspend fun addCreditCardDetails(accountId: String, limit: Paise, statementDay: Int) {
+        require(limit.value > 0) { "A card needs a limit" }
+        require(statementDay in 1..28) { "The statement day must be from 1 to 28" }
+        dao.insertCreditCard(CreditCardEntity(accountId, limit.value, statementDay))
     }
 
     suspend fun accountIdByName(name: String): String? = dao.findAccountByName(name)?.id

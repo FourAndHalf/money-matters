@@ -20,7 +20,14 @@ data class ProfileInfo(val dateOfBirthDigits: String = "", val monthStartDay: St
 
 /** One account being added by the setup wizard, before it's posted to the real ledger. */
 @Immutable
-data class NewAccountDraft(val name: String = "", val kind: AccountKind = AccountKind.Bank, val openingBalance: String = "")
+data class NewAccountDraft(
+    val name: String = "",
+    val kind: AccountKind = AccountKind.Bank,
+    val openingBalance: String = "",
+    /** Credit cards only: the limit in rupees and the day of the month the statement is cut. */
+    val creditLimit: String = "",
+    val statementDay: String = "",
+)
 
 /** [AccountKind] is a UI grouping; the ledger only knows the five double-entry types. */
 fun AccountKind.toLedgerType() = when (this) {

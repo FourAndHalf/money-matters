@@ -14,6 +14,7 @@ import com.moneymatters.app.core.ledger.PostingEntity
 import com.moneymatters.app.core.ledger.TransactionEntity
 import com.moneymatters.app.core.ledger.TransactionStatus
 import com.moneymatters.app.core.money.Paise
+import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.feature.accounts.AccountGroup
 import com.moneymatters.app.feature.accounts.AccountLedgerState
 import com.moneymatters.app.feature.accounts.AccountSummary
@@ -54,6 +55,15 @@ const val NOT_IN_NET_WORTH = "Not in net worth"
 fun periodStart(today: LocalDate, monthStartDay: Int): LocalDate {
     val thisMonth = today.withDayOfMonth(monthStartDay)
     return if (thisMonth.isAfter(today)) thisMonth.minusMonths(1) else thisMonth
+}
+
+/** 1 → `1st`, 22 → `22nd`, 11 → `11th`. */
+internal fun ordinal(day: Int): String = day.toString() + when {
+    day % 100 in 11..13 -> "th"
+    day % 10 == 1 -> "st"
+    day % 10 == 2 -> "nd"
+    day % 10 == 3 -> "rd"
+    else -> "th"
 }
 
 fun AccountKind.label() = when (this) {
@@ -125,6 +135,15 @@ fun buildBooks(
     }
 
     // ---- Accounts (P08) ----
+    val cardsById = snapshot.creditCards.associateBy { it.accountId }
+    /** `Limit ₹1,00,000 · 8% used · statement on the 5th · ` for a card with details, else nothing. */
+    fun cardNote(a: AccountEntity, balance: Long): String {
+        val card = cardsById[a.id] ?: return ""
+        // Balances are signed by what the account holds, so a liability's owed amount is positive.
+        val owed = balance.coerceAtLeast(0)
+        val used = (owed * 100 / card.limitPaise)
+        return "Limit ${Paise(card.limitPaise).formatInr()} · $used% used · statement on the ${ordinal(card.statementDay)} · "
+    }
     fun summaryRow(a: AccountEntity): AccountSummary {
         val count = entryCounts[a.id] ?: 0
         val kind = a.kind ?: if (a.type == AccountType.Liability) AccountKind.Loan else AccountKind.Bank
@@ -132,7 +151,7 @@ fun buildBooks(
             id = a.id,
             kind = kind,
             name = a.name,
-            subtitle = "${kind.label()} · " + (if (count == 0) "no entries yet" else "$count ${if (count == 1) "entry" else "entries"}") +
+            subtitle = "${kind.label()} · " + cardNote(a, balances[a.id] ?: 0) + (if (count == 0) "no entries yet" else "$count ${if (count == 1) "entry" else "entries"}") +
                 if (a.id in marketByAccount) " · at market" else if ((unpostedByAccount[a.id]?.value ?: 0) > 0) " · with accrued interest" else "",
             balance = marketByAccount[a.id] ?: (Paise(balances[a.id] ?: 0) + (unpostedByAccount[a.id] ?: Paise.Zero)),
             isLiability = a.type == AccountType.Liability,
