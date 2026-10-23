@@ -10,7 +10,9 @@ import androidx.compose.ui.test.performClick
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.moneymatters.app.core.close.CloseRepository
 import com.moneymatters.app.core.invest.CapitalGainsRules
+import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.core.invest.InvestRepository
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
@@ -50,6 +52,14 @@ class MoneyMattersAppNavigationTest {
 
     private fun quickAddPrefs() = QuickAddPrefs(ApplicationProvider.getApplicationContext())
 
+    private fun closeModel(): CloseViewModel {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, MoneyMattersDatabase::class.java).allowMainThreadQueries().build()
+        val ledger = LedgerRepository(db)
+        val rules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24)))
+        return CloseViewModel(ledger, InvestRepository(db, ledger, rules), CloseRepository(db, ledger), monthStartDay = { 1 })
+    }
+
     private fun investModel(): InvestViewModel {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, MoneyMattersDatabase::class.java).allowMainThreadQueries().build()
@@ -70,7 +80,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `View all on Home switches to the Accounts tab`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
         }
         compose.onAllNodesWithText("View all")[0].performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
@@ -78,7 +88,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `tapping an account opens its ledger and back returns to the tab bar`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
         }
         compose.onAllNodesWithText("View all")[0].performClick()
         compose.onNodeWithText("HDFC Bank").performClick()
@@ -93,7 +103,7 @@ class MoneyMattersAppNavigationTest {
 
     @Test fun `tapping Quick add opens the entry screen and back returns to the tab bar`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
         }
         compose.onNodeWithContentDescription("Quick add").performClick()
         compose.onAllNodesWithText("Quick add")[0].assertIsDisplayed()
@@ -107,7 +117,7 @@ class MoneyMattersAppNavigationTest {
     @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
     @Test fun `the Invest tab opens the portfolio and shows its empty state`() {
         compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel()) }
+            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
         }
         compose.onNodeWithText("Invest").performClick()
         compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasText("No stocks yet"), 5_000)

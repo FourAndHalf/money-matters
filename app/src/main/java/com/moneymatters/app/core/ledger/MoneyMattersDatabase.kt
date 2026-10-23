@@ -68,8 +68,9 @@ class CorporateActionsV4 : AutoMigrationSpec
         AccountEntity::class, TransactionEntity::class, PostingEntity::class, AuditLogEntity::class,
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
+        ClosedPeriodEntity::class,
     ],
-    version = 8,
+    version = 9,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -85,6 +86,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 6, to = 7),
         // v8: the price download log.
         AutoMigration(from = 7, to = 8),
+        // v9: month-end closes and their hash chain.
+        AutoMigration(from = 8, to = 9),
     ],
 )
 @TypeConverters(LedgerConverters::class)

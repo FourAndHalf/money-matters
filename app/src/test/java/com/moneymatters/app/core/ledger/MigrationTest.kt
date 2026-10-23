@@ -64,7 +64,7 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(8, db.openHelper.readableDatabase.version) // 1 → 2 → … → 8 in one open
+            assertEquals(9, db.openHelper.readableDatabase.version) // 1 → 2 → … → 9 in one open
         }
         db.close()
     }
@@ -85,7 +85,7 @@ class MigrationTest {
             assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
             assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
             assertNull(db.investDao().holdingForAccount("bank"))
-            assertEquals(8, db.openHelper.readableDatabase.version)
+            assertEquals(9, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -104,7 +104,7 @@ class MigrationTest {
             assertEquals(180_000L, action.amountPaise)
             assertNull(action.ratioMicro)
             assertNull(action.transactionId)
-            assertEquals(8, db.openHelper.readableDatabase.version)
+            assertEquals(9, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -120,7 +120,7 @@ class MigrationTest {
         runBlocking {
             assertEquals("h1", db.investDao().holdingForAccount("a1")!!.id)
             assertEquals(0, db.investDao().getAllPending().size)
-            assertEquals(8, db.openHelper.readableDatabase.version)
+            assertEquals(9, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -138,7 +138,7 @@ class MigrationTest {
             assertEquals(10_000_000L, fd.principalPaise)
             assertNull(fd.closedOn)
             assertNull(fd.openTransactionId)
-            assertEquals(8, db.openHelper.readableDatabase.version)
+            assertEquals(9, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -156,7 +156,7 @@ class MigrationTest {
         runBlocking {
             assertEquals(1_000_000L, db.investDao().getSipPlan("s1")!!.amountPaise)
             assertEquals(0, db.investDao().getAllSipSkips().size)
-            assertEquals(8, db.openHelper.readableDatabase.version)
+            assertEquals(9, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -173,7 +173,23 @@ class MigrationTest {
         runBlocking {
             assertEquals(11_680_000L, db.investDao().getAllPrices().single().price)
             assertEquals(0, db.investDao().getAllFetchLog().size)
-            assertEquals(8, db.openHelper.readableDatabase.version)
+            assertEquals(9, db.openHelper.readableDatabase.version)
+        }
+        db.close()
+    }
+
+    @Test fun `v8 to v9 adds month closes and keeps existing entries`() {
+        createDatabase(8).apply {
+            execSQL("INSERT INTO accounts (id, name, type, parentId, isArchived, kind, inNetWorth) VALUES ('a1', 'Bank', 'Asset', NULL, 0, 'Bank', 1)")
+            execSQL("INSERT INTO transactions (id, date, payee, memo, status) VALUES ('t1', '2026-10-05', 'Lunch', NULL, 'Posted')")
+            close()
+        }
+
+        val db = Room.databaseBuilder(context, MoneyMattersDatabase::class.java, DB).allowMainThreadQueries().build()
+        runBlocking {
+            assertEquals("Lunch", db.ledgerDao().getTransaction("t1")!!.payee)
+            assertEquals(0, db.ledgerDao().getAllClosedPeriods().size)
+            assertEquals(9, db.openHelper.readableDatabase.version)
         }
         db.close()
     }

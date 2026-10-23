@@ -39,7 +39,7 @@ private enum class SettingsSection { Profile, Security, Accounts, Ai, Backup, Au
 
 /** Settings (P21): everything the app's other pages read from or write to, and nothing it doesn't. */
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: Modifier = Modifier, onOpenClose: () -> Unit = {}) {
     var section by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
 
     section?.let {
@@ -124,6 +124,11 @@ fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: 
                     SettingsRow("Backup & restore, export", "Encrypted database file, or a CSV of every posting", divider = false) {
                         section = SettingsSection.Backup
                     }
+                }
+            }
+            item("close") {
+                Module {
+                    SettingsRow("Month-end close", "Reconcile, confirm balances and lock a finished month", divider = false, onClick = onOpenClose)
                 }
             }
             item("audit") {

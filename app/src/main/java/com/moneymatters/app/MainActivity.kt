@@ -23,7 +23,9 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.moneymatters.app.core.invest.CapitalGainsRules
 import com.moneymatters.app.core.invest.HttpPriceFetcher
 import com.moneymatters.app.core.invest.InvestRepository
+import com.moneymatters.app.core.close.CloseRepository
 import com.moneymatters.app.core.invest.AllocationPrefs
+import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.core.invest.PriceSourcePrefs
 import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.PriceWorker
@@ -79,6 +81,11 @@ class MainActivity : ComponentActivity() {
                     allocationPrefs = allocationPrefs,
                 )
             }
+        }
+    }
+    private val closeModel: CloseViewModel by viewModels {
+        viewModelFactory {
+            initializer { CloseViewModel(ledgerRepo, investRepo, CloseRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) }
         }
     }
     private val appLock: AppLock by viewModels {
@@ -159,7 +166,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel) }
                     }
                 }
             }

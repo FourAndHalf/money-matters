@@ -39,6 +39,8 @@ import com.moneymatters.app.feature.invest.ImportScreen
 import com.moneymatters.app.feature.invest.InvestScreen
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.PriceScreen
+import com.moneymatters.app.feature.close.CloseScreen
+import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.feature.invest.GainsScreen
 import com.moneymatters.app.feature.invest.PricesScreen
 import com.moneymatters.app.feature.invest.SipDetailScreen
@@ -74,7 +76,7 @@ private enum class InvestOverlay { Trade, Price, Import, Dividend, Action, Allot
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -89,6 +91,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var openSipId by rememberSaveable { mutableStateOf<String?>(null) }
     var showPrices by rememberSaveable { mutableStateOf(false) }
     var showGains by rememberSaveable { mutableStateOf(false) }
+    var showClose by rememberSaveable { mutableStateOf(false) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
     val c = MoneyTheme.colors
@@ -204,9 +207,26 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 BackHandler { showQuickAdd = false }
                 QuickAddScreen(quickAdd, quickAddPrefs, onClose = { quickAdd.reset(); showQuickAdd = false })
             }
+            showClose -> {
+                BackHandler { showClose = false }
+                val closeState = closeModel.state.collectAsState().value
+                if (closeState != null) {
+                    CloseScreen(
+                        closeState, closeModel.typedName, closeModel.error,
+                        onTypedName = { closeModel.typedName = it },
+                        onBack = { showClose = false },
+                        onConfirm = closeModel::confirm,
+                        onConfirmAll = closeModel::confirmAll,
+                        onReconcile = closeModel::reconcile,
+                        onPostInterest = closeModel::postInterest,
+                        onOpenPrices = { showClose = false; showSettings = false; tab = INVEST_TAB; showPrices = true },
+                        onClose = closeModel::closeMonth,
+                    )
+                }
+            }
             showSettings -> {
                 BackHandler { showSettings = false }
-                SettingsScreen(settings, onClose = { showSettings = false })
+                SettingsScreen(settings, onClose = { showSettings = false }, onOpenClose = { showClose = true })
             }
             else -> {
                 when (tab) {

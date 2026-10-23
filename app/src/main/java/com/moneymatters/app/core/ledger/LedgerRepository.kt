@@ -19,6 +19,7 @@ data class LedgerSnapshot(
     val audit: List<AuditLogEntity>,
     /** Accounts that are stock/fund holdings; their postings must carry units, so Quick Add keeps them out of its pickers. */
     val holdingAccountIds: Set<String> = emptySet(),
+    val closedPeriods: List<ClosedPeriodEntity> = emptyList(),
 )
 
 /** The optional P04 tags on a transaction; none affect balances. */
@@ -57,11 +58,12 @@ class LedgerRepository(
      * a snapshot never holds a transaction without its postings. Fine at personal scale; page it if it ever isn't.
      */
     fun snapshot(): Flow<LedgerSnapshot> =
-        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log", "holdings").map {
+        database.invalidationTracker.createFlow("accounts", "transactions", "postings", "audit_log", "holdings", "closed_periods").map {
             database.withTransaction {
                 LedgerSnapshot(
                     dao.getAllAccounts(), dao.getAllTransactions(), dao.getAllPostings(), dao.getAllAuditLog(),
                     database.investDao().getAllHoldings().map { it.accountId }.toSet(),
+                    dao.getAllClosedPeriods(),
                 )
             }
         }
@@ -123,6 +125,7 @@ class LedgerRepository(
         }
         validateBalanced(postings)
         requireUnitsOnHoldingLegs(postings)
+        requireOpenDate(date)
         val id = newId()
         database.withTransaction {
             dao.insertTransaction(TransactionEntity(id, date.toString(), payee, memo, status, tags.decision, tags.plan, tags.paymentMethod))
@@ -150,6 +153,7 @@ class LedgerRepository(
         }
         validateBalanced(postings)
         requireUnitsOnHoldingLegs(postings)
+        requireOpenDate(date)
         database.withTransaction {
             dao.updateTransaction(
                 existing.copy(
@@ -254,6 +258,12 @@ class LedgerRepository(
         val invest = database.investDao()
         return invest.lotsFromTransaction(transactionId).isNotEmpty() || invest.consumptionCountForSale(transactionId) > 0 ||
             invest.pendingCountForOrder(transactionId) > 0
+    }
+
+    private suspend fun requireOpenDate(date: LocalDate) {
+        if (dao.closedPeriodsCovering(date.toString()) > 0) {
+            throw ClosedPeriodException("That date is in a closed month; fix it with a prior-period adjustment instead")
+        }
     }
 
     private suspend fun requireTransaction(id: String) =
