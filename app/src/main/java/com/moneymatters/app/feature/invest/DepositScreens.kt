@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.invest.Compounding
 import com.moneymatters.app.core.ledger.AccountEntity
+import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
@@ -36,6 +38,7 @@ import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.MoneyText
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
+import com.moneymatters.app.ui.components.ProgressTrack
 import com.moneymatters.app.ui.components.SegmentedControl
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Toggle
@@ -242,6 +245,25 @@ internal fun DepositCloseContent(
                 { if (canSave) onSave() }, style = if (detail.matured) PillStyle.Primary else PillStyle.Destructive, height = 44.dp,
                 modifier = Modifier.fillMaxWidth().alpha(if (canSave) 1f else 0.4f),
             )
+        }
+    }
+}
+
+/** When the fixed deposits mature, a month at a time, each bar sized against the biggest. */
+@Composable
+internal fun MaturityLadderModule(ladder: List<MaturityRung>, modifier: Modifier = Modifier) {
+    val c = MoneyTheme.colors
+    Module(modifier) {
+        ModuleHeader("Maturity ladder", subtitle = "${ladder.sumOf { it.count }} deposits maturing, ${Paise(ladder.sumOf { it.amount.value }).formatInr()} in all")
+        ladder.forEachIndexed { i, rung ->
+            Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.width(74.dp)) {
+                    Text(rung.label, style = MoneyTheme.type.bodyMd, color = if (rung.label == "Matured") c.warning else c.ink)
+                    if (rung.count > 1) Text("${rung.count} deposits", style = MoneyTheme.type.bodySm, color = c.muted)
+                }
+                ProgressTrack(rung.fraction, Modifier.weight(1f).padding(horizontal = 8.dp))
+                Text(rung.amount.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink)
+            }
         }
     }
 }

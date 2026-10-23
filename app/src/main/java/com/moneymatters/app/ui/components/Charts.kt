@@ -17,7 +17,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -47,6 +49,39 @@ fun Sparkline(values: List<Float>, modifier: Modifier = Modifier) {
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
         drawPath(path, color, style = Stroke(1.25.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/**
+ * Price line with a soft fill under it and a dot on the latest value. [reference] draws a dashed line
+ * (average cost, so you can see at a glance whether the price is above or below what you paid).
+ */
+@Composable
+fun PriceChart(values: List<Float>, modifier: Modifier = Modifier, reference: Float? = null) {
+    val c = MoneyTheme.colors
+    Canvas(modifier.fillMaxWidth().height(132.dp)) {
+        if (values.size < 2) return@Canvas
+        val all = if (reference != null) values + reference else values
+        val min = all.min()
+        val span = (all.max() - min).takeIf { it > 0f } ?: 1f
+        val inset = 8.dp.toPx()
+        fun y(v: Float) = size.height - inset - (v - min) / span * (size.height - 2 * inset)
+        fun x(i: Int) = i / (values.size - 1f) * size.width
+        val line = Path().apply { values.forEachIndexed { i, v -> if (i == 0) moveTo(x(i), y(v)) else lineTo(x(i), y(v)) } }
+        val fill = Path().apply {
+            addPath(line)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        drawPath(fill, Brush.verticalGradient(listOf(c.anchor.copy(alpha = 0.16f), c.anchor.copy(alpha = 0f))))
+        if (reference != null) {
+            val ry = y(reference)
+            drawLine(c.champagne, Offset(0f, ry), Offset(size.width, ry), 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())))
+        }
+        drawPath(line, c.anchor, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawCircle(c.surface, 5.dp.toPx(), Offset(x(values.lastIndex), y(values.last())))
+        drawCircle(c.anchor, 3.5.dp.toPx(), Offset(x(values.lastIndex), y(values.last())))
     }
 }
 

@@ -24,7 +24,7 @@ import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.MoneyText
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
-import com.moneymatters.app.ui.components.Sparkline
+import com.moneymatters.app.ui.components.PriceChart
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -60,7 +60,6 @@ fun HoldingDetailScreen(
                     MoneyText(row.marketValue ?: row.cost, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         GainLine(row.gain, row.gainPercent)
-                        if (detail.priceTrend.size >= 2) Sparkline(detail.priceTrend, Modifier.padding(start = 12.dp))
                     }
                     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Pill("Buy more", onBuy, style = PillStyle.Primary)
@@ -73,6 +72,7 @@ fun HoldingDetailScreen(
                     }
                 }
             }
+            detail.chart?.let { chart -> item("chart") { PriceChartModule(chart) } }
             item("facts") {
                 Module {
                     KeyValueRow("Units held", row.unitsLabel)
@@ -151,6 +151,22 @@ fun HoldingDetailScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PriceChartModule(chart: PriceChartData) {
+    val c = MoneyTheme.colors
+    Module {
+        ModuleHeader("Price", subtitle = "${chart.values.size} prices, ${chart.firstLabel} to ${chart.lastLabel}")
+        PriceChart(chart.values, reference = chart.averageCost)
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Low ${chart.lowLabel}", style = MoneyTheme.type.bodySm, color = c.muted)
+            Text("High ${chart.highLabel}", style = MoneyTheme.type.bodySm, color = c.muted)
+        }
+        chart.averageCostLabel?.let {
+            Text("- - Your average cost $it", style = MoneyTheme.type.bodySm, color = c.champagne, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
