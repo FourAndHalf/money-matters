@@ -3,15 +3,12 @@ package com.moneymatters.app.feature.invest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.moneymatters.app.core.invest.RowError
-import com.moneymatters.app.core.invest.SymbolPreview
-import com.moneymatters.app.core.invest.TradeParse
-import com.moneymatters.app.core.invest.TradePreview
 import com.moneymatters.app.core.invest.TradeSide
 import com.moneymatters.app.core.money.Units
 import com.moneymatters.app.core.money.rupees
@@ -55,7 +52,7 @@ class InvestScreensTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun `portfolio shows value, return, each stock with its price status and a warning for unpriced ones`() {
-        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = {}) } }
         compose.onNodeWithText("Portfolio value").assertIsDisplayed()
         compose.onNodeWithText("Infosys (INFY)").assertIsDisplayed()
         compose.onNodeWithText("Wipro (WIPRO)").assertIsDisplayed()
@@ -66,23 +63,22 @@ class InvestScreensTest {
     }
 
     @Test fun `portfolio renders in dark`() {
-        compose.setContent { MoneyMattersTheme(darkTheme = true) { InvestScreen(state, onOpenHolding = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme(darkTheme = true) { InvestScreen(state, onOpenHolding = {}) } }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_portfolio_dark.png")
     }
 
-    @Test fun `an empty portfolio invites an import`() {
+    @Test fun `an empty portfolio points at the plus button`() {
         val empty = InvestState(emptyList(), 0.rupees, 0.rupees, 0.rupees, null, null, 0, emptyMap())
-        var imported = false
-        compose.setContent { MoneyMattersTheme { InvestScreen(empty, onOpenHolding = {}, onImport = { imported = true }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(empty, onOpenHolding = {}) } }
         compose.onNodeWithText("No stocks yet").assertIsDisplayed()
-        compose.onNodeWithText("Import").performClick()
-        assertTrue(imported)
+        compose.onNodeWithText("Tap + to add a stock, a mutual fund or a fixed deposit.").assertIsDisplayed()
+        compose.onNodeWithText("Import").assertDoesNotExist()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_empty.png")
     }
 
     @Test fun `tapping a stock opens it`() {
         var opened: String? = null
-        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = { opened = it }, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state, onOpenHolding = { opened = it }) } }
         compose.onNodeWithText("Tata Consultancy (TCS)").performClick()
         assertEquals("h2", opened)
     }
@@ -136,24 +132,6 @@ class InvestScreensTest {
         compose.onNodeWithText("That's more than you held on that date.").assertIsDisplayed()
     }
 
-    @Test fun `the import screen lists what will be held and what must be fixed`() {
-        val parse = TradeParse(emptyList(), listOf(RowError(4, "Type must be buy or sell")))
-        val preview = TradePreview(
-            listOf(SymbolPreview("TCS", "Tata Consultancy", 3, Units.whole(6), 24_000.rupees)),
-            listOf(RowError(9, "Sells 11 INFY on 2026-03-01 but only 10 were held")),
-        )
-        compose.setContent { MoneyMattersTheme { ImportContent(parse, preview, canImport = false, importedCount = null, isSaving = false, error = null, onChoose = {}, onImport = {}, onClose = {}) } }
-        compose.onNodeWithText("Tata Consultancy").assertIsDisplayed()
-        compose.onNodeWithText("Line 4: Type must be buy or sell").assertIsDisplayed()
-        compose.onNodeWithText("Line 9: Sells 11 INFY on 2026-03-01 but only 10 were held").assertIsDisplayed()
-        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_import.png")
-    }
-
-    @Test fun `a finished import says how many trades went in`() {
-        compose.setContent { MoneyMattersTheme { ImportContent(null, null, false, importedCount = 42, isSaving = false, error = null, onChoose = {}, onImport = {}, onClose = {}) } }
-        compose.onNodeWithText("Imported 42 trades").assertIsDisplayed()
-    }
-
     @Test fun `the price form renders`() {
         compose.setContent { MoneyMattersTheme { PriceContent("Infosys (INFY)", PriceForm("h1", LocalDate.of(2026, 10, 20), "1512.35"), null, {}, {}, {}) } }
         compose.onNodeWithText("Update price").assertIsDisplayed()
@@ -195,7 +173,7 @@ class InvestScreensTest {
         var allotted: String? = null
         var cancelled: String? = null
         compose.setContent {
-            MoneyMattersTheme { InvestScreen(withFund, onOpenHolding = {}, onImport = {}, onAllot = { allotted = it }, onCancelOrder = { cancelled = it }) }
+            MoneyMattersTheme { InvestScreen(withFund, onOpenHolding = {}, onAllot = { allotted = it }, onCancelOrder = { cancelled = it }) }
         }
         compose.onNodeWithText("Stocks").assertIsDisplayed()
         compose.onNodeWithText("Mutual funds").assertIsDisplayed()
@@ -243,7 +221,7 @@ class InvestScreensTest {
     @Test fun `the portfolio lists fixed deposits and opens one`() {
         val withDeposit = state.copy(deposits = listOf(depositRow))
         var opened: String? = null
-        compose.setContent { MoneyMattersTheme { InvestScreen(withDeposit, onOpenHolding = {}, onImport = {}, onOpenDeposit = { opened = it }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(withDeposit, onOpenHolding = {}, onOpenDeposit = { opened = it }) } }
         compose.onNodeWithText("Fixed deposits").assertIsDisplayed()
         compose.onNodeWithText("Matures in 21 days").assertIsDisplayed()
         compose.onNodeWithText("HDFC FD 1").performClick()
@@ -252,7 +230,7 @@ class InvestScreensTest {
 
     @Test fun `a portfolio with only a deposit still shows its summary`() {
         val onlyDeposit = InvestState(emptyList(), 1_00_000.rupees, 1_03_500.rupees, 3_500.rupees, 0.035, 0.07, 0, emptyMap(), deposits = listOf(depositRow))
-        compose.setContent { MoneyMattersTheme { InvestScreen(onlyDeposit, onOpenHolding = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(onlyDeposit, onOpenHolding = {}) } }
         compose.onNodeWithText("Portfolio value").assertIsDisplayed()
     }
 
@@ -315,7 +293,7 @@ class InvestScreensTest {
         var opened: String? = null
         var added = false
         val withSip = state.copy(sips = listOf(sipRow, sipRow.copy(planId = "s2", fundName = "Index Fund", missedCount = 0, dueCount = 0)), hasFunds = true)
-        compose.setContent { MoneyMattersTheme { InvestScreen(withSip, onOpenHolding = {}, onImport = {}, onNewSip = { added = true }, onOpenSip = { opened = it }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(withSip, onOpenHolding = {}, onNewSip = { added = true }, onOpenSip = { opened = it }) } }
         compose.onNodeWithText("SIPs").assertIsDisplayed()
         compose.onNodeWithText("1 missed").assertIsDisplayed()
         compose.onNodeWithText("On track").assertIsDisplayed()
@@ -326,7 +304,7 @@ class InvestScreensTest {
     }
 
     @Test fun `a portfolio with a fund but no SIP invites starting one`() {
-        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(hasFunds = true), onOpenHolding = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(hasFunds = true), onOpenHolding = {}) } }
         compose.onNodeWithText("Monthly investments into a fund").assertIsDisplayed()
     }
 
@@ -447,7 +425,7 @@ class InvestScreensTest {
     @Test fun `the portfolio links to prices and counts what needs review`() {
         var opened = false
         val withPrices = state.copy(prices = pricesState)
-        compose.setContent { MoneyMattersTheme { InvestScreen(withPrices, onOpenHolding = {}, onImport = {}, onOpenPrices = { opened = true }) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(withPrices, onOpenHolding = {}, onOpenPrices = { opened = true }) } }
         compose.onNodeWithText("2 to review").assertIsDisplayed()
         compose.onNodeWithText("Prices").performClick()
         assertTrue(opened)
@@ -463,7 +441,7 @@ class InvestScreensTest {
         var nudged = 0
         compose.setContent {
             MoneyMattersTheme {
-                InvestScreen(state.copy(analytics = analytics), onOpenHolding = {}, onImport = {}, onNudgeTarget = { nudged += it })
+                InvestScreen(state.copy(analytics = analytics), onOpenHolding = {}, onNudgeTarget = { nudged += it })
             }
         }
         compose.onNodeWithText("Equity target 60%").assertIsDisplayed()
@@ -494,7 +472,7 @@ class InvestScreensTest {
 
     @Test fun `the portfolio shows the maturity ladder above the deposits`() {
         val ladder = listOf(MaturityRung("Matured", 1, 50_000.rupees, 0.5f), MaturityRung("Mar 2027", 2, 1_00_000.rupees, 1f))
-        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(deposits = listOf(depositRow), ladder = ladder), onOpenHolding = {}, onImport = {}) } }
+        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(deposits = listOf(depositRow), ladder = ladder), onOpenHolding = {}) } }
         compose.onNodeWithText("Maturity ladder").assertIsDisplayed()
         compose.onNodeWithText("3 deposits maturing, ₹1,50,000 in all").assertIsDisplayed()
         compose.onNodeWithText("Mar 2027").assertIsDisplayed()
@@ -522,5 +500,124 @@ class InvestScreensTest {
         compose.onNodeWithContentDescription("Previous month").performClick()
         compose.onNodeWithText("September 2026").assertIsDisplayed()
         compose.onNodeWithContentDescription("5, done").assertIsDisplayed()
+    }
+
+    @Test fun `the holding page offers to edit or delete each trade and the whole holding, asking first`() {
+        var editedTrade: String? = null
+        var deletedTrade: String? = null
+        var deletedHolding = false
+        var edited = false
+        val withTrades = detail.copy(transactions = listOf(HoldingTxn("t2", "1 Jun 2026", true, "2.5", 10_000.rupees, canDelete = true, canEdit = true)))
+        compose.setContent {
+            MoneyMattersTheme {
+                HoldingDetailScreen(
+                    withTrades, onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {},
+                    onEdit = { edited = true }, onDelete = { deletedHolding = true }, onEditTrade = { editedTrade = it }, onDeleteTrade = { deletedTrade = it },
+                )
+            }
+        }
+        compose.onNodeWithText("Edit details").performClick()
+        assertTrue(edited)
+        compose.onNodeWithText("Edit").performClick()
+        assertEquals("t2", editedTrade)
+        // Deleting a trade asks first; cancelling does nothing.
+        compose.onAllNodesWithText("Delete")[0].performClick()
+        compose.onNodeWithText("Delete this trade?").assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals(null, deletedTrade)
+        compose.onAllNodesWithText("Delete")[0].performClick()
+        compose.onAllNodesWithText("Delete").onLast().performClick()
+        assertEquals("t2", deletedTrade)
+        compose.onNodeWithText("Delete stock").performClick()
+        compose.onNodeWithText("Delete Infosys (INFY)?").assertIsDisplayed()
+        compose.onAllNodesWithText("Delete").onLast().performClick()
+        assertTrue(deletedHolding)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_holding_manage.png")
+    }
+
+    @Test fun `a trade that can't be edited or deleted shows no buttons, and a refusal is shown on the page`() {
+        compose.setContent { MoneyMattersTheme { HoldingDetailScreen(detail, onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {}, error = "\"Sell INFY\" on 2026-01-01 is reconciled, so it can't be deleted; reverse it instead") } }
+        compose.onNodeWithText("\"Sell INFY\" on 2026-01-01 is reconciled, so it can't be deleted; reverse it instead").assertIsDisplayed()
+        compose.onNodeWithText("Edit").assertDoesNotExist()
+    }
+
+    @Test fun `a bond shows its coupon and maturity, says coupon instead of dividend, and has no split`() {
+        val bond = detail.copy(row = infy.copy(name = "REC 7.5% 2030", instrument = com.moneymatters.app.core.invest.Instrument.Bond), bond = BondFacts("7.50%", "15 Mar 2030"))
+        compose.setContent { MoneyMattersTheme { HoldingDetailScreen(bond, onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {}) } }
+        compose.onNodeWithText("7.50%").assertIsDisplayed()
+        compose.onNodeWithText("15 Mar 2030").assertIsDisplayed()
+        compose.onAllNodesWithText("Coupon")[0].assertExists()
+        compose.onNodeWithText("Dividend").assertDoesNotExist()
+        compose.onNodeWithText("Split / bonus").assertDoesNotExist()
+        compose.onNodeWithText("Delete bond").assertIsDisplayed()
+    }
+
+    @Test fun `the bond form asks for a name, coupon and maturity`() {
+        val form = TradeForm.empty(TradeSide.Buy, LocalDate.of(2026, 10, 20), instrument = com.moneymatters.app.core.invest.Instrument.Bond)
+        compose.setContent { MoneyMattersTheme { TradeContent(form, emptyList(), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("Bond name").assertIsDisplayed()
+        compose.onNodeWithText("Coupon (% a year, optional)").assertIsDisplayed()
+        compose.onNodeWithText("Maturity date (optional)").assertIsDisplayed()
+        compose.onNodeWithText("Buy bond").assertIsDisplayed()
+    }
+
+    @Test fun `editing a trade says so and keeps the identity fields out of the way`() {
+        val form = TradeForm(TradeSide.Buy, LocalDate.of(2026, 10, 20), holdingId = "h1", unitsText = "10", amountText = "1000", accountId = "a", editingTransactionId = "t1")
+        compose.setContent { MoneyMattersTheme { TradeContent(form, emptyList(), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("Edit trade").assertIsDisplayed()
+        compose.onNodeWithText("Save changes").assertIsDisplayed()
+        compose.onNodeWithText("Symbol").assertDoesNotExist()
+    }
+
+    @Test fun `the holding edit page shows the fields that fit what it is`() {
+        compose.setContent { MoneyMattersTheme { HoldingEditContent(HoldingEditForm("h1", com.moneymatters.app.core.invest.Instrument.Stock, "Infosys", "INFY"), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("Symbol").assertIsDisplayed()
+        compose.onNodeWithText("Type").assertDoesNotExist()
+    }
+
+    @Test fun `the holding edit page for a fund offers its type and exit load, and for a bond its coupon`() {
+        compose.setContent { MoneyMattersTheme { HoldingEditContent(HoldingEditForm("h1", com.moneymatters.app.core.invest.Instrument.MutualFund, "Flexi Cap"), null, false, {}, {}, {}) } }
+        compose.onNodeWithText("Type").assertIsDisplayed()
+        compose.onNodeWithText("Exit load window in days (optional)").assertIsDisplayed()
+    }
+
+    @Test fun `a deposit page offers edit and delete, and a closed one only delete`() {
+        var deleted = false
+        compose.setContent { MoneyMattersTheme { DepositDetailScreen(depositDetail, onBack = {}, onPostInterest = {}, onClose = {}, onDelete = { deleted = true }) } }
+        compose.onNodeWithText("Edit deposit").assertIsDisplayed()
+        compose.onNodeWithText("Delete deposit").performClick()
+        compose.onNodeWithText("Delete HDFC FD 1?").assertIsDisplayed()
+        compose.onAllNodesWithText("Delete").onLast().performClick()
+        assertTrue(deleted)
+    }
+
+    @Test fun `a closed deposit can't be edited`() {
+        compose.setContent { MoneyMattersTheme { DepositDetailScreen(depositDetail.copy(isClosed = true, closedLabel = "1 Jan 2027", payout = 1_07_000.rupees), onBack = {}, onPostInterest = {}, onClose = {}) } }
+        compose.onNodeWithText("Edit deposit").assertDoesNotExist()
+        compose.onNodeWithText("Delete deposit").assertIsDisplayed()
+    }
+
+    @Test fun `a SIP page offers edit and delete`() {
+        var deleted = false
+        var edited = false
+        compose.setContent { MoneyMattersTheme { SipDetailScreen(sipDetail, onBack = {}, onPay = {}, onSkip = {}, onStop = {}, onEdit = { edited = true }, onDelete = { deleted = true }) } }
+        compose.onNodeWithText("Edit SIP").performClick()
+        assertTrue(edited)
+        compose.onNodeWithText("Delete SIP").performClick()
+        compose.onNodeWithText("Delete this SIP?").assertIsDisplayed()
+        compose.onAllNodesWithText("Delete").onLast().performClick()
+        assertTrue(deleted)
+    }
+
+    @Test fun `a date field shows the date and opens a calendar to change it`() {
+        var picked: LocalDate? = null
+        compose.setContent { MoneyMattersTheme { com.moneymatters.app.ui.components.DateField("Date", LocalDate.of(2026, 10, 20), { picked = it }) } }
+        compose.onNodeWithText("20 Oct 2026").assertIsDisplayed()
+        compose.onNodeWithText("20 Oct 2026").performClick()
+        compose.onNodeWithText("OK").assertExists()
+        compose.onNodeWithText("Cancel").assertExists()
+        compose.onNodeWithText("OK").performClick()
+        // Confirming without moving keeps the same day, whatever the time zone.
+        assertEquals(LocalDate.of(2026, 10, 20), picked)
     }
 }

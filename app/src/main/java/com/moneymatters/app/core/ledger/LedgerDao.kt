@@ -31,6 +31,15 @@ interface LedgerDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC")
     fun transactions(): Flow<List<TransactionEntity>>
 
+    @Query("DELETE FROM transactions WHERE id = :id")
+    suspend fun deleteTransaction(id: String)
+
+    @Query("DELETE FROM accounts WHERE id = :id")
+    suspend fun deleteAccount(id: String)
+
+    @Query("SELECT DISTINCT transactionId FROM postings WHERE accountId = :accountId")
+    suspend fun transactionIdsForAccount(accountId: String): List<String>
+
     @Insert suspend fun insertPostings(postings: List<PostingEntity>)
 
     @Query("DELETE FROM postings WHERE transactionId = :transactionId")

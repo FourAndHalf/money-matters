@@ -2,6 +2,7 @@ package com.moneymatters.app.core.ledger
 
 import androidx.room.withTransaction
 import com.moneymatters.app.core.money.Paise
+import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.core.money.UnitPrice
 import com.moneymatters.app.core.money.Units
 import java.time.LocalDate
@@ -100,6 +101,56 @@ class LedgerRepository(
     suspend fun unarchiveAccount(id: String) {
         val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
         dao.updateAccount(account.copy(isArchived = false))
+    }
+
+    /** Gives an account a new name; names stay unique. */
+    suspend fun renameAccount(id: String, name: String) {
+        val trimmed = name.trim()
+        require(trimmed.isNotEmpty()) { "Give it a name" }
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        if (account.name == trimmed) return
+        require(dao.findAccountByName(trimmed) == null) { "There is already an account called $trimmed" }
+        dao.updateAccount(account.copy(name = trimmed))
+    }
+
+    /** Every transaction with a posting on [accountId], drafts included. */
+    suspend fun transactionIdsFor(accountId: String): List<String> = dao.transactionIdsForAccount(accountId)
+
+    suspend fun accountIdsIn(transactionId: String): Set<String> = dao.getPostingsForTransaction(transactionId).map { it.accountId }.toSet()
+
+    suspend fun transaction(id: String): TransactionEntity? = dao.getTransaction(id)
+
+    /**
+     * Removes an account that has nothing posted to it any more, e.g. a deposit or holding whose entries were just deleted.
+     * An account with postings is refused: its history has to stay.
+     */
+    suspend fun deleteEmptyAccount(id: String) {
+        check(dao.transactionIdsForAccount(id).isEmpty()) { "That account still has entries" }
+        dao.deleteAccount(id)
+    }
+
+    /**
+     * Permanently removes Draft or Posted entries, with their postings, so they disappear from every list, journal and balance.
+     * Reconciled and closed-month entries are immutable and are refused (reverse those instead), and one failure refuses them all.
+     * Each deletion leaves a line in the audit log: the log itself is never trimmed.
+     */
+    suspend fun deleteEntries(ids: Collection<String>, reason: String) = database.withTransaction {
+        val entries = ids.distinct().map { requireTransaction(it) }
+        for (t in entries) {
+            if (t.status != TransactionStatus.Draft && t.status != TransactionStatus.Posted) {
+                throw IllegalLifecycleTransitionException(
+                    "\"${t.payee}\" on ${t.date} is ${t.status.name.lowercase()}, so it can't be deleted; reverse it instead",
+                )
+            }
+            requireOpenDate(LocalDate.parse(t.date))
+        }
+        for (t in entries) {
+            val legs = dao.getPostingsForTransaction(t.id)
+            val amount = Paise(legs.sumOf { it.debitPaise ?: 0 })
+            dao.deletePostingsForTransaction(t.id)
+            dao.deleteTransaction(t.id)
+            audit(t.id, "Deleted", "Deleted ${t.payee} (${t.date}, ${amount.formatInr(showPaise = true)}): $reason", before = t.payee)
+        }
     }
 
     /** Looks an account up by name first; creates it only if missing. Used for shared accounts like `Equity:Opening`. */

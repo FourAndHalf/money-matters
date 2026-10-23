@@ -38,7 +38,6 @@ import com.moneymatters.app.ui.theme.MoneyTheme
 fun InvestScreen(
     state: InvestState,
     onOpenHolding: (holdingId: String) -> Unit,
-    onImport: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     onAllot: (pendingId: String) -> Unit = {},
@@ -67,15 +66,12 @@ fun InvestScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Invest", style = MoneyTheme.type.headlineXlMobile, color = MoneyTheme.colors.ink)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pill("Import", onImport)
-                }
             }
         }
         if (state.holdings.isEmpty() && state.pending.isEmpty() && state.deposits.isEmpty()) {
             item("empty") {
                 Module(Modifier.padding(horizontal = margin)) {
-                    ModuleHeader("No stocks yet", subtitle = "Buy a stock or fund, add a fixed deposit, or import your trade history from a CSV to rebuild your holdings exactly.")
+                    ModuleHeader("No stocks yet", subtitle = "Tap + to add a stock, a mutual fund or a fixed deposit.")
                 }
             }
         } else {
@@ -176,7 +172,7 @@ fun InvestScreen(
                     }
                 }
             }
-            listOf(Instrument.Stock to "Stocks", Instrument.MutualFund to "Mutual funds").forEach { (instrument, title) ->
+            listOf(Instrument.Stock to "Stocks", Instrument.MutualFund to "Mutual funds", Instrument.Bond to "Bonds").forEach { (instrument, title) ->
                 val rows = state.holdings.filter { it.instrument == instrument }
                 if (rows.isNotEmpty()) {
                     item(title) {

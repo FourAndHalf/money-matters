@@ -33,8 +33,8 @@ import com.moneymatters.app.ui.theme.MoneyTheme
 fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String,
     modifier: Modifier = Modifier,
+    placeholder: String? = null,
 ) {
     val c = MoneyTheme.colors
     val textStyle: TextStyle = MoneyTheme.type.bodyLg.copy(color = c.ink)
@@ -51,7 +51,7 @@ fun SearchField(
     ) {
         Icon(MoneyIcons.Search, null, tint = c.muted, modifier = Modifier.size(18.dp))
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) {
+            if (value.isEmpty() && placeholder != null) {
                 Text(placeholder, style = textStyle, color = c.muted)
             }
             BasicTextField(
@@ -60,7 +60,7 @@ fun SearchField(
                 textStyle = textStyle,
                 cursorBrush = SolidColor(c.anchor),
                 singleLine = true,
-                modifier = Modifier.testTag("search-field"),
+                modifier = Modifier.fillMaxWidth().testTag("search-field"),
             )
         }
         if (value.isNotEmpty()) {

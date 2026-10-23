@@ -126,37 +126,6 @@ class InvestViewModelTest {
         assertEquals(PriceStatus.Manual, price.status)
     }
 
-    @Test fun `loading a CSV previews it and only a clean file can be imported`() = runBlocking {
-        model.loadCsv("date,symbol,type,units,amount\n2025-01-10,TCS,buy,10,40000\n2026-03-01,TCS,sell,4,18000")
-        idle()
-        assertTrue(model.canImport)
-        assertEquals(Units.whole(6), model.importPreview!!.symbols.single().unitsHeld)
-
-        model.loadCsv("date,symbol,type,units,amount\n2025-01-10,TCS,buy,10,40000\n2026-03-01,TCS,sell,40,18000")
-        idle()
-        assertFalse(model.canImport)
-        assertEquals(1, model.importPreview!!.errors.size)
-
-        model.loadCsv("date,symbol,type,units,amount\nbad,TCS,buy,10,40000")
-        idle()
-        assertFalse(model.canImport)
-        assertEquals(1, model.importParse!!.errors.size)
-    }
-
-    @Test fun `confirming an import rebuilds the holdings against opening equity and leaves the bank alone`() = runBlocking {
-        model.loadCsv("date,symbol,type,units,amount,name\n2025-01-10,TCS,buy,10,40000,Tata Consultancy\n2026-03-01,TCS,sell,4,18000,")
-        idle()
-        model.confirmImport()
-        idle()
-        assertEquals(2, model.importDone)
-        assertNull(model.error)
-        val holding = db.investDao().holdingBySymbol("TCS")!!
-        assertEquals(Units.whole(6), invest.unitsHeld(holding.id))
-        assertEquals(0.rupees, ledger.accountBalance(bank))
-        assertNotNull(ledger.accountIdByName("Equity:Opening"))
-        assertNotNull(ledger.accountIdByName("Tata Consultancy (TCS)"))
-    }
-
     @Test fun `settlement accounts leave out holdings, investments and archived accounts`() = runBlocking {
         val cash = ledger.createAccount("Cash", AccountType.Asset)
         val old = ledger.createAccount("Old account", AccountType.Asset)
@@ -392,5 +361,121 @@ class InvestViewModelTest {
         idle()
         assertEquals(PriceStatus.Manual, db.investDao().getPrice(suspicious.id)!!.status)
         assertNull(model.error)
+    }
+
+    @Test fun `a saved trade can be reopened, corrected and saved again`() = runBlocking {
+        fillBuy()
+        model.saveTrade {}
+        idle()
+        val buyId = ledger.snapshot().first().transactions.first { it.payee == "Buy INFY" }.id
+        var ready = false
+        model.startEditTrade(buyId) { ready = true }
+        idle()
+        assertTrue(ready)
+        val form = model.tradeForm
+        assertEquals(buyId, form.editingTransactionId)
+        assertEquals("10", form.unitsText)
+        assertEquals("1000", form.amountText)
+        assertEquals(bank, form.accountId)
+        assertEquals(LocalDate.of(2025, 1, 10), form.date)
+        model.tradeForm = form.copy(unitsText = "8", amountText = "960")
+        var saved = false
+        model.saveTrade { saved = true }
+        idle()
+        assertTrue(saved)
+        assertNull(model.error)
+        val holding = db.investDao().holdingBySymbol("INFY")!!
+        assertEquals(Units.whole(8), invest.unitsHeld(holding.id))
+        assertEquals(1, ledger.snapshot().first().transactions.count { it.payee == "Buy INFY" })
+        assertEquals((-960).rupees, ledger.accountBalance(bank))
+    }
+
+    @Test fun `deleting a holding clears it everywhere, and a refusal is explained and changes nothing`() = runBlocking {
+        fillBuy()
+        model.saveTrade {}
+        idle()
+        val holding = db.investDao().holdingBySymbol("INFY")!!
+        val buy = ledger.snapshot().first().transactions.first { it.payee == "Buy INFY" }
+        ledger.reconcile(buy.id)
+        var done = false
+        model.deleteHolding(holding.id) { done = true }
+        idle()
+        assertFalse(done)
+        assertNotNull(model.manageError)
+        assertNotNull(db.investDao().getHolding(holding.id))
+        assertEquals((-1_000).rupees, ledger.accountBalance(bank))
+
+        // A draft or posted entry goes without a fuss.
+        fillBuy(symbol = "TCS", amount = "2,000")
+        model.saveTrade {}
+        idle()
+        val tcs = db.investDao().holdingBySymbol("TCS")!!
+        model.deleteHolding(tcs.id) { done = true }
+        idle()
+        assertTrue(done)
+        assertNull(model.manageError)
+        assertNull(db.investDao().getHolding(tcs.id))
+        assertEquals((-1_000).rupees, ledger.accountBalance(bank))
+    }
+
+    @Test fun `a bond is saved with its coupon and maturity, and its coupon is booked as interest`() = runBlocking {
+        model.startTrade(TradeSide.Buy, instrument = Instrument.Bond)
+        model.tradeForm = model.tradeForm.copy(name = "REC 7.5% 2030", couponText = "7.5", maturity = LocalDate.of(2030, 3, 15), date = LocalDate.of(2025, 4, 1), unitsText = "10", amountText = "10,000", accountId = bank)
+        assertTrue(model.tradeForm.canSave)
+        model.saveTrade {}
+        idle()
+        val bond = db.investDao().getAllHoldings().single()
+        assertEquals(Instrument.Bond, bond.instrument)
+        assertEquals(750, bond.couponBps)
+        assertEquals("2030-03-15", bond.maturityDate)
+        model.startDividend(bond.id)
+        model.dividendForm = model.dividendForm!!.copy(date = LocalDate.of(2025, 10, 1), netText = "375", accountId = bank)
+        model.saveDividend("") {}
+        idle()
+        assertEquals(com.moneymatters.app.core.invest.CorporateActionKind.Coupon, db.investDao().getAllCorporateActions().single().kind)
+        assertEquals(375.rupees, db.ledgerDao().findAccountByName("Income:Interest")!!.let { Paise(-ledger.accountBalance(it.id).value) })
+        assertFalse(model.tradeForm.copy(couponText = "seven").canSave)
+    }
+
+    @Test fun `a holding's details, a deposit's terms and a SIP's amount can all be reopened and saved`() = runBlocking {
+        fillBuy()
+        model.saveTrade {}
+        idle()
+        val holding = db.investDao().holdingBySymbol("INFY")!!
+        model.startEditHolding(holding.id) {}
+        idle()
+        assertEquals("INFY", model.holdingEditForm!!.symbol)
+        assertEquals("Infosys", model.holdingEditForm!!.name)
+        model.holdingEditForm = model.holdingEditForm!!.copy(name = "Infosys Ltd", isin = "INE009A01021")
+        model.saveHoldingEdit {}
+        idle()
+        assertNull(model.holdingEditForm)
+        assertEquals("Infosys Ltd (INFY)", db.ledgerDao().getAccount(holding.accountId)!!.name)
+        assertEquals("INE009A01021", db.investDao().getHolding(holding.id)!!.isin)
+
+        val acct = invest.openDeposit("SBI FD", 1_00_000.rupees, 700, com.moneymatters.app.core.invest.Compounding.Quarterly, today.minusMonths(1), today.plusMonths(11), bank)
+        model.startEditDeposit(acct) {}
+        idle()
+        assertEquals("7", model.depositForm!!.rateText.removeSuffix(".00"))
+        assertEquals("100000", model.depositForm!!.principalText)
+        model.depositForm = model.depositForm!!.copy(rateText = "7.5", name = "SBI FD 1")
+        model.saveDeposit {}
+        idle()
+        assertEquals(750, db.investDao().getFixedDeposit(acct)!!.rateBps)
+        assertEquals("SBI FD 1", db.ledgerDao().getAccount(acct)!!.name)
+
+        val fund = invest.findOrCreateHolding(Instrument.MutualFund, null, name = "Index Fund", fundClass = com.moneymatters.app.core.invest.FundClass.Equity)
+        val plan = invest.createSipPlan(fund, 5_000.rupees, 5, bank, today.minusMonths(1))
+        model.startEditSip(plan) {}
+        idle()
+        assertEquals("5000", model.sipForm!!.amountText)
+        model.sipForm = model.sipForm!!.copy(amountText = "6,000", dayText = "12")
+        model.saveSip {}
+        idle()
+        assertEquals(6_000_00L, db.investDao().getSipPlan(plan)!!.amountPaise)
+        assertEquals(12, db.investDao().getSipPlan(plan)!!.dayOfMonth)
+        model.deleteSip(plan) {}
+        idle()
+        assertNull(db.investDao().getSipPlan(plan))
     }
 }

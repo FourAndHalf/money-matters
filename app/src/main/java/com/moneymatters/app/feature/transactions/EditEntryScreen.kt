@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.Module
@@ -48,11 +49,7 @@ fun EditEntryScreen(
                 Module {
                     FormField("Payee", form.payee, { onChange(form.copy(payee = it)) })
                     Column(Modifier.padding(top = 10.dp)) {
-                        FormField(
-                            "Date", form.dateText, { onChange(form.copy(dateText = it)) },
-                            placeholder = "yyyy-MM-dd",
-                            error = if (form.date == null) "Use the form yyyy-MM-dd" else null,
-                        )
+                        DateField("Date", form.date, { onChange(form.copy(dateText = it.toString())) })
                     }
                     if (form.amountEditable) {
                         Column(Modifier.padding(top = 10.dp)) {

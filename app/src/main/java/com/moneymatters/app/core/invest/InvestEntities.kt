@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.TransactionEntity
 
-enum class Instrument { Stock, MutualFund }
+enum class Instrument { Stock, MutualFund, Bond }
 
 /** A mutual fund's tax class; [Elss] adds a 3-year lock per instalment. Null for stocks. */
 enum class FundClass {
@@ -24,12 +24,12 @@ enum class FundClass {
 val HoldingEntity.isEquityOriented: Boolean
     get() = instrument == Instrument.Stock || fundClass == FundClass.Equity || fundClass == FundClass.Elss || fundClass == FundClass.EquityHybrid
 
-enum class CorporateActionKind { Split, Bonus, Dividend }
+enum class CorporateActionKind { Split, Bonus, Dividend, Coupon }
 
 /** plan.html's price badges: only [Verified] and a confirmed [Manual] price are allowed at month-end close. */
 enum class PriceStatus { Verified, Manual, Mismatch, Stale, Failed, Suspicious }
 
-/** The instrument details of a stock or fund; its units and cost live on the linked asset account's postings and lots. */
+/** The instrument details of a stock, fund or bond; its units and cost live on the linked asset account's postings and lots. */
 @Entity(
     tableName = "holdings",
     foreignKeys = [ForeignKey(AccountEntity::class, ["id"], ["accountId"])],
@@ -45,6 +45,9 @@ data class HoldingEntity(
     val fundClass: FundClass? = null,
     val exitLoadDays: Int? = null,
     val exitLoadBps: Int? = null,
+    /** Bonds only: the yearly coupon in basis points, and the date the bond is redeemed. */
+    val couponBps: Int? = null,
+    val maturityDate: String? = null,
 )
 
 /** One purchase. Never edited: what a sale uses is recorded in [LotConsumptionEntity], so remaining units are derived. */
