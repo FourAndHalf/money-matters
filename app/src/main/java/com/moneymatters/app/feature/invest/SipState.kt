@@ -3,12 +3,16 @@ package com.moneymatters.app.feature.invest
 import androidx.compose.runtime.Immutable
 import com.moneymatters.app.core.invest.InstalmentState
 import com.moneymatters.app.core.invest.InvestSnapshot
+import com.moneymatters.app.core.invest.SipPlanEntity
 import com.moneymatters.app.core.invest.nextSipDue
+import com.moneymatters.app.core.invest.sipDueDates
 import com.moneymatters.app.core.invest.sipInstalments
 import com.moneymatters.app.core.ledger.LedgerSnapshot
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.feature.dashboard.projectedValue
+import com.moneymatters.app.ui.components.CalendarMark
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
@@ -42,7 +46,47 @@ data class SipDetail(
     /** What the missed instalments would have grown to by the goal date; null with no goal. */
     val missedImpact: Paise?,
     val goalLabel: String?,
+    val calendar: SipCalendar? = null,
 )
+
+/** Instalment dates by state, spanning [first] to [last] month; what the calendar draws. */
+@Immutable
+data class SipCalendar(val first: YearMonth, val last: YearMonth, val today: LocalDate, val marks: Map<LocalDate, CalendarMark>)
+
+/** How far ahead the calendar shows upcoming instalments of a SIP that has no end date. */
+private const val CALENDAR_MONTHS_AHEAD = 12L
+
+private fun CalendarMark.rank() = when (this) {
+    CalendarMark.Missed -> 4
+    CalendarMark.Due -> 3
+    CalendarMark.Upcoming -> 2
+    CalendarMark.Skipped -> 1
+    CalendarMark.Done -> 0
+}
+
+private fun InstalmentState.mark() = when (this) {
+    InstalmentState.Paid -> CalendarMark.Done
+    InstalmentState.Skipped -> CalendarMark.Skipped
+    InstalmentState.Due -> CalendarMark.Due
+    InstalmentState.Missed -> CalendarMark.Missed
+}
+
+/**
+ * Every instalment of [plans], past ones by their state and future ones (to the end date, or a year ahead) as upcoming.
+ * Where plans share a day the one needing the most attention is shown. Null when there are none.
+ */
+fun sipCalendar(plans: List<SipPlanEntity>, invest: InvestSnapshot, today: LocalDate): SipCalendar? {
+    val marks = HashMap<LocalDate, CalendarMark>()
+    for (plan in plans) {
+        val horizon = today.plusMonths(CALENDAR_MONTHS_AHEAD)
+        val through = plan.endDate?.let(LocalDate::parse)?.let { if (it.isBefore(horizon)) it else horizon } ?: horizon
+        val past = sipInstalments(plan, invest.pending, invest.sipSkips, today).associate { it.due to it.state.mark() }
+        val upcoming = sipDueDates(LocalDate.parse(plan.startDate), plan.dayOfMonth, through).filter { it.isAfter(today) }.associateWith { CalendarMark.Upcoming }
+        for ((date, mark) in past + upcoming) marks.merge(date, mark) { a, b -> if (a.rank() >= b.rank()) a else b }
+    }
+    if (marks.isEmpty()) return null
+    return SipCalendar(YearMonth.from(marks.keys.min()), YearMonth.from(marks.keys.max()), today, marks)
+}
 
 internal fun ordinal(day: Int): String {
     val suffix = if (day % 100 in 11..13) "th" else when (day % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
@@ -85,6 +129,7 @@ internal fun buildSips(ledger: LedgerSnapshot, invest: InvestSnapshot, today: Lo
             paidCount = instalments.count { it.state == InstalmentState.Paid },
             missedImpact = impact,
             goalLabel = goal?.date?.format(DayMonthYear),
+            calendar = sipCalendar(listOf(plan), invest, today),
         )
     }
     val rows = details.values.map { it.row }.sortedWith(compareBy<SipRow> { it.ended }.thenBy { it.nextLabel == null }.thenBy { it.fundName })

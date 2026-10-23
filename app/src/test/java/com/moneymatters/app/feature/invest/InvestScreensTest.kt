@@ -3,6 +3,7 @@ package com.moneymatters.app.feature.invest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -479,5 +480,47 @@ class InvestScreensTest {
         compose.onNodeWithText("FY 2025-26").assertIsDisplayed()
         compose.onNodeWithText("1 Mar 2026 · 4 units · Long-term").assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_gains_light.png")
+    }
+
+    @Test fun `holding detail draws the price chart with its range and your average cost`() {
+        val chart = PriceChartData(listOf(1_200f, 1_260f, 1_180f, 1_320f, 1_512f), "1 Sep 2026", "20 Oct 2026", "₹1,180.00", "₹1,512.00", 1_234f, "₹1,234.00")
+        compose.setContent { MoneyMattersTheme { HoldingDetailScreen(detail.copy(chart = chart), onBack = {}, onBuy = {}, onSell = {}, onUpdatePrice = {}) } }
+        compose.onNodeWithText("5 prices, 1 Sep 2026 to 20 Oct 2026").assertIsDisplayed()
+        compose.onNodeWithText("Low ₹1,180.00").assertIsDisplayed()
+        compose.onNodeWithText("High ₹1,512.00").assertIsDisplayed()
+        compose.onNodeWithText("- - Your average cost ₹1,234.00").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_holding_chart.png")
+    }
+
+    @Test fun `the portfolio shows the maturity ladder above the deposits`() {
+        val ladder = listOf(MaturityRung("Matured", 1, 50_000.rupees, 0.5f), MaturityRung("Mar 2027", 2, 1_00_000.rupees, 1f))
+        compose.setContent { MoneyMattersTheme { InvestScreen(state.copy(deposits = listOf(depositRow), ladder = ladder), onOpenHolding = {}, onImport = {}) } }
+        compose.onNodeWithText("Maturity ladder").assertIsDisplayed()
+        compose.onNodeWithText("3 deposits maturing, ₹1,50,000 in all").assertIsDisplayed()
+        compose.onNodeWithText("Mar 2027").assertIsDisplayed()
+        compose.onNodeWithText("2 deposits").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_ladder.png")
+    }
+
+    @Test fun `the SIP calendar opens on this month and pages through the months the SIP has`() {
+        val marks = mapOf(
+            LocalDate.of(2026, 9, 5) to com.moneymatters.app.ui.components.CalendarMark.Done,
+            LocalDate.of(2026, 10, 5) to com.moneymatters.app.ui.components.CalendarMark.Missed,
+            LocalDate.of(2026, 11, 5) to com.moneymatters.app.ui.components.CalendarMark.Upcoming,
+        )
+        val cal = SipCalendar(java.time.YearMonth.of(2026, 9), java.time.YearMonth.of(2026, 11), LocalDate.of(2026, 10, 20), marks)
+        compose.setContent { MoneyMattersTheme { SipDetailScreen(sipDetail.copy(calendar = cal), onBack = {}, onPay = {}, onSkip = {}, onStop = {}) } }
+        compose.onNodeWithText("October 2026").assertIsDisplayed()
+        compose.onNodeWithContentDescription("5, missed").assertIsDisplayed()
+        compose.onNodeWithContentDescription("20, today").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_sip_calendar.png")
+        compose.onNodeWithContentDescription("Next month").performClick()
+        compose.onNodeWithText("November 2026").assertIsDisplayed()
+        compose.onNodeWithContentDescription("5, upcoming").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Next month").assertDoesNotExist() // November is the last month
+        compose.onNodeWithContentDescription("Previous month").performClick()
+        compose.onNodeWithContentDescription("Previous month").performClick()
+        compose.onNodeWithText("September 2026").assertIsDisplayed()
+        compose.onNodeWithContentDescription("5, done").assertIsDisplayed()
     }
 }

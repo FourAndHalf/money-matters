@@ -96,9 +96,23 @@ data class HoldingDetail(
     val dividendTotal: Paise = Paise.Zero,
     /** What selling everything sellable today would realise; null without a price or units. */
     val taxPreview: TaxPreviewRow? = null,
-    /** Price per unit in rupees, oldest first (up to the last 24 prices), for the trend line. */
-    val priceTrend: List<Float> = emptyList(),
+    /** The recorded prices drawn as a line; null until there are at least two. */
+    val chart: PriceChartData? = null,
 )
+
+/** The price line (rupees per unit, oldest first, up to the last [CHART_POINTS] prices) with its range and, if units are held, your average cost. */
+@Immutable
+data class PriceChartData(
+    val values: List<Float>,
+    val firstLabel: String,
+    val lastLabel: String,
+    val lowLabel: String,
+    val highLabel: String,
+    val averageCost: Float? = null,
+    val averageCostLabel: String? = null,
+)
+
+const val CHART_POINTS = 60
 
 /** A fund purchase paid for but not yet allotted units. */
 @Immutable
@@ -128,7 +142,15 @@ data class InvestState(
     /** Realised gains by financial year, newest first (the capital-gains register). */
     val gainsByYear: List<YearGains> = emptyList(),
     val harvest: HarvestRow? = null,
+    /** Open deposits grouped by the month they mature, soonest first; empty with fewer than two. */
+    val ladder: List<MaturityRung> = emptyList(),
+    /** Every SIP's instalments on one calendar; null with no SIPs. */
+    val sipCalendar: SipCalendar? = null,
 )
+
+/** One step of the maturity ladder: what comes due in [label] (a month, or "Matured" for deposits already past their date). [fraction] is relative to the biggest rung. */
+@Immutable
+data class MaturityRung(val label: String, val count: Int, val amount: Paise, val fraction: Float)
 
 /** A fixed deposit in the portfolio list; [value] is principal plus interest earned so far. */
 @Immutable
@@ -238,6 +260,8 @@ fun buildInvest(
         depositDetails = deposits.associate { v -> v.deposit.accountId to depositDetail(v, depositRows.getValue(v.deposit.accountId), today) },
         sips = sipRows,
         sipDetails = sipDetails,
+        sipCalendar = sipCalendar(invest.sipPlans, invest, today),
+        ladder = maturityLadder(openDeposits),
         prices = buildPrices(valued, rowsById, invest, today, zone),
         analytics = slices.let { buildAnalytics(it, drift(it, targetEquityPercent), concentrations(valued), rowsById.mapValues { r -> r.value.name }) },
         gainsByYear = buildYears(register, rowsById.mapValues { it.value.name }, equityYears(register, rules)),
@@ -348,8 +372,20 @@ private fun detailFor(
             CorporateActionKind.Bonus -> ActionRow(date, "Bonus ${formatUnits(Units(it.ratioMicro ?: 0))} per unit", null)
         }
     }
-    val trend = invest.prices.filter { it.holdingId == v.holding.id }.sortedWith(compareBy({ it.date }, { it.id })).takeLast(24).map { it.price / 10_000f }
-    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }), priceTrend = trend)
+    val series = invest.prices.filter { it.holdingId == v.holding.id }.sortedWith(compareBy({ it.date }, { it.id })).takeLast(CHART_POINTS)
+    val chart = series.takeIf { it.size >= 2 }?.let { pts ->
+        val avg = if (v.units.micro > 0) v.cost.value * 10_000 / v.units.micro else null
+        PriceChartData(
+            values = pts.map { it.price / 10_000f },
+            firstLabel = LocalDate.parse(pts.first().date).format(DayMonthYear),
+            lastLabel = LocalDate.parse(pts.last().date).format(DayMonthYear),
+            lowLabel = formatUnitPrice(pts.minOf { it.price }),
+            highLabel = formatUnitPrice(pts.maxOf { it.price }),
+            averageCost = avg?.let { v.cost.value * 10_000f / v.units.micro },
+            averageCostLabel = avg?.let { perUnit(v.cost, v.units.micro) },
+        )
+    }
+    return HoldingDetail(row, lots, txns, prices, xirr, actions, Paise(dividends.sumOf { it.amount.value }), chart = chart)
 }
 
 /** A dividend is money the holding paid out, so it counts as an inflow on its date (gross: net received plus TDS to be claimed). */
@@ -417,6 +453,19 @@ private fun depositDetail(v: DepositValuation, row: DepositRow, today: LocalDate
         closedLabel = d.closedOn?.let { LocalDate.parse(it).format(DayMonthYear) },
         payout = d.payoutPaise?.let(::Paise),
     )
+}
+
+private val RungMonth = java.time.format.DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
+
+/** Open deposits by maturity month at what each will pay out then. One deposit makes no ladder, so fewer than two gives none. */
+internal fun maturityLadder(open: List<DepositValuation>): List<MaturityRung> {
+    if (open.size < 2) return emptyList()
+    val groups = open.groupBy { v -> if (v.daysToMaturity <= 0) null else java.time.YearMonth.from(LocalDate.parse(v.deposit.maturityDate)) }
+    val biggest = groups.values.maxOf { g -> g.sumOf { it.maturityValue.value } }.toFloat()
+    return groups.entries.sortedWith(compareBy(nullsFirst()) { it.key }).map { (month, g) ->
+        val amount = Paise(g.sumOf { it.maturityValue.value })
+        MaturityRung(month?.format(RungMonth) ?: "Matured", g.size, amount, amount.value / biggest)
+    }
 }
 
 /** 725 basis points as `7.25%`. */

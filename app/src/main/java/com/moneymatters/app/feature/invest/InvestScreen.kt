@@ -107,6 +107,7 @@ fun InvestScreen(
                 item("sips") {
                     Module(Modifier.padding(horizontal = margin)) {
                         ModuleHeader("SIPs", subtitle = if (state.sips.isEmpty()) "Monthly investments into a fund" else "${state.sips.size} ${if (state.sips.size == 1) "SIP" else "SIPs"}", action = { Pill("+ New", onNewSip, height = 28.dp) })
+                        state.sipCalendar?.let { SipCalendarBody(it, Modifier.padding(bottom = 12.dp)) }
                         state.sips.forEachIndexed { i, sip ->
                             ListRow(
                                 title = sip.fundName,
@@ -127,6 +128,7 @@ fun InvestScreen(
                     }
                 }
             }
+            if (state.ladder.isNotEmpty()) item("ladder") { MaturityLadderModule(state.ladder, Modifier.padding(horizontal = margin)) }
             if (state.deposits.isNotEmpty()) {
                 item("deposits") {
                     Module(Modifier.padding(horizontal = margin)) {

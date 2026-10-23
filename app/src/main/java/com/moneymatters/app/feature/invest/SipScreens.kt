@@ -30,10 +30,12 @@ import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
+import com.moneymatters.app.ui.components.CalendarLegend
 import com.moneymatters.app.ui.components.KeyValueRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
+import com.moneymatters.app.ui.components.MonthCalendar
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.StatusBadge
@@ -143,6 +145,7 @@ fun SipDetailScreen(
                     KeyValueRow("Next instalment", if (row.ended) "Ended" else row.nextLabel ?: "—", divider = false)
                 }
             }
+            detail.calendar?.let { cal -> item("calendar") { Module { SipCalendarBody(cal) } } }
             if (detail.missedImpact != null && detail.goalLabel != null) {
                 item("impact") {
                     Module {
@@ -188,5 +191,19 @@ fun SipDetailScreen(
                 }
             }
         }
+    }
+}
+
+/** The month grid with its key, opening on the current month (or the nearest one the SIP has). */
+@Composable
+internal fun SipCalendarBody(calendar: SipCalendar, modifier: Modifier = Modifier) {
+    var month by remember(calendar) { mutableStateOf(java.time.YearMonth.from(calendar.today).coerceIn(calendar.first, calendar.last)) }
+    Column(modifier) {
+        MonthCalendar(
+            month = month, marks = calendar.marks, today = calendar.today,
+            canPrev = month > calendar.first, canNext = month < calendar.last,
+            onPrev = { month = month.minusMonths(1) }, onNext = { month = month.plusMonths(1) },
+        )
+        CalendarLegend(calendar.marks.values.toSet(), Modifier.padding(top = 10.dp))
     }
 }
