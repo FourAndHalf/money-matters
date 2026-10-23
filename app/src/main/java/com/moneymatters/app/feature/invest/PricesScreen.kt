@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.invest.PriceSources
 import com.moneymatters.app.core.invest.PriceStatus
+import com.moneymatters.app.ui.components.BarSegment
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.ListRow
@@ -29,6 +30,7 @@ import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
+import com.moneymatters.app.ui.components.SegmentBar
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -65,6 +67,29 @@ fun PricesScreen(
             contentPadding = PaddingValues(start = margin, top = MoneyTheme.spacing.sm, end = margin, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
+            if (state.rows.isNotEmpty()) {
+                item("health") {
+                    val c = MoneyTheme.colors
+                    val total = state.rows.size.toFloat()
+                    Module(shape = MoneyTheme.shapes.xl) {
+                        Text("Price health", style = MoneyTheme.type.bodySm, color = c.muted)
+                        Text("${state.currentCount} of ${state.rows.size} current", style = MoneyTheme.type.headlineMd, color = c.ink, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                        SegmentBar(
+                            listOf(
+                                BarSegment(state.currentCount / total, c.positive),
+                                BarSegment(state.reviewCount / total, c.warning),
+                                BarSegment(state.missingCount / total, c.negative),
+                            ),
+                            height = 12.dp, gap = 2.dp,
+                        )
+                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text("● ${state.currentCount} current", style = MoneyTheme.type.bodySm, color = c.positive)
+                            if (state.reviewCount > 0) Text("● ${state.reviewCount} to review", style = MoneyTheme.type.bodySm, color = c.warning)
+                            if (state.missingCount > 0) Text("● ${state.missingCount} no price", style = MoneyTheme.type.bodySm, color = c.negative)
+                        }
+                    }
+                }
+            }
             item("sources") {
                 Module {
                     ModuleHeader("Sources", subtitle = "Downloaded weekly, and whenever you refresh")

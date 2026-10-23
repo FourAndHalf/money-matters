@@ -46,6 +46,11 @@ data class PricesState(
     val log: List<LogRow> = emptyList(),
 ) {
     val attentionCount: Int get() = rows.count { it.needsAttention }
+
+    /** Holdings with a price that is verified or confirmed, with a price that needs a look, and with none at all. */
+    val currentCount: Int get() = rows.count { !it.needsAttention }
+    val missingCount: Int get() = rows.count { it.status == null }
+    val reviewCount: Int get() = attentionCount - missingCount
 }
 
 internal fun buildPrices(valued: List<HoldingValuation>, rowsById: Map<String, HoldingRow>, invest: InvestSnapshot, today: LocalDate, zone: ZoneId): PricesState {

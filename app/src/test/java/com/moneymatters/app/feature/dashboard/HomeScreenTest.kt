@@ -53,7 +53,8 @@ class HomeScreenTest {
 
     @Test fun `rows open their pages`() {
         show(SampleBooks.state.home)
-        compose.onNodeWithText("HDFC Bank").performClick()
+        // The stack opens with the largest account in front; its panel carries the way in.
+        compose.onNodeWithText("Open ledger").performClick()
         assertEquals("hdfc-bank", opened)
         compose.onNodeWithText("1 draft waiting").performClick()
         assertEquals("transactions", opened)

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +24,7 @@ import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.MoneyText
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
+import com.moneymatters.app.ui.components.Sparkline
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -56,7 +58,10 @@ fun HoldingDetailScreen(
                 Module(shape = MoneyTheme.shapes.xl) {
                     Text("Current value", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted)
                     MoneyText(row.marketValue ?: row.cost, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
-                    GainLine(row.gain, row.gainPercent)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        GainLine(row.gain, row.gainPercent)
+                        if (detail.priceTrend.size >= 2) Sparkline(detail.priceTrend, Modifier.padding(start = 12.dp))
+                    }
                     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Pill("Buy more", onBuy, style = PillStyle.Primary)
                         if (row.hasUnits) Pill("Sell", onSell)
