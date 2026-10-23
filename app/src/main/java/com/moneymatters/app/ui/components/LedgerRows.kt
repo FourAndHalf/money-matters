@@ -78,7 +78,7 @@ fun TransactionRow(
         leading = { GlyphChip(text = chip) },
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
-                Text(amount.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, textAlign = TextAlign.End)
+                Text(amount.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, textAlign = TextAlign.End, softWrap = false)
                 if (badge != null) Column(Modifier.padding(top = 4.dp)) { badge() }
             }
         },
@@ -102,12 +102,29 @@ fun NetWorthCard(netWorth: Paise, assets: Paise, liabilities: Paise, modifier: M
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("Assets", style = MoneyTheme.type.bodySm, color = c.muted)
-                Text(assets.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink)
+                Text(assets.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink, softWrap = false)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("Liabilities", style = MoneyTheme.type.bodySm, color = c.muted)
-                Text(liabilities.formatInr(), style = MoneyTheme.type.metricTable, color = c.negative, textAlign = TextAlign.End)
+                Text(liabilities.formatInr(), style = MoneyTheme.type.metricTable, color = c.negative, textAlign = TextAlign.End, softWrap = false)
             }
+        }
+    }
+}
+
+/**
+ * One journal leg: the account on the left (it wraps), the amount on the right with `Dr` or `Cr` after it.
+ * The amount never wraps, so a long figure can't be split across lines the way a narrow column would.
+ */
+@Composable
+fun PostingLineRow(account: String, debit: Paise?, credit: Paise?, modifier: Modifier = Modifier) {
+    val c = MoneyTheme.colors
+    val amount = debit ?: credit ?: Paise.Zero
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+        Text(account, style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(amount.formatInr(), style = MoneyTheme.type.ledgerMono, color = c.ink, softWrap = false)
+            Text(if (debit != null) "Dr" else "Cr", style = MoneyTheme.type.ledgerMono, color = c.muted, softWrap = false)
         }
     }
 }

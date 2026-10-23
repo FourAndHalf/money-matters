@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.InnerPanel
+import com.moneymatters.app.ui.components.PostingLineRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.MoneyText
@@ -127,17 +128,8 @@ private fun JournalModule(detail: TransactionDetail) {
     Module {
         ModuleHeader("Journal", subtitle = "Postings")
         InnerPanel {
-            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                Text("Account", style = MoneyTheme.type.labelUppercase, color = c.muted, modifier = Modifier.weight(1.8f))
-                Text("Dr", style = MoneyTheme.type.labelUppercase, color = c.muted, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                Text("Cr", style = MoneyTheme.type.labelUppercase, color = c.muted, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-            }
             detail.postings.forEachIndexed { i, posting ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-                    Text(posting.account, style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(1.8f))
-                    Text(posting.debit?.formatInr() ?: "", style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                    Text(posting.credit?.formatInr() ?: "", style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                }
+                PostingLineRow(posting.account, posting.debit, posting.credit, Modifier.padding(vertical = 5.dp))
                 if (i < detail.postings.lastIndex) RowDivider(Modifier.padding(vertical = 2.dp))
             }
         }

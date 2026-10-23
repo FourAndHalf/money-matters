@@ -114,7 +114,7 @@ internal fun ImportContent(
                                 trailing = {
                                     Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
                                         Text("${formatUnits(s.unitsHeld)} units", style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink)
-                                        Text(s.costHeld.formatInr(), style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted)
+                                        Text(s.costHeld.formatInr(), style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, softWrap = false)
                                     }
                                 },
                             )

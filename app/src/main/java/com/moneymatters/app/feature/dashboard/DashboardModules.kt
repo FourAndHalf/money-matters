@@ -237,7 +237,7 @@ fun SpendingModule(spending: Spending, onViewAll: () -> Unit) {
                             Box(Modifier.size(8.dp).clip(MoneyTheme.shapes.sm).background(seg.color))
                             Column {
                                 Muted(cat.name)
-                                Text(cat.amount.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink)
+                                Text(cat.amount.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink, softWrap = false)
                             }
                         }
                     }
@@ -314,7 +314,7 @@ fun GoalsModule(goals: Goals, onOpen: () -> Unit) {
             KeyValueRow("Required SIP", "${corpus.requiredSip.formatInr()} / mo")
             KeyValueRow("Your SIP", "${corpus.monthlySip.formatInr()} / mo")
             KeyValueRow("Projected at 30", divider = false) {
-                Text(corpus.projected.formatInrCompact(), style = t.metricTable.copy(fontSize = t.ledgerMono.fontSize), color = c.ink)
+                Text(corpus.projected.formatInrCompact(), style = t.metricTable.copy(fontSize = t.ledgerMono.fontSize), color = c.ink, softWrap = false)
                 if (!corpus.onTrack) Muted("· ${(corpus.target - corpus.projected).formatInrCompact()} short")
             }
         }

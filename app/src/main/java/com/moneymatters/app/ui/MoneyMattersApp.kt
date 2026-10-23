@@ -53,6 +53,7 @@ import com.moneymatters.app.feature.quickadd.QuickAddScreen
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.settings.SettingsScreen
 import com.moneymatters.app.feature.settings.SettingsViewModel
+import com.moneymatters.app.feature.transactions.EditEntryScreen
 import com.moneymatters.app.feature.transactions.TransactionDetailScreen
 import com.moneymatters.app.feature.transactions.TransactionsScreen
 import com.moneymatters.app.ui.components.MoneyBottomBar
@@ -215,9 +216,16 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 BackHandler { openAccountId = null }
                 AccountLedgerScreen(openLedger, onBack = { openAccountId = null })
             }
+            quickAdd.editForm != null -> {
+                BackHandler { quickAdd.cancelEdit() }
+                EditEntryScreen(
+                    quickAdd.editForm!!, quickAdd.editError, quickAdd.isSaving,
+                    onChange = { quickAdd.editForm = it }, onSave = { quickAdd.saveEdit(onSaved = {}) }, onClose = quickAdd::cancelEdit,
+                )
+            }
             openTransaction != null -> {
                 BackHandler { openTransactionId = null }
-                TransactionDetailScreen(openTransaction, onBack = { openTransactionId = null })
+                TransactionDetailScreen(openTransaction, onBack = { openTransactionId = null }, onEdit = { quickAdd.startEdit(openTransaction.id) })
             }
             showQuickAdd -> {
                 BackHandler { showQuickAdd = false }

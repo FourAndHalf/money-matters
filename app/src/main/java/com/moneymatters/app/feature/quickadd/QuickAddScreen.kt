@@ -38,6 +38,7 @@ import com.moneymatters.app.ui.components.AmountPad
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.InnerPanel
+import com.moneymatters.app.ui.components.PostingLineRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
@@ -312,11 +313,7 @@ fun QuickAddScreen(
                         ModuleHeader("Journal", subtitle = "Postings")
                         InnerPanel {
                             postings.forEachIndexed { i, posting ->
-                                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-                                    Text(accountLabel(posting.accountId), style = MoneyTheme.type.ledgerMono, color = MoneyTheme.colors.ink, modifier = Modifier.weight(1.8f))
-                                    Text(posting.debit?.formatInr() ?: "", style = MoneyTheme.type.ledgerMono, color = MoneyTheme.colors.ink, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                                    Text(posting.credit?.formatInr() ?: "", style = MoneyTheme.type.ledgerMono, color = MoneyTheme.colors.ink, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                                }
+                                PostingLineRow(accountLabel(posting.accountId), posting.debit, posting.credit, Modifier.padding(vertical = 5.dp))
                                 if (i < postings.lastIndex) RowDivider(Modifier.padding(vertical = 2.dp))
                             }
                         }

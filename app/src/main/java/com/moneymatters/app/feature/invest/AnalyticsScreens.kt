@@ -57,7 +57,7 @@ fun AllocationModule(
                 leading = { GlyphChip(text = "●", content = shades[i % shades.size]) },
                 subtitle = String.format(Locale.ROOT, "%.1f%%", slice.fraction * 100),
                 divider = i < analytics.allocation.lastIndex,
-                trailing = { Text(slice.value.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink) },
+                trailing = { Text(slice.value.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink, softWrap = false) },
             )
         }
         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -139,7 +139,7 @@ fun GainsScreen(years: List<YearGains>, onBack: () -> Unit, modifier: Modifier =
                             title = sale.name,
                             subtitle = "${sale.dateLabel} · ${sale.unitsLabel} units · ${sale.termLabel}",
                             divider = i < year.sales.lastIndex,
-                            trailing = { Text(sale.gain.formatInr(), style = MoneyTheme.type.metricTable, color = if (sale.gain.value >= 0) MoneyTheme.colors.positive else MoneyTheme.colors.negative) },
+                            trailing = { Text(sale.gain.formatInr(), style = MoneyTheme.type.metricTable, color = if (sale.gain.value >= 0) MoneyTheme.colors.positive else MoneyTheme.colors.negative, softWrap = false) },
                         )
                     }
                 }

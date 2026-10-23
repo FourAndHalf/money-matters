@@ -130,14 +130,14 @@ private fun AccountContext(card: AccountCard, onAction: () -> Unit) {
                         leading = { GlyphChip(text = "${i + 1}") },
                         trailing = {
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(fd.accrued.formatInr(signed = true), style = MoneyTheme.type.metricTable.copy(fontSize = MoneyTheme.type.ledgerMono.fontSize), color = c.ink)
+                                Text(fd.accrued.formatInr(signed = true), style = MoneyTheme.type.metricTable.copy(fontSize = MoneyTheme.type.ledgerMono.fontSize), color = c.ink, softWrap = false)
                                 Text("accrued", style = MoneyTheme.type.metricDelta.copy(fontWeight = FontWeight.Normal), color = c.muted)
                             }
                         },
                     )
                 }
                 KeyValueRow("Break-today value", divider = false) {
-                    Text(d.breakTodayValue.formatInr(), style = MoneyTheme.type.metricTable.copy(fontSize = MoneyTheme.type.ledgerMono.fontSize), color = c.ink)
+                    Text(d.breakTodayValue.formatInr(), style = MoneyTheme.type.metricTable.copy(fontSize = MoneyTheme.type.ledgerMono.fontSize), color = c.ink, softWrap = false)
                     Text("after penalty", style = MoneyTheme.type.bodySm, color = c.muted)
                 }
             }
