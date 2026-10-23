@@ -20,6 +20,7 @@ import com.moneymatters.app.core.invest.effectiveStatus
 import com.moneymatters.app.core.invest.allocation
 import com.moneymatters.app.core.invest.capitalGainsRegister
 import com.moneymatters.app.core.invest.concentrations
+import com.moneymatters.app.core.invest.equityYears
 import com.moneymatters.app.core.invest.drift
 import com.moneymatters.app.core.invest.holdingFlows
 import com.moneymatters.app.core.invest.taxIfSoldToday
@@ -124,6 +125,7 @@ data class InvestState(
     val analytics: AnalyticsState = AnalyticsState(),
     /** Realised gains by financial year, newest first (the capital-gains register). */
     val gainsByYear: List<YearGains> = emptyList(),
+    val harvest: HarvestRow? = null,
 )
 
 /** A fixed deposit in the portfolio list; [value] is principal plus interest earned so far. */
@@ -221,6 +223,7 @@ fun buildInvest(
     val allPriced = (held.isNotEmpty() || deposits.isNotEmpty()) && held.all { it.marketValue != null }
     val (sipRows, sipDetails) = buildSips(ledger, invest, today, goal, rowsById.mapValues { it.value.name })
     val slices = allocation(valued, deposits)
+    val register = capitalGainsRegister(ledger, invest, rules)
     val depositRows = deposits.associate { v -> v.deposit.accountId to depositRow(v, accountsById.getValue(v.deposit.accountId).name, today) }
     return InvestState(
         holdings = holdings,
@@ -235,7 +238,8 @@ fun buildInvest(
         sipDetails = sipDetails,
         prices = buildPrices(valued, rowsById, invest, today, zone),
         analytics = slices.let { buildAnalytics(it, drift(it, targetEquityPercent), concentrations(valued), rowsById.mapValues { r -> r.value.name }) },
-        gainsByYear = buildYears(capitalGainsRegister(ledger, invest, rules), rowsById.mapValues { it.value.name }),
+        gainsByYear = buildYears(register, rowsById.mapValues { it.value.name }, equityYears(register, rules)),
+        harvest = harvestRoom(valued, invest, today, rules, equityYears(register, rules)),
         hasFunds = valued.any { it.holding.instrument == Instrument.MutualFund },
         unpricedCount = held.count { it.marketValue == null },
         details = details,
@@ -243,6 +247,18 @@ fun buildInvest(
             PendingRow(p.id, rowsById[p.holdingId]?.name.orEmpty(), LocalDate.parse(p.orderDate).format(DayMonthYear), Paise(p.amountPaise))
         },
     )
+}
+
+/** What is left of this year's tax-free long-term equity gain, against the long-term gain that selling today would realise. Null when there is neither. */
+private fun harvestRoom(valued: List<HoldingValuation>, invest: InvestSnapshot, today: LocalDate, rules: CapitalGainsRules, years: List<com.moneymatters.app.core.invest.EquityYear>): HarvestRow? {
+    val year = financialYearOf(today)
+    val limit = rules.equityTax(LocalDate.of(year + 1, 3, 31)).longTermExemption
+    val used = years.firstOrNull { it.year == year }?.exemptionUsed ?: Paise.Zero
+    val available = valued.filter { it.units.micro > 0 && it.holding.isEquityOriented }.sumOf { v ->
+        taxIfSoldToday(v, invest, today, rules)?.buckets?.filter { it.term == GainTerm.Long && it.gain.value > 0 }?.sumOf { it.gain.value } ?: 0L
+    }
+    val room = Paise(maxOf(limit.value - used.value, 0))
+    return if (room.value > 0 && available > 0) HarvestRow(yearLabel(year), room, Paise(available)) else null
 }
 
 private fun rowFor(v: HoldingValuation, accountName: String, today: LocalDate): HoldingRow {

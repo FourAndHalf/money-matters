@@ -132,7 +132,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             }
             showGains && investState != null && openHolding == null -> {
                 BackHandler { showGains = false }
-                GainsScreen(investState.gainsByYear, onBack = { showGains = false })
+                GainsScreen(investState.gainsByYear, onBack = { showGains = false }, harvest = investState.harvest)
             }
             showPrices && investState != null && openHolding == null -> {
                 BackHandler { showPrices = false }
