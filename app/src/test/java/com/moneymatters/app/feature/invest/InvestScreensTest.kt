@@ -456,4 +456,33 @@ class InvestScreensTest {
         compose.onNodeWithText("Prices").performClick()
         assertTrue(opened)
     }
+
+    @Test fun `allocation shows drift and concentration, and the gains register totals each year`() {
+        val analytics = AnalyticsState(
+            allocation = listOf(AllocationRow("Equity", 1_20_000.rupees, 0.7), AllocationRow("Debt & FDs", 51_000.rupees, 0.3)),
+            targetEquityPercent = 60,
+            driftMessage = "Equity is 10.0 points above your 60% target",
+            concentration = listOf(ConcentrationRow("h1", "Infosys (INFY)", "62.0% of equity")),
+        )
+        var nudged = 0
+        compose.setContent {
+            MoneyMattersTheme {
+                InvestScreen(state.copy(analytics = analytics), onOpenHolding = {}, onBuy = {}, onImport = {}, onNudgeTarget = { nudged += it })
+            }
+        }
+        compose.onNodeWithText("Equity target 60%").assertIsDisplayed()
+        compose.onNodeWithText("Equity is 10.0 points above your 60% target").assertIsDisplayed()
+        compose.onNodeWithText("62.0% of equity").assertIsDisplayed()
+        compose.onNodeWithText("+5").performClick()
+        assertEquals(5, nudged)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_allocation_light.png")
+    }
+
+    @Test fun `the capital gains screen lists sales under their financial year`() {
+        val sale = SaleRow("t1", "1 Mar 2026", "Infosys (INFY)", "4", 600.rupees, 400.rupees, 200.rupees, "Long-term")
+        compose.setContent { MoneyMattersTheme { GainsScreen(listOf(YearGains("FY 2025-26", 0.rupees, 200.rupees, 0.rupees, listOf(sale))), onBack = {}) } }
+        compose.onNodeWithText("FY 2025-26").assertIsDisplayed()
+        compose.onNodeWithText("1 Mar 2026 · 4 units · Long-term").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/invest_gains_light.png")
+    }
 }

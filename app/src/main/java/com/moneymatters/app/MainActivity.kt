@@ -23,6 +23,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.moneymatters.app.core.invest.CapitalGainsRules
 import com.moneymatters.app.core.invest.HttpPriceFetcher
 import com.moneymatters.app.core.invest.InvestRepository
+import com.moneymatters.app.core.invest.AllocationPrefs
 import com.moneymatters.app.core.invest.PriceSourcePrefs
 import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.PriceWorker
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val priceSourcePrefs by lazy { PriceSourcePrefs(applicationContext.getSharedPreferences("price_sources", MODE_PRIVATE)) }
+    private val allocationPrefs by lazy { AllocationPrefs(applicationContext.getSharedPreferences("allocation", MODE_PRIVATE)) }
     private val investModel: InvestViewModel by viewModels {
         viewModelFactory {
             initializer {
@@ -74,6 +76,7 @@ class MainActivity : ComponentActivity() {
                     goal = { profiles.profile()?.takeIf { it.croreByThirtyGoal }?.let { SipGoal(it.dateOfBirth.plusYears(30), 0.12) } },
                     priceUpdater = PriceUpdater(investRepo, HttpPriceFetcher(), priceSourcePrefs::sources),
                     sourcePrefs = priceSourcePrefs,
+                    allocationPrefs = allocationPrefs,
                 )
             }
         }

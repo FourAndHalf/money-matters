@@ -17,7 +17,12 @@ import com.moneymatters.app.core.invest.formatUnits
 import com.moneymatters.app.core.invest.gainTerm
 import com.moneymatters.app.core.invest.depositValuation
 import com.moneymatters.app.core.invest.effectiveStatus
+import com.moneymatters.app.core.invest.allocation
+import com.moneymatters.app.core.invest.capitalGainsRegister
+import com.moneymatters.app.core.invest.concentrations
+import com.moneymatters.app.core.invest.drift
 import com.moneymatters.app.core.invest.holdingFlows
+import com.moneymatters.app.core.invest.taxIfSoldToday
 import com.moneymatters.app.core.invest.isEquityOriented
 import com.moneymatters.app.core.invest.valuations
 import com.moneymatters.app.core.invest.xirr
@@ -88,6 +93,8 @@ data class HoldingDetail(
     val xirr: Double?,
     val actions: List<ActionRow> = emptyList(),
     val dividendTotal: Paise = Paise.Zero,
+    /** What selling everything sellable today would realise; null without a price or units. */
+    val taxPreview: TaxPreviewRow? = null,
 )
 
 /** A fund purchase paid for but not yet allotted units. */
@@ -114,6 +121,9 @@ data class InvestState(
     val prices: PricesState = PricesState(),
     /** Whether there is a fund to start a SIP in. */
     val hasFunds: Boolean = false,
+    val analytics: AnalyticsState = AnalyticsState(),
+    /** Realised gains by financial year, newest first (the capital-gains register). */
+    val gainsByYear: List<YearGains> = emptyList(),
 )
 
 /** A fixed deposit in the portfolio list; [value] is principal plus interest earned so far. */
@@ -176,6 +186,7 @@ fun buildInvest(
     rules: CapitalGainsRules,
     goal: SipGoal? = null,
     zone: ZoneId = ZoneId.systemDefault(),
+    targetEquityPercent: Int? = null,
 ): InvestState {
     val accountsById = ledger.accounts.associateBy { it.id }
     val valued = valuations(invest)
@@ -189,6 +200,7 @@ fun buildInvest(
         val dividends = dividendFlows(invest, v.holding.id)
         flows += own.map { it.second } + dividends
         v.holding.id to detailFor(v, rowsById.getValue(v.holding.id), own, dividends, ledger, invest, today, rules)
+            .copy(taxPreview = taxIfSoldToday(v, invest, today, rules)?.toRow())
     }
 
     val held = valued.filter { it.units.micro > 0 }
@@ -208,6 +220,7 @@ fun buildInvest(
     val totalPricedCost = pricedCost + openDeposits.sumOf { it.principal.value }
     val allPriced = (held.isNotEmpty() || deposits.isNotEmpty()) && held.all { it.marketValue != null }
     val (sipRows, sipDetails) = buildSips(ledger, invest, today, goal, rowsById.mapValues { it.value.name })
+    val slices = allocation(valued, deposits)
     val depositRows = deposits.associate { v -> v.deposit.accountId to depositRow(v, accountsById.getValue(v.deposit.accountId).name, today) }
     return InvestState(
         holdings = holdings,
@@ -221,6 +234,8 @@ fun buildInvest(
         sips = sipRows,
         sipDetails = sipDetails,
         prices = buildPrices(valued, rowsById, invest, today, zone),
+        analytics = slices.let { buildAnalytics(it, drift(it, targetEquityPercent), concentrations(valued), rowsById.mapValues { r -> r.value.name }) },
+        gainsByYear = buildYears(capitalGainsRegister(ledger, invest, rules), rowsById.mapValues { it.value.name }),
         hasFunds = valued.any { it.holding.instrument == Instrument.MutualFund },
         unpricedCount = held.count { it.marketValue == null },
         details = details,

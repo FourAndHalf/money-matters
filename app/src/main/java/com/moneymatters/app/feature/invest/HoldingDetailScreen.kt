@@ -80,6 +80,7 @@ fun HoldingDetailScreen(
                     KeyValueRow("XIRR", detail.xirr?.let(::formatPercent) ?: "—", divider = false)
                 }
             }
+            detail.taxPreview?.let { item("tax-preview") { TaxPreviewModule(it) } }
             if (detail.lots.isNotEmpty()) {
                 item("lots") {
                     Module {
