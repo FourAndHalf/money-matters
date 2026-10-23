@@ -3,6 +3,7 @@ package com.moneymatters.app.feature.dashboard
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.core.money.rupees
+import com.moneymatters.app.ui.components.CardFinish
 import com.moneymatters.app.ui.components.Tone
 
 /**

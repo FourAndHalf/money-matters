@@ -1,6 +1,7 @@
 package com.moneymatters.app.feature.dashboard
 
 import androidx.compose.runtime.Immutable
+import com.moneymatters.app.ui.components.CardFinish
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.ui.components.Tone
 
@@ -47,8 +48,6 @@ data class Leeway(
 
 @Immutable
 data class Kpi(val label: String, val value: String, val delta: String, val tone: Tone, val trend: List<Float>)
-
-enum class CardFinish { Pearl, Graphite, Silver, Champagne, Smoke }
 
 /** One card in the account stack, plus the facts its context panel shows. */
 @Immutable

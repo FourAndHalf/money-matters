@@ -4,6 +4,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
@@ -40,7 +42,8 @@ class AccountsScreenTest {
     @Test fun `tapping an account row opens its ledger`() {
         var opened: String? = null
         compose.setContent { MoneyMattersTheme { AccountsScreen(SampleAccounts.state, onOpenAccount = { opened = it }) } }
-        compose.onNodeWithText("HDFC Bank").performClick()
+        // The name also appears on the stack card and its panel; the list row comes last.
+        compose.onAllNodesWithText("HDFC Bank").onLast().performClick()
         assertEquals("hdfc-bank", opened)
     }
 

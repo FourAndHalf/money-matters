@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,12 +15,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.PostingLine
+import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.core.money.parseRupees
+import com.moneymatters.app.feature.books.label
+import com.moneymatters.app.ui.components.AccountCardFace
 import com.moneymatters.app.feature.onboarding.NewAccountDraft
 import com.moneymatters.app.feature.onboarding.OPENING_EQUITY_ACCOUNT
 import com.moneymatters.app.feature.onboarding.isValidOptionalAmount
@@ -89,6 +94,23 @@ fun AddAccountScreen(
             contentPadding = PaddingValues(horizontal = margin, vertical = MoneyTheme.spacing.sm),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
+            item("preview") {
+                // A live preview, so the card you are adding looks like it will in the stack.
+                val limit = parseRupees(draft.creditLimit)
+                val owedOrHeld = parseRupees(draft.openingBalance) ?: com.moneymatters.app.core.money.Paise.Zero
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(176.dp).clip(MoneyTheme.shapes.xl)) {
+                    AccountCardFace(
+                        finish = draft.kind.finish(),
+                        typeLabel = draft.kind.label(),
+                        name = draft.name.ifBlank { if (isCard) "Card name" else "Account name" },
+                        amountLabel = if (owed) "Owed" else "Balance",
+                        amount = owedOrHeld,
+                        footLeft = if (isCard) (limit?.let { "Limit ${it.formatInr()}" } ?: "Limit") else "",
+                        footRight = if (isCard && draft.statementDay.isNotBlank()) "Statement ${draft.statementDay}" else "",
+                        glyph = draft.kind.glyph(),
+                    )
+                }
+            }
             item("fields") {
                 Module {
                     SegmentedControl(AddableKinds, draft.kind, { onChange(draft.copy(kind = it)) }, { it.shortLabel() })
