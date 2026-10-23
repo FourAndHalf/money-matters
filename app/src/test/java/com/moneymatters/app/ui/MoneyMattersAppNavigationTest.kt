@@ -133,6 +133,8 @@ class MoneyMattersAppNavigationTest {
         compose.onNodeWithText("Add account").assertIsDisplayed()
         compose.onNodeWithText("Card").performClick()
         compose.onNodeWithText("Amount owed today (₹)").assertIsDisplayed()
+        compose.onNodeWithText("Credit limit (₹)").assertIsDisplayed()
+        compose.onNodeWithText("Statement day of the month").assertIsDisplayed()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
     }

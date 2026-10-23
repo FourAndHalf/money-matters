@@ -100,3 +100,12 @@ data class ClosedPeriodEntity(
     val hash: String,
     val snapshot: String,
 )
+
+/** What a credit card has beyond its liability account: the limit it was issued with and the day its statement is cut. */
+@Entity(tableName = "credit_cards", foreignKeys = [ForeignKey(AccountEntity::class, ["id"], ["accountId"])])
+data class CreditCardEntity(
+    @PrimaryKey val accountId: String,
+    val limitPaise: Long,
+    /** Day of the month, 1 to 28. */
+    val statementDay: Int,
+)

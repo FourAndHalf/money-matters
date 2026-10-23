@@ -41,8 +41,25 @@ class AddAccountTest {
         assertEquals(AccountType.Asset, runBlocking { ledger.snapshot().first().accounts.single { it.name == "ICICI Bank" }.type })
     }
 
+    @Test fun `a card needs a limit and a statement day, and keeps them`() {
+        assertThrows(IllegalArgumentException::class.java) { add(NewAccountDraft("Card", AccountKind.CreditCard, "", "", "")) }
+        assertThrows(IllegalArgumentException::class.java) { add(NewAccountDraft("Card", AccountKind.CreditCard, "", "1,00,000", "")) }
+        assertThrows(IllegalArgumentException::class.java) { add(NewAccountDraft("Card", AccountKind.CreditCard, "", "1,00,000", "31")) }
+        assertThrows(IllegalArgumentException::class.java) { add(NewAccountDraft("Card", AccountKind.CreditCard, "", "0", "5")) }
+        assertEquals(null, runBlocking { ledger.accountIdByName("Card") })
+        add(NewAccountDraft("Card", AccountKind.CreditCard, "8,000", "1,00,000", "5"))
+        val card = runBlocking { ledger.snapshot().first().creditCards.single() }
+        assertEquals(1_00_000.rupees.value, card.limitPaise)
+        assertEquals(5, card.statementDay)
+    }
+
+    @Test fun `limit and statement day are not asked of other accounts`() {
+        add(NewAccountDraft("Savings", AccountKind.Bank, "100"))
+        assertEquals(0, runBlocking { ledger.snapshot().first().creditCards.size })
+    }
+
     @Test fun `a credit card is a liability and the amount owed is a credit`() {
-        add(NewAccountDraft("HDFC Regalia", AccountKind.CreditCard, "8,000"))
+        add(NewAccountDraft("HDFC Regalia", AccountKind.CreditCard, "8,000", "1,00,000", "5"))
         val card = runBlocking { ledger.snapshot().first().accounts.single { it.name == "HDFC Regalia" } }
         assertEquals(AccountType.Liability, card.type)
         assertEquals(AccountKind.CreditCard, card.kind)
