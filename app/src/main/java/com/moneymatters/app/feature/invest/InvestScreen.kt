@@ -49,6 +49,8 @@ fun InvestScreen(
     onNewSip: () -> Unit = {},
     onOpenSip: (planId: String) -> Unit = {},
     onOpenPrices: () -> Unit = {},
+    onOpenGains: () -> Unit = {},
+    onNudgeTarget: (delta: Int) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -143,6 +145,21 @@ fun InvestScreen(
                                 trailing = { AmountWithBadge(d.value.formatInr()) { StatusBadge(d.badge.text, d.badge.tone) } },
                             )
                         }
+                    }
+                }
+            }
+            if (state.analytics.allocation.isNotEmpty()) {
+                item("allocation") { AllocationModule(state.analytics, onNudgeTarget, onOpenHolding, Modifier.padding(horizontal = margin)) }
+            }
+            if (state.gainsByYear.isNotEmpty()) {
+                item("gains") {
+                    Module(Modifier.padding(horizontal = margin)) {
+                        ListRow(
+                            title = "Capital gains",
+                            subtitle = state.gainsByYear.first().let { "${it.label}: ${it.total.formatInr()} realised" },
+                            divider = false,
+                            modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open capital gains", onClick = onOpenGains),
+                        )
                     }
                 }
             }

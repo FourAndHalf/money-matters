@@ -10,6 +10,7 @@ import com.moneymatters.app.core.invest.InsufficientUnitsException
 import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.invest.LockedUnitsException
 import com.moneymatters.app.core.invest.InvestRepository
+import com.moneymatters.app.core.invest.AllocationPrefs
 import com.moneymatters.app.core.invest.PriceSourcePrefs
 import com.moneymatters.app.core.invest.PriceSources
 import com.moneymatters.app.core.invest.PriceStatus
@@ -30,6 +31,7 @@ import com.moneymatters.app.core.money.impliedPrice
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -39,6 +41,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 private const val OPENING_EQUITY = "Equity:Opening"
+private const val DEFAULT_EQUITY_TARGET = 60
 
 /** The accounts a stock can be paid for from or sold into: live assets that aren't holdings or other investments. */
 internal fun settlementAccountsIn(ledger: LedgerSnapshot): List<AccountEntity> =
@@ -56,9 +59,19 @@ class InvestViewModel(
     private val goal: () -> SipGoal? = { null },
     private val priceUpdater: PriceUpdater? = null,
     private val sourcePrefs: PriceSourcePrefs? = null,
+    private val allocationPrefs: AllocationPrefs? = null,
 ) : ViewModel() {
 
-    val state: StateFlow<InvestState?> = combine(ledger.snapshot(), invest.snapshot()) { l, i -> buildInvest(l, i, today(), rules, goal()) }
+    private val targetEquity = MutableStateFlow(allocationPrefs?.targetEquityPercent())
+
+    /** Moves the equity target by [delta] points (starting from 60 when none is set), keeping it between 0 and 100. */
+    fun nudgeTarget(delta: Int) {
+        val next = ((targetEquity.value ?: DEFAULT_EQUITY_TARGET) + delta).coerceIn(0, 100)
+        allocationPrefs?.save(next)
+        targetEquity.value = next
+    }
+
+    val state: StateFlow<InvestState?> = combine(ledger.snapshot(), invest.snapshot(), targetEquity) { l, i, target -> buildInvest(l, i, today(), rules, goal(), targetEquityPercent = target) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
