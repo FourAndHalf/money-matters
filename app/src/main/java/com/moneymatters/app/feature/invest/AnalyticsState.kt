@@ -5,6 +5,7 @@ import com.moneymatters.app.core.invest.AllocationSlice
 import com.moneymatters.app.core.invest.AssetClass
 import com.moneymatters.app.core.invest.Concentration
 import com.moneymatters.app.core.invest.Drift
+import com.moneymatters.app.core.invest.EquityYear
 import com.moneymatters.app.core.invest.GainTerm
 import com.moneymatters.app.core.invest.RealisedSale
 import com.moneymatters.app.core.invest.TaxPreview
@@ -54,9 +55,27 @@ data class SaleRow(
     val termLabel: String,
 )
 
+/** Listed-equity gains for a year once losses are set off; [lossForward] is what carries into later years. */
+@Immutable
+data class EquityRow(val shortNet: Paise, val longNet: Paise, val exemptionUsed: Paise, val exemptionLimit: Paise, val estimatedTax: Paise, val lossForward: Paise)
+
+/** Room left in this year's tax-free long-term gain, and the long-term gain that could fill it by selling today. */
+@Immutable
+data class HarvestRow(val yearLabel: String, val room: Paise, val available: Paise) {
+    val suggested: Paise get() = Paise(minOf(room.value, available.value))
+}
+
 /** One financial year of realised gains; [slab] is debt-fund gain taxed at the investor's slab rate. */
 @Immutable
-data class YearGains(val label: String, val short: Paise, val long: Paise, val slab: Paise, val sales: List<SaleRow>) {
+data class YearGains(
+    val label: String,
+    val short: Paise,
+    val long: Paise,
+    val slab: Paise,
+    val sales: List<SaleRow>,
+    /** Listed-equity result after loss set-off, with the exemption and an estimate of tax; null when no equity was sold. */
+    val equity: EquityRow? = null,
+) {
     val total: Paise get() = short + long + slab
 }
 
@@ -76,6 +95,10 @@ internal fun buildAnalytics(slices: List<AllocationSlice>, drift: Drift?, concen
     concentration = concentrations.map { ConcentrationRow(it.holdingId, names[it.holdingId].orEmpty(), String.format(Locale.ROOT, "%.1f%% of equity", it.fraction * 100)) },
 )
 
+internal fun financialYearOf(date: java.time.LocalDate) = if (date.monthValue >= 4) date.year else date.year - 1
+
+internal fun yearLabel(year: Int) = "FY $year-${String.format(Locale.ROOT, "%02d", (year + 1) % 100)}"
+
 internal fun TaxPreview.toRow(): TaxPreviewRow = TaxPreviewRow(
     sellableLabel = formatUnits(sellableUnits),
     lockedLabel = lockedUnits.micro.takeIf { it > 0 }?.let { formatUnits(lockedUnits) },
@@ -92,14 +115,17 @@ private fun GainTerm.label() = when (this) {
 }
 
 /** Groups the register by financial year, newest year first. */
-internal fun buildYears(sales: List<RealisedSale>, names: Map<String, String>): List<YearGains> =
+internal fun buildYears(sales: List<RealisedSale>, names: Map<String, String>, equity: List<EquityYear> = emptyList()): List<YearGains> =
     sales.groupBy { it.financialYear }.toSortedMap(compareByDescending { it }).map { (year, list) ->
         fun sum(term: GainTerm) = Paise(list.sumOf { s -> s.buckets.filter { it.term == term }.sumOf { it.gain.value } })
         YearGains(
-            label = "FY $year-${String.format(Locale.ROOT, "%02d", (year + 1) % 100)}",
+            label = yearLabel(year),
             short = sum(GainTerm.Short),
             long = sum(GainTerm.Long),
             slab = sum(GainTerm.Slab),
+            equity = equity.firstOrNull { it.year == year }?.let {
+                EquityRow(it.shortNet, it.longNet, it.exemptionUsed, it.exemptionLimit, it.estimatedTax, it.shortLossForward + it.longLossForward)
+            },
             sales = list.map { s ->
                 SaleRow(
                     id = s.transactionId,

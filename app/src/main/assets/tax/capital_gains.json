@@ -1,6 +1,7 @@
 {
-  "note": "Holding-period thresholds for long-term capital gains, and the date from which gains on debt mutual funds are taxed at slab rate rather than by holding period. Versioned by the date a rule takes effect. To be verified against the official Income-tax Act 2025 text (docs/plan.html, open items) before Phase 3 relies on it.",
+  "note": "Holding-period thresholds for long-term capital gains, the date from which gains on debt mutual funds are taxed at slab rate, and the flat rates and yearly exemption on listed-equity gains (basis points; paise). Versioned by the date a rule takes effect. The rates and exemption are the Finance Act 2024 figures and, like the thresholds, are still to be verified against the official Income-tax Act 2025 text (docs/plan.html, open items).",
   "capitalGains": [
-    { "effectiveFrom": "2018-04-01", "listedEquityLongTermMonths": 12, "otherLongTermMonths": 24, "debtFundSlabTaxedFrom": "2023-04-01" }
+    { "effectiveFrom": "2018-04-01", "listedEquityLongTermMonths": 12, "otherLongTermMonths": 24, "debtFundSlabTaxedFrom": "2023-04-01", "equityShortTermBps": 1500, "equityLongTermBps": 1000, "equityLongTermExemptionPaise": 10000000 },
+    { "effectiveFrom": "2024-07-23", "listedEquityLongTermMonths": 12, "otherLongTermMonths": 24, "debtFundSlabTaxedFrom": "2023-04-01", "equityShortTermBps": 2000, "equityLongTermBps": 1250, "equityLongTermExemptionPaise": 12500000 }
   ]
 }

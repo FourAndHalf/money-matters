@@ -82,7 +82,7 @@ fun TaxPreviewModule(preview: TaxPreviewRow, modifier: Modifier = Modifier) {
 
 /** The capital-gains register: realised sales by financial year, split by term, ready for the Tax page (P20). */
 @Composable
-fun GainsScreen(years: List<YearGains>, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun GainsScreen(years: List<YearGains>, onBack: () -> Unit, modifier: Modifier = Modifier, harvest: HarvestRow? = null) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
     Column(modifier.fillMaxSize()) {
@@ -96,13 +96,33 @@ fun GainsScreen(years: List<YearGains>, onBack: () -> Unit, modifier: Modifier =
             if (years.isEmpty()) {
                 item("empty") { Module { ModuleHeader("No sales yet", subtitle = "Gains appear here once you sell a stock or fund.") } }
             }
+            harvest?.let { h ->
+                item("harvest") {
+                    Module {
+                        ModuleHeader("Tax-free room this year", subtitle = "${h.yearLabel}: ${h.room.formatInr()} of long-term equity gain is still under the exemption")
+                        KeyValueRow("Gain you could book today", h.available.formatInr())
+                        KeyValueRow("Could be booked tax-free", h.suggested.formatInr(), divider = false)
+                    }
+                }
+            }
             items(years, key = { it.label }) { year ->
                 Module {
                     ModuleHeader(year.label, subtitle = "${year.sales.size} ${if (year.sales.size == 1) "sale" else "sales"}")
                     KeyValueRow("Short-term", year.short.formatInr())
                     KeyValueRow("Long-term", year.long.formatInr())
                     if (year.slab.value != 0L) KeyValueRow("Slab rate (debt funds)", year.slab.formatInr())
-                    KeyValueRow("Total", year.total.formatInr(), divider = year.sales.isNotEmpty())
+                    KeyValueRow("Total", year.total.formatInr(), divider = year.equity != null || year.sales.isNotEmpty())
+                    year.equity?.let { e ->
+                        KeyValueRow("Equity after set-off: short", e.shortNet.formatInr())
+                        KeyValueRow("Equity after set-off: long", e.longNet.formatInr())
+                        KeyValueRow("Exemption used", "${e.exemptionUsed.formatInr()} of ${e.exemptionLimit.formatInr()}")
+                        KeyValueRow("Estimated equity tax", e.estimatedTax.formatInr())
+                        if (e.lossForward.value > 0) KeyValueRow("Loss carried forward", e.lossForward.formatInr())
+                        Text(
+                            "Estimate on listed equity only, at the rates for the year's end, before cess. Other assets are taxed at slab rate.",
+                            style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 8.dp, bottom = if (year.sales.isNotEmpty()) 8.dp else 0.dp),
+                        )
+                    }
                     year.sales.forEachIndexed { i, sale ->
                         ListRow(
                             title = sale.name,

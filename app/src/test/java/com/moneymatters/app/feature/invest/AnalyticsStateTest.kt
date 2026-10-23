@@ -61,7 +61,7 @@ class AnalyticsStateTest {
 
     private fun price(id: String, rupees: Long) = runBlocking { invest.recordPrice(id, today, UnitPrice.rupees(rupees), "manual", PriceStatus.Manual) }
 
-    private fun state(target: Int? = null) = runBlocking { buildInvest(ledger.snapshot().first(), invest.snapshot().first(), today, rules, targetEquityPercent = target) }
+    private fun state(target: Int? = null, with: CapitalGainsRules = rules) = runBlocking { buildInvest(ledger.snapshot().first(), invest.snapshot().first(), today, with, targetEquityPercent = target) }
 
     // ---- Allocation and drift ----
 
@@ -193,5 +193,31 @@ class AnalyticsStateTest {
         assertEquals(-year.total.value, gains.value)
         // 10 units at 100 plus 5 at 150 cost 1,750, so 2,700 of proceeds is a 950 gain.
         assertEquals(950.rupees, year.total)
+    }
+
+    // ---- Equity tax and harvesting ----
+
+    private val taxRules = CapitalGainsRules(listOf(CapitalGainsRules.Entry(LocalDate.of(2018, 4, 1), 12, 24, LocalDate.of(2023, 4, 1), 2000, 1250, 1_25_000.rupees)))
+
+    @Test fun `the register carries the equity result and the tax estimate`() {
+        val infy = stock("INFY")
+        buy(infy, LocalDate.of(2024, 1, 10), 10, 1_000)
+        sell(infy, LocalDate.of(2026, 5, 1), 10, 3_001_000 / 10 * 10)
+        val year = state(with = taxRules).gainsByYear.single()
+        val equity = year.equity!!
+        assertEquals(3_000_000.rupees, equity.longNet)
+        assertEquals(1_25_000.rupees, equity.exemptionUsed)
+    }
+
+    @Test fun `harvest room is this year's exemption less what is used, capped by the gain available`() {
+        val infy = stock("INFY")
+        buy(infy, LocalDate.of(2025, 1, 10), 10, 1_000)
+        price(infy, 300)
+        val harvest = state(with = taxRules).harvest!!
+        assertEquals("FY 2026-27", harvest.yearLabel)
+        assertEquals(1_25_000.rupees, harvest.room)
+        assertEquals(2_000.rupees, harvest.available)
+        assertEquals(2_000.rupees, harvest.suggested)
+        assertNull("no exemption in the data means no suggestion", state().harvest)
     }
 }

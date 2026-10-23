@@ -108,6 +108,8 @@ data class RealisedSale(
     val proceeds: Paise,
     val cost: Paise,
     val buckets: List<GainBucket>,
+    /** Stocks and equity-oriented funds, the gains the equity rates and the yearly exemption apply to. */
+    val equity: Boolean = false,
 ) {
     val gain: Paise get() = proceeds - cost
 
@@ -135,6 +137,6 @@ fun capitalGainsRegister(ledger: LedgerSnapshot, snapshot: InvestSnapshot, rules
         val consumed = rows.map { DatedConsumption(Consumption(it.lotId, Units(it.units), Paise(it.costPaise)), LocalDate.parse(lotsById.getValue(it.lotId).acquiredOn)) }
         val rule = if (holding.isEquityOriented) rules.listedEquity(date) else rules.other(date)
         val slabFrom = if (holding.fundClass == FundClass.Debt) rules.debtSlabFrom(date) else null
-        RealisedSale(txn, holding.id, date, Units(rows.sumOf { it.units }), proceeds, Paise(rows.sumOf { it.costPaise }), splitGain(proceeds, consumed, date, rule, slabFrom))
+        RealisedSale(txn, holding.id, date, Units(rows.sumOf { it.units }), proceeds, Paise(rows.sumOf { it.costPaise }), splitGain(proceeds, consumed, date, rule, slabFrom), holding.isEquityOriented)
     }.sortedWith(compareByDescending<RealisedSale> { it.date }.thenByDescending { it.transactionId })
 }
