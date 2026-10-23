@@ -9,10 +9,13 @@ import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.LedgerSnapshot
 import com.moneymatters.app.core.ledger.TransactionStatus
 import com.moneymatters.app.core.ledger.TransactionTags
+import com.moneymatters.app.feature.transactions.EditEntryForm
+import com.moneymatters.app.feature.transactions.editFormFor
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -33,6 +36,49 @@ class QuickAddViewModel(
 
     /** True once [form] has everything [save] needs: a payee, and a balanced set of postings. */
     fun canSave(): Boolean = form.payee.isNotBlank() && isBalanced(postingsFor(form))
+
+    /** The entry being edited from its detail page, if any. */
+    var editForm by mutableStateOf<EditEntryForm?>(null)
+    var editError by mutableStateOf<String?>(null)
+        private set
+
+    fun startEdit(transactionId: String) {
+        editError = null
+        viewModelScope.launch { editForm = editFormFor(repo.snapshot().first(), transactionId) }
+    }
+
+    fun cancelEdit() {
+        editForm = null
+        editError = null
+    }
+
+    /** Writes the edit through [LedgerRepository.edit]; its refusals (closed month, investment entry) show as [editError]. */
+    fun saveEdit(onSaved: () -> Unit) {
+        val form = editForm ?: return
+        if (!form.canSave || isSaving) return
+        viewModelScope.launch {
+            isSaving = true
+            editError = null
+            try {
+                repo.edit(
+                    transactionId = form.transactionId,
+                    date = requireNotNull(form.date),
+                    payee = form.payee.trim(),
+                    postings = form.postings(),
+                    memo = form.note.trim().ifBlank { null },
+                    tags = form.tags,
+                )
+                editForm = null
+                onSaved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                editError = e.message ?: "Couldn't save the change."
+            } finally {
+                isSaving = false
+            }
+        }
+    }
 
     fun reset() {
         form = QuickAddForm.empty(today())

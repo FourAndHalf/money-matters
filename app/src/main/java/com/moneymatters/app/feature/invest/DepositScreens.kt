@@ -262,7 +262,7 @@ internal fun MaturityLadderModule(ladder: List<MaturityRung>, modifier: Modifier
                     if (rung.count > 1) Text("${rung.count} deposits", style = MoneyTheme.type.bodySm, color = c.muted)
                 }
                 ProgressTrack(rung.fraction, Modifier.weight(1f).padding(horizontal = 8.dp))
-                Text(rung.amount.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink)
+                Text(rung.amount.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink, softWrap = false)
             }
         }
     }

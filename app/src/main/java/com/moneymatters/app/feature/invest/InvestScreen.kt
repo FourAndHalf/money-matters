@@ -91,7 +91,7 @@ fun InvestScreen(
                                 divider = i < state.pending.lastIndex,
                                 trailing = {
                                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(p.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink)
+                                        Text(p.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false)
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Pill("Cancel", { onCancelOrder(p.id) }, height = 26.dp)
                                             Pill("Allot", { onAllot(p.id) }, style = PillStyle.Primary, height = 26.dp)
@@ -201,7 +201,7 @@ private fun SummaryModule(state: InvestState, modifier: Modifier = Modifier) {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("Invested", style = MoneyTheme.type.bodySm, color = c.muted)
-                Text(state.cost.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink)
+                Text(state.cost.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink, softWrap = false)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("XIRR", style = MoneyTheme.type.bodySm, color = c.muted)

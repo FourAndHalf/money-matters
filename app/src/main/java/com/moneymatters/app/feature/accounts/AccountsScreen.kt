@@ -109,7 +109,7 @@ private fun EarmarksModule(earmarks: List<Earmark>) {
             Column(Modifier.padding(vertical = 10.dp)) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(e.name, style = MoneyTheme.type.ledgerMono, color = MoneyTheme.colors.ink)
-                    Text("${e.saved.formatInr()} / ${e.target.formatInr()}", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted)
+                    Text("${e.saved.formatInr()} / ${e.target.formatInr()}", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, softWrap = false)
                 }
                 ProgressTrack(fraction = e.saved.value.toFloat() / e.target.value)
             }

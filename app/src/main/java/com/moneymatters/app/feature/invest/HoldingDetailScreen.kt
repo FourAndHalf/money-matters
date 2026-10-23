@@ -98,7 +98,7 @@ fun HoldingDetailScreen(
                                 trailing = {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                         StatusBadge(lot.termLabel, if (lot.isLongTerm) Tone.Positive else Tone.Neutral)
-                                        Text(lot.cost.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink)
+                                        Text(lot.cost.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false)
                                     }
                                 },
                             )
@@ -115,7 +115,7 @@ fun HoldingDetailScreen(
                                 title = a.label,
                                 subtitle = a.dateLabel,
                                 divider = i < detail.actions.lastIndex,
-                                trailing = { a.amount?.let { Text(it.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink) } },
+                                trailing = { a.amount?.let { Text(it.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false) } },
                             )
                         }
                     }
@@ -130,7 +130,7 @@ fun HoldingDetailScreen(
                                 title = "${if (t.isBuy) "Bought" else "Sold"} ${t.unitsLabel}",
                                 subtitle = t.dateLabel,
                                 divider = i < detail.transactions.lastIndex,
-                                trailing = { Text(t.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink) },
+                                trailing = { Text(t.amount.formatInr(), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false) },
                             )
                         }
                     }

@@ -138,7 +138,7 @@ private fun SectionModule(section: LedgerSection, periodLabel: String) {
 private fun EntryTrailing(entry: LedgerEntry) {
     val c = MoneyTheme.colors
     Column(horizontalAlignment = Alignment.End) {
-        Text(entry.amount.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = c.ink, textAlign = TextAlign.End)
+        Text(entry.amount.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = c.ink, textAlign = TextAlign.End, softWrap = false)
         entry.status?.let { status ->
             val (text, tone, icon) = status.badge()
             StatusBadge(text, tone, icon = icon, modifier = Modifier.padding(top = 4.dp))

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.GlyphChip
 import com.moneymatters.app.ui.components.InnerPanel
+import com.moneymatters.app.ui.components.PostingLineRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
@@ -88,7 +89,7 @@ fun TransactionsScreen(
             Column(Modifier.padding(horizontal = margin), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SearchField(query, { query = it }, placeholder = "Search payee, category, account")
                 StatusFilterRow(statusFilter) { statusFilter = it }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     AccountFilterPill(state.accounts, accountFilter) { accountFilter = it }
                     SegmentedControl(
                         options = listOf(JournalMode.Everyday, JournalMode.Accountant),
@@ -150,7 +151,7 @@ private fun StatusFilterRow(selected: TxnStatus?, onSelect: (TxnStatus?) -> Unit
 private fun AccountFilterPill(accounts: List<String>, selected: String?, onSelect: (String?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        Pill(selected ?: "All accounts", { expanded = true }, trailingIcon = MoneyIcons.ChevronDown)
+        Pill(selected ?: "All accounts", { expanded = true }, height = 40.dp, trailingIcon = MoneyIcons.ChevronDown)
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("All accounts") }, onClick = { onSelect(null); expanded = false })
             accounts.forEach { account ->
@@ -182,7 +183,7 @@ private fun DayModule(group: DayGroup, mode: JournalMode, onOpenTransaction: (St
     Module {
         Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(group.dateLabel, style = MoneyTheme.type.headlineMd, color = MoneyTheme.colors.ink)
-            Text(group.total.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink)
+            Text(group.total.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, softWrap = false)
         }
         when (mode) {
             JournalMode.Everyday -> group.items.forEachIndexed { i, txn ->
@@ -217,11 +218,7 @@ private fun AccountantPanel(group: DayGroup) {
     InnerPanel {
         group.items.forEachIndexed { i, txn ->
             txn.postings.forEach { posting ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(posting.account, style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(1.8f))
-                    Text(posting.debit?.formatInr() ?: "", style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                    Text(posting.credit?.formatInr() ?: "", style = MoneyTheme.type.ledgerMono, color = c.ink, modifier = Modifier.weight(0.5f), textAlign = TextAlign.End)
-                }
+                PostingLineRow(posting.account, posting.debit, posting.credit, Modifier.padding(vertical = 4.dp))
             }
             if (i < group.items.lastIndex) RowDivider(Modifier.padding(vertical = 4.dp))
         }
