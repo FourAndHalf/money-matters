@@ -263,17 +263,14 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                     ACCOUNTS_TAB -> AccountsScreen(
                         accounts,
                         onOpenAccount = { id -> openAccountId = id },
-                        onAddAccount = { settings.resetNewAccount(); showAddAccount = true },
                         contentPadding = PaddingValues(bottom = 132.dp),
                     )
                     INVEST_TAB -> investState?.let {
                         InvestScreen(
                             it,
                             onOpenHolding = { id -> openHoldingId = id },
-                            onBuy = { invest.startTrade(TradeSide.Buy); investOverlay = InvestOverlay.Trade },
                             onImport = { invest.resetImport(); investOverlay = InvestOverlay.Import },
                             onAllot = { id -> invest.startAllot(id); investOverlay = InvestOverlay.Allot },
-                            onNewDeposit = { invest.startDeposit(); investOverlay = InvestOverlay.NewDeposit },
                             onNewSip = { invest.startSip(); investOverlay = InvestOverlay.NewSip },
                             onOpenPrices = { showPrices = true },
                             onOpenGains = { showGains = true },

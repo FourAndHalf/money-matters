@@ -137,15 +137,6 @@ class MoneyMattersAppNavigationTest {
         compose.onNodeWithText("Net worth").assertIsDisplayed()
     }
 
-    @Test fun `the Add button on the Accounts page opens the same screen`() {
-        compose.setContent {
-            MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
-        }
-        compose.onAllNodesWithText("View all")[0].performClick()
-        compose.onNodeWithText("+ Add").performClick()
-        compose.onNodeWithText("Add account").assertIsDisplayed()
-    }
-
     @Test fun `the plus on Transactions still opens Quick add`() {
         compose.setContent {
             MoneyMattersTheme { MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel()) }
