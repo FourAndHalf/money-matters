@@ -59,18 +59,27 @@ private fun QuickActionsContent() {
     val context = LocalContext.current
     val add = GlanceModifier.clickable(actionStartActivity(launchIntent(context, ACTION_ADD_ENTRY)))
     val accounts = GlanceModifier.clickable(actionStartActivity(launchIntent(context, ACTION_OPEN_ACCOUNTS)))
-    if (LocalSize.current.height >= Square.height) {
-        Column(GlanceModifier.fillMaxSize().padding(4.dp)) {
-            ActionButton("+ Add", filled = true, add.fillMaxWidth().defaultWeight())
-            Spacer(GlanceModifier.height(6.dp))
-            ActionButton("Accounts", filled = false, accounts.fillMaxWidth().defaultWeight())
-        }
-    } else {
-        Row(GlanceModifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            ActionButton("+ Add", filled = true, add.defaultWeight().fillMaxHeight())
-            Spacer(GlanceModifier.width(6.dp))
-            ActionButton("Accounts", filled = false, accounts.defaultWeight().fillMaxHeight())
-        }
+    // One rounded card behind both buttons, a step darker than the unfilled button so each still reads against it.
+    Box(GlanceModifier.fillMaxSize().background(widgetColor { it.surfaceLow }).cornerRadius(24.dp).padding(6.dp)) {
+        if (LocalSize.current.height >= Square.height) StackedButtons(add, accounts) else SideBySideButtons(add, accounts)
+    }
+}
+
+@Composable
+private fun StackedButtons(add: GlanceModifier, accounts: GlanceModifier) {
+    Column(GlanceModifier.fillMaxSize()) {
+        ActionButton("+ Add", filled = true, add.fillMaxWidth().defaultWeight())
+        Spacer(GlanceModifier.height(6.dp))
+        ActionButton("Accounts", filled = false, accounts.fillMaxWidth().defaultWeight())
+    }
+}
+
+@Composable
+private fun SideBySideButtons(add: GlanceModifier, accounts: GlanceModifier) {
+    Row(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        ActionButton("+ Add", filled = true, add.defaultWeight().fillMaxHeight())
+        Spacer(GlanceModifier.width(6.dp))
+        ActionButton("Accounts", filled = false, accounts.defaultWeight().fillMaxHeight())
     }
 }
 
@@ -79,7 +88,7 @@ private fun ActionButton(text: String, filled: Boolean, modifier: GlanceModifier
     Box(
         modifier
             .background(widgetColor { if (filled) it.anchor else it.surfaceLowest })
-            .cornerRadius(20.dp),
+            .cornerRadius(18.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
