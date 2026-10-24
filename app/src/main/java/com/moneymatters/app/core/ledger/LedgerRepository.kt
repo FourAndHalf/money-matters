@@ -142,6 +142,25 @@ class LedgerRepository(
     }
 
     /**
+     * Deletes an account added by mistake: one with no entries, or only the opening-balance entry that came with it (removed
+     * along with it, and logged). An account with any other history is refused, so is an investment (delete it from Invest),
+     * Equity, and one whose opening entry sits in a reconciled or closed month. Archive hides those instead.
+     */
+    suspend fun deleteAccount(id: String) = database.withTransaction {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        require(account.type != AccountType.Equity) { "${account.name} is a system account and can't be deleted" }
+        require(account.kind != AccountKind.Investment && account.kind != AccountKind.FixedDeposit) {
+            "${account.name} is an investment: delete it from the Invest page"
+        }
+        val entries = dao.transactionIdsForAccount(id)
+        val opening = entries.filter { dao.getTransaction(it)?.payee == "Opening balance: ${account.name}" }
+        require(entries.size == opening.size) { "${account.name} has entries, so it can't be deleted; archive it instead" }
+        deleteEntries(opening, "Account ${account.name} deleted")
+        dao.deleteCreditCard(id)
+        dao.deleteAccount(id)
+    }
+
+    /**
      * Permanently removes Draft or Posted entries, with their postings, so they disappear from every list, journal and balance.
      * Reconciled and closed-month entries are immutable and are refused (reverse those instead), and one failure refuses them all.
      * Each deletion leaves a line in the audit log: the log itself is never trimmed.

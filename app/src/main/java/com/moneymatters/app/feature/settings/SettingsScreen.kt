@@ -73,7 +73,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: 
             }
             item("accounts") {
                 Module {
-                    SettingsRow("Accounts & categories", "Add, archive and mark essentials", divider = false) { section = SettingsSection.Accounts }
+                    SettingsRow("Accounts & categories", "Add, rename, archive, delete, mark essentials", divider = false) { section = SettingsSection.Accounts }
                 }
             }
             item("display") {

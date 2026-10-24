@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.feature.books.displayName
+import com.moneymatters.app.ui.components.ConfirmDialog
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.FormField
 import com.moneymatters.app.ui.components.ListRow
@@ -46,9 +48,20 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     var newType by rememberSaveable { mutableStateOf(AccountType.Expense) }
     var addError by rememberSaveable { mutableStateOf<String?>(null) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<AccountEntity?>(null) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
+    deleting?.let { account ->
+        ConfirmDialog(
+            title = "Delete ${account.displayName()}?",
+            text = "For an account added by mistake. Its opening balance entry goes with it, and this can't be undone.",
+            confirmLabel = "Delete",
+            onConfirm = { viewModel.deleteAccount(account.id) { deleteError = it } },
+            onDismiss = { deleting = null },
+        )
+    }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(top = status.calculateTopPadding())) {
             DetailTopBar(title = "Accounts & categories", onBack = onBack)
@@ -88,6 +101,9 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+            deleteError?.let { message ->
+                item("delete-error") { Text(message, style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.negative) }
+            }
             item("list") {
                 Module {
                     ModuleHeader("Every account and category")
@@ -99,6 +115,7 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                             divider = i < accounts.lastIndex,
                             isEditing = editingId == account.id,
                             onEdit = { editingId = if (it) account.id else null },
+                            onDelete = { deleteError = null; deleting = account },
                         )
                     }
                 }
@@ -115,6 +132,7 @@ private fun AccountRow(
     divider: Boolean,
     isEditing: Boolean,
     onEdit: (Boolean) -> Unit,
+    onDelete: () -> Unit,
 ) {
     if (isEditing) {
         CategoryEditor(account, viewModel, divider, onClose = { onEdit(false) })
@@ -154,9 +172,9 @@ private fun AccountRow(
             Pill(
                 if (account.isArchived) "Unarchive" else "Archive",
                 onClick = { if (account.isArchived) viewModel.unarchiveAccount(account.id) else viewModel.archiveAccount(account.id) },
-                style = if (account.isArchived) PillStyle.Secondary else PillStyle.Destructive,
                 height = 28.dp,
             )
+            if (account.type != AccountType.Equity) Pill("Delete", onClick = onDelete, style = PillStyle.Destructive, height = 28.dp)
         }
         if (divider) RowDivider()
     }
