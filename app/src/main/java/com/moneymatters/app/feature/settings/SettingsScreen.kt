@@ -35,11 +35,11 @@ import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.Toggle
 import com.moneymatters.app.ui.theme.MoneyTheme
 
-private enum class SettingsSection { Profile, Security, Accounts, Ai, Backup, AuditLog }
+private enum class SettingsSection { Profile, Security, Accounts, Ai }
 
-/** Settings (P21): everything the app's other pages read from or write to, and nothing it doesn't. */
+/** Settings (P21), opened from the gear on Home: preferences only. Close, backup and the audit log live on More. */
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: Modifier = Modifier, onOpenClose: () -> Unit = {}) {
+fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
     var section by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
 
     section?.let {
@@ -49,8 +49,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: 
             SettingsSection.Security -> SecuritySettingsScreen(viewModel, onBack = { section = null })
             SettingsSection.Accounts -> AccountsEditorScreen(viewModel, onBack = { section = null })
             SettingsSection.Ai -> AiSettingsScreen(viewModel, onBack = { section = null })
-            SettingsSection.Backup -> BackupRestoreScreen(viewModel, onBack = { section = null })
-            SettingsSection.AuditLog -> AuditLogScreen(viewModel, onBack = { section = null })
         }
         return
     }
@@ -119,29 +117,12 @@ fun SettingsScreen(viewModel: SettingsViewModel, onClose: () -> Unit, modifier: 
                     ) { viewModel.prefs.notificationsEnabled = it }
                 }
             }
-            item("backup") {
-                Module {
-                    SettingsRow("Backup & restore, export", "Encrypted database file, or a CSV of every posting", divider = false) {
-                        section = SettingsSection.Backup
-                    }
-                }
-            }
-            item("close") {
-                Module {
-                    SettingsRow("Month-end close", "Reconcile, confirm balances and lock a finished month", divider = false, onClick = onOpenClose)
-                }
-            }
-            item("audit") {
-                Module {
-                    SettingsRow("Audit log", "Every ledger change, before and after", divider = false) { section = SettingsSection.AuditLog }
-                }
-            }
         }
     }
 }
 
 @Composable
-private fun SettingsRow(title: String, subtitle: String, divider: Boolean = true, clickable: Boolean = true, onClick: () -> Unit = {}) {
+internal fun SettingsRow(title: String, subtitle: String, divider: Boolean = true, clickable: Boolean = true, onClick: () -> Unit = {}) {
     ListRow(
         title = title,
         subtitle = subtitle,
