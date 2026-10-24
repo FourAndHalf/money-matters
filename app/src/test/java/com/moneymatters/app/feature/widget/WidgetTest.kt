@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import com.moneymatters.app.core.money.Paise
+import com.moneymatters.app.feature.settings.NumberFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -28,6 +29,14 @@ class WidgetTest {
         store.save(WidgetSnapshot(Paise(5_00), Paise(5_00), Paise.Zero, 2_000))
         assertEquals(Paise(5_00), store.read()!!.netWorth)
         assertEquals(2_000L, store.read()!!.updatedAtMillis)
+    }
+
+    @Test fun `figures show normally and become dots when the app lock is on`() {
+        val amount = Paise(2_40_000_00)
+        assertEquals("₹2,40,000", amount.widgetText(NumberFormat.Full))
+        assertEquals("₹2.4L", amount.widgetText(NumberFormat.Compact))
+        assertEquals(HIDDEN_AMOUNT, amount.widgetText(NumberFormat.Full, hidden = true))
+        assertEquals(HIDDEN_AMOUNT, Paise(-5_00).widgetText(NumberFormat.Compact, hidden = true))
     }
 
     @Test fun `each widget button's intent maps to its page, and anything else to none`() {

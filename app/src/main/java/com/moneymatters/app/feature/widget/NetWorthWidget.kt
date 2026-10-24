@@ -35,6 +35,7 @@ import androidx.glance.color.ColorProvider
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.core.money.formatInrCompact
+import com.moneymatters.app.core.security.PasscodeStore
 import com.moneymatters.app.feature.settings.NumberFormat
 import com.moneymatters.app.feature.settings.SettingsPrefs
 import com.moneymatters.app.ui.theme.DarkMoneyColors
@@ -57,8 +58,11 @@ class NetWorthWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(OneRow, TwoRows))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val (snapshot, format) = withContext(Dispatchers.IO) { WidgetStore.encrypted(context).read() to SettingsPrefs(context).numberFormat }
-        provideContent { NetWorthContent(snapshot, format) }
+        val (snapshot, format, hidden) = withContext(Dispatchers.IO) {
+            val passcodes = PasscodeStore.encrypted(context)
+            Triple(WidgetStore.encrypted(context).read(), SettingsPrefs(context).numberFormat, passcodes.isSet() && passcodes.isLockEnabled())
+        }
+        provideContent { NetWorthContent(snapshot, format, hidden) }
     }
 }
 
@@ -66,10 +70,17 @@ class NetWorthWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NetWorthWidget()
 }
 
-private fun Paise.widgetText(format: NumberFormat) = if (format == NumberFormat.Compact) formatInrCompact() else formatInr()
+internal const val HIDDEN_AMOUNT = "₹ ••••••"
+
+/** With the app lock on, a home screen shouldn't read out the books: every figure becomes [HIDDEN_AMOUNT]. */
+internal fun Paise.widgetText(format: NumberFormat, hidden: Boolean = false) = when {
+    hidden -> HIDDEN_AMOUNT
+    format == NumberFormat.Compact -> formatInrCompact()
+    else -> formatInr()
+}
 
 @Composable
-private fun NetWorthContent(snapshot: WidgetSnapshot?, format: NumberFormat) {
+private fun NetWorthContent(snapshot: WidgetSnapshot?, format: NumberFormat, hidden: Boolean) {
     val context = LocalContext.current
     val tall = LocalSize.current.height >= TwoRows.height
     val label = TextStyle(color = widgetColor { it.muted }, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
@@ -89,7 +100,7 @@ private fun NetWorthContent(snapshot: WidgetSnapshot?, format: NumberFormat) {
         }
         Text("Net worth", style = label)
         Text(
-            snapshot.netWorth.widgetText(format),
+            snapshot.netWorth.widgetText(format, hidden),
             style = TextStyle(color = widgetColor { it.ink }, fontSize = if (tall) 30.sp else 22.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
             maxLines = 1,
         )
@@ -98,11 +109,11 @@ private fun NetWorthContent(snapshot: WidgetSnapshot?, format: NumberFormat) {
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(GlanceModifier.defaultWeight()) {
                     Text("Assets", style = label)
-                    Text(snapshot.assets.widgetText(format), style = TextStyle(color = widgetColor { it.ink }, fontSize = 14.sp, fontFamily = FontFamily.Monospace), maxLines = 1)
+                    Text(snapshot.assets.widgetText(format, hidden), style = TextStyle(color = widgetColor { it.ink }, fontSize = 14.sp, fontFamily = FontFamily.Monospace), maxLines = 1)
                 }
                 Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.End) {
                     Text("Liabilities", style = label)
-                    Text(snapshot.liabilities.widgetText(format), style = TextStyle(color = widgetColor { it.negative }, fontSize = 14.sp, fontFamily = FontFamily.Monospace), maxLines = 1)
+                    Text(snapshot.liabilities.widgetText(format, hidden), style = TextStyle(color = widgetColor { it.negative }, fontSize = 14.sp, fontFamily = FontFamily.Monospace), maxLines = 1)
                 }
             }
         }

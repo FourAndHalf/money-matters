@@ -156,6 +156,19 @@ class SettingsViewModelTest {
         assertTrue("Groceries" in model.profileForm.essentialCategories)
     }
 
+    @Test fun `switching the app lock tells the widget to redraw`() {
+        var redraws = 0
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val watched = SettingsViewModel(
+            repo, profiles, passcodes, SettingsPrefs(context),
+            AiSettingsStore(context.getSharedPreferences("settings_vm_ai", Context.MODE_PRIVATE)),
+            hashing = Dispatchers.Unconfined, onLockChanged = { redraws++ },
+        )
+        watched.updateLockEnabled(false)
+        watched.updateLockEnabled(true)
+        assertEquals(2, redraws)
+    }
+
     @Test fun `the app lock switch writes straight through and keeps the passcode`() {
         assertTrue(model.lockEnabled)
         model.updateLockEnabled(false)

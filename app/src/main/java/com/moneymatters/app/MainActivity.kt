@@ -42,7 +42,9 @@ import com.moneymatters.app.feature.books.BooksViewModel
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.SipGoal
 import com.moneymatters.app.feature.lock.AppLock
+import androidx.glance.appwidget.updateAll
 import com.moneymatters.app.feature.widget.LaunchTarget
+import com.moneymatters.app.feature.widget.NetWorthWidget
 import com.moneymatters.app.feature.widget.WidgetStore
 import com.moneymatters.app.feature.widget.syncNetWorthWidget
 import com.moneymatters.app.feature.lock.LockScreen
@@ -117,6 +119,7 @@ class MainActivity : ComponentActivity() {
                     passcodes,
                     SettingsPrefs(applicationContext),
                     AiSettingsStore.encrypted(applicationContext),
+                    onLockChanged = { lifecycleScope.launch { NetWorthWidget().updateAll(applicationContext) } },
                 )
             }
         }
