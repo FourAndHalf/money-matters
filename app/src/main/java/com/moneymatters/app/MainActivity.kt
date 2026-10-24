@@ -65,8 +65,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val SPLASH_EXIT_DURATION_MS = 420L
-private const val SPLASH_EXIT_SCALE = 4f
+private const val SPLASH_EXIT_DURATION_MS = 450L
+// The wallet mark fills ~40% of the icon view, so it needs this much to leave even a tall screen.
+private const val SPLASH_EXIT_SCALE = 16f
 
 class MainActivity : ComponentActivity() {
     private val onboarding: OnboardingWizard by viewModels()
@@ -144,16 +145,23 @@ class MainActivity : ComponentActivity() {
         }
 
         splashScreen.setOnExitAnimationListener { splashScreenView ->
+            val icon = splashScreenView.iconView
+            // Scale and fade the mark only; the charcoal backdrop fades over the last stretch so the
+            // home screen is revealed behind a mark that has already gone, with no jump at the end.
+            icon.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            icon.pivotX = icon.width / 2f
+            icon.pivotY = icon.height / 2f
             val scaleUp = ObjectAnimator.ofPropertyValuesHolder(
-                splashScreenView.iconView,
+                icon,
                 PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, SPLASH_EXIT_SCALE),
                 PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, SPLASH_EXIT_SCALE),
+                PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 1f, 0f),
             )
-            val fadeOut = ObjectAnimator.ofFloat(splashScreenView.view, View.ALPHA, 1f, 0f)
+            val fadeOut = ObjectAnimator.ofFloat(splashScreenView.view, View.ALPHA, 1f, 1f, 0f)
             AnimatorSet().apply {
                 playTogether(scaleUp, fadeOut)
                 duration = SPLASH_EXIT_DURATION_MS
-                interpolator = AccelerateInterpolator()
+                interpolator = AccelerateInterpolator(1.5f)
                 doOnEnd { splashScreenView.remove() }
                 start()
             }
