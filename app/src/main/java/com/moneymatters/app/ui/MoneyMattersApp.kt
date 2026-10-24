@@ -52,6 +52,7 @@ import com.moneymatters.app.feature.invest.TradeScreen
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddScreen
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
+import com.moneymatters.app.feature.settings.MoreScreen
 import com.moneymatters.app.feature.settings.SettingsScreen
 import com.moneymatters.app.feature.settings.SettingsViewModel
 import com.moneymatters.app.feature.transactions.EditEntryScreen
@@ -90,6 +91,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var openTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showMore by rememberSaveable { mutableStateOf(false) }
     var openHoldingId by rememberSaveable { mutableStateOf<String?>(null) }
     var openDepositId by rememberSaveable { mutableStateOf<String?>(null) }
     var openSipId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -272,14 +274,18 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         onConfirmAll = closeModel::confirmAll,
                         onReconcile = closeModel::reconcile,
                         onPostInterest = closeModel::postInterest,
-                        onOpenPrices = { showClose = false; showSettings = false; tab = INVEST_TAB; showPrices = true },
+                        onOpenPrices = { showClose = false; showMore = false; showSettings = false; tab = INVEST_TAB; showPrices = true },
                         onClose = closeModel::closeMonth,
                     )
                 }
             }
             showSettings -> {
                 BackHandler { showSettings = false }
-                SettingsScreen(settings, onClose = { showSettings = false }, onOpenClose = { showClose = true })
+                SettingsScreen(settings, onClose = { showSettings = false })
+            }
+            showMore -> {
+                BackHandler { showMore = false }
+                MoreScreen(settings, onClose = { showMore = false }, onOpenClose = { showClose = true })
             }
             else -> {
                 when (tab) {
@@ -290,6 +296,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         onEditCard = { settings.startEditCard(it.id, it.name, it.cardLimit, it.statementDay) },
                         onOpenTransactions = { tab = TXNS_TAB },
                         onOpenTransaction = { id -> openTransactionId = id },
+                        onOpenSettings = { showSettings = true },
                         // Clears the floating bar and Quick Add.
                         contentPadding = PaddingValues(bottom = 132.dp),
                     )
@@ -332,7 +339,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         .navigationBarsPadding()
                         .padding(horizontal = 10.dp, vertical = 14.dp),
                 ) {
-                    MoneyBottomBar(Tabs, tab, onSelect = { if (it == MORE_TAB) showSettings = true else tab = it })
+                    MoneyBottomBar(Tabs, tab, onSelect = { if (it == MORE_TAB) showMore = true else tab = it })
                 }
                 QuickAddFab(
                     // The + does what the page it is on needs: add an account on Accounts, an investment on Invest, an entry elsewhere.

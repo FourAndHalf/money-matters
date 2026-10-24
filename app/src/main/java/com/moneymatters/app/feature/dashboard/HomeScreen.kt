@@ -4,9 +4,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -24,6 +27,7 @@ import com.moneymatters.app.feature.accounts.AccountSummary
 import com.moneymatters.app.feature.transactions.SummaryRow
 import com.moneymatters.app.feature.transactions.TransactionSummary
 import com.moneymatters.app.ui.components.AccountRow
+import com.moneymatters.app.ui.components.CircleIconButton
 import com.moneymatters.app.ui.components.KeyValueRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
@@ -32,6 +36,7 @@ import com.moneymatters.app.ui.components.NetWorthCard
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
+import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyTheme
 
 
@@ -64,6 +69,7 @@ fun HomeScreen(
     onOpenTransactions: () -> Unit,
     onOpenTransaction: (id: String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val margin = MoneyTheme.spacing.margin
@@ -77,9 +83,16 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
     ) {
         padded(margin, "header") {
-            Column(Modifier.padding(start = 2.dp, top = 10.dp, bottom = 6.dp)) {
-                Text("Home", style = MoneyTheme.type.headlineXlMobile, color = MoneyTheme.colors.ink)
-                Text(state.dateLabel, style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 3.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(start = 2.dp, top = 10.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Home", style = MoneyTheme.type.headlineXlMobile, color = MoneyTheme.colors.ink)
+                    Text(state.dateLabel, style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 3.dp))
+                }
+                CircleIconButton(MoneyIcons.Settings, "Settings", onOpenSettings, size = 40.dp, iconSize = 18.dp)
             }
         }
         padded(margin, "net-worth") { NetWorthCard(state.netWorth, state.assetsTotal, state.liabilitiesTotal) }
