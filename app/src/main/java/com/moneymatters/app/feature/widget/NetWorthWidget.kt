@@ -2,13 +2,12 @@ package com.moneymatters.app.feature.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
@@ -16,53 +15,36 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.background
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.Spacer
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.height
-import androidx.glance.layout.padding
-import androidx.glance.text.FontFamily
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
 import androidx.glance.color.ColorProvider
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
-import com.moneymatters.app.core.money.formatInrCompact
 import com.moneymatters.app.core.security.PasscodeStore
-import com.moneymatters.app.feature.settings.NumberFormat
-import com.moneymatters.app.feature.settings.SettingsPrefs
 import com.moneymatters.app.ui.theme.DarkMoneyColors
 import com.moneymatters.app.ui.theme.LightMoneyColors
 import com.moneymatters.app.ui.theme.MoneyColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val OneRow = DpSize(250.dp, 40.dp)
-private val TwoRows = DpSize(250.dp, 110.dp)
-
 /** The widgets can't use Compose theming, so they take the app's light and dark palettes directly. */
 internal fun widgetColor(pick: (MoneyColors) -> Color) = ColorProvider(day = pick(LightMoneyColors), night = pick(DarkMoneyColors))
 
 /**
- * Net worth, as on Home. One row tall (4×1) it is the figure alone; two rows tall (4×2) it adds assets and liabilities.
- * Tapping opens the app, which asks for the passcode as usual.
+ * Net worth, as on Home: the same card, drawn by [NetWorthCardRenderer]. One row tall (4×1) it is the figure and the split bar;
+ * two rows tall (4×2) it adds assets and liabilities. Tapping opens the app, which asks for the passcode as usual.
  */
 class NetWorthWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(OneRow, TwoRows))
+    // Exact, so the card is drawn at the size it is shown at rather than stretched from a nearby one.
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val (snapshot, format, hidden) = withContext(Dispatchers.IO) {
+        val (snapshot, hidden) = withContext(Dispatchers.IO) {
             val passcodes = PasscodeStore.encrypted(context)
-            Triple(WidgetStore.encrypted(context).read(), SettingsPrefs(context).numberFormat, passcodes.isSet() && passcodes.isLockEnabled())
+            WidgetStore.encrypted(context).read() to (passcodes.isSet() && passcodes.isLockEnabled())
         }
-        provideContent { NetWorthContent(snapshot, format, hidden) }
+        provideContent { NetWorthContent(snapshot, hidden) }
     }
 }
 
@@ -73,49 +55,22 @@ class NetWorthWidgetReceiver : GlanceAppWidgetReceiver() {
 internal const val HIDDEN_AMOUNT = "₹ ••••••"
 
 /** With the app lock on, a home screen shouldn't read out the books: every figure becomes [HIDDEN_AMOUNT]. */
-internal fun Paise.widgetText(format: NumberFormat, hidden: Boolean = false) = when {
-    hidden -> HIDDEN_AMOUNT
-    format == NumberFormat.Compact -> formatInrCompact()
-    else -> formatInr()
-}
+internal fun Paise.widgetText(hidden: Boolean = false) = if (hidden) HIDDEN_AMOUNT else formatInr()
 
 @Composable
-private fun NetWorthContent(snapshot: WidgetSnapshot?, format: NumberFormat, hidden: Boolean) {
+private fun NetWorthContent(snapshot: WidgetSnapshot?, hidden: Boolean) {
     val context = LocalContext.current
-    val tall = LocalSize.current.height >= TwoRows.height
-    val label = TextStyle(color = widgetColor { it.muted }, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-    Column(
-        GlanceModifier
-            .fillMaxSize()
-            .background(widgetColor { it.surfaceLowest })
-            .cornerRadius(24.dp)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .clickable(actionStartActivity(launchIntent(context))),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (snapshot == null) {
-            Text("Net worth", style = label)
-            Text("Open Money Matters to start", style = TextStyle(color = widgetColor { it.ink }, fontSize = 14.sp, fontFamily = FontFamily.Monospace))
-            return@Column
-        }
-        Text("Net worth", style = label)
-        Text(
-            snapshot.netWorth.widgetText(format, hidden),
-            style = TextStyle(color = widgetColor { it.ink }, fontSize = if (tall) 30.sp else 22.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
-            maxLines = 1,
-        )
-        if (tall) {
-            Spacer(GlanceModifier.height(10.dp))
-            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Column(GlanceModifier.defaultWeight()) {
-                    Text("Assets", style = label)
-                    Text(snapshot.assets.widgetText(format, hidden), style = TextStyle(color = widgetColor { it.ink }, fontSize = 14.sp, fontFamily = FontFamily.Monospace), maxLines = 1)
-                }
-                Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.End) {
-                    Text("Liabilities", style = label)
-                    Text(snapshot.liabilities.widgetText(format, hidden), style = TextStyle(color = widgetColor { it.negative }, fontSize = 14.sp, fontFamily = FontFamily.Monospace), maxLines = 1)
-                }
-            }
-        }
+    val size = LocalSize.current
+    val card = remember(size, snapshot, hidden) { NetWorthCardRenderer.render(context, size, snapshot, hidden) }
+    val description = when {
+        snapshot == null -> "Net worth"
+        hidden -> "Net worth, hidden while the app lock is on"
+        else -> "Net worth ${snapshot.netWorth.widgetText()}, assets ${snapshot.assets.widgetText()}, liabilities ${snapshot.liabilities.widgetText()}"
     }
+    Image(
+        ImageProvider(card),
+        contentDescription = description,
+        contentScale = ContentScale.FillBounds,
+        modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity(launchIntent(context))),
+    )
 }
