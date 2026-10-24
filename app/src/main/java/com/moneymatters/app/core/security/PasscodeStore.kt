@@ -15,6 +15,7 @@ private const val KEY_PASSCODE_SALT = "passcode_salt"
 private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
 private const val KEY_PASSCODE_LENGTH = "passcode_length"
 private const val KEY_LOCK_TIMEOUT = "lock_timeout"
+private const val KEY_LOCK_ENABLED = "lock_enabled"
 private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
 private const val KEY_LOCKED_OUT_UNTIL = "locked_out_until"
 private const val SALT_BYTES = 16
@@ -49,6 +50,13 @@ class PasscodeStore(private val prefs: SharedPreferences) {
         val salt = prefs.getString(KEY_PASSCODE_SALT, null)?.hexToBytes() ?: return false
         val stored = prefs.getString(KEY_PASSCODE_HASH, null)?.hexToBytes() ?: return false
         return MessageDigest.isEqual(stored, hash(passcode, salt))
+    }
+
+    /** Whether the app asks for the passcode at all. Off keeps the saved passcode, so turning it back on needs no setup. */
+    fun isLockEnabled(): Boolean = prefs.getBoolean(KEY_LOCK_ENABLED, true)
+
+    fun setLockEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_LOCK_ENABLED, enabled).apply()
     }
 
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)

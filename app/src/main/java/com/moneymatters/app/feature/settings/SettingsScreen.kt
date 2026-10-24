@@ -197,11 +197,17 @@ private fun ProfileSettingsScreen(viewModel: SettingsViewModel, onBack: () -> Un
 private fun SecuritySettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     SettingsSubScreen("Security", onBack) {
         Module {
-            ModuleHeader("Unlock")
-            ToggleRow("Use biometrics", "Fingerprint or face, alongside the passcode", viewModel.biometricEnabled, divider = false) {
-                viewModel.updateBiometricEnabled(it)
+            ModuleHeader("App lock")
+            ToggleRow("Ask for passcode on open", "Off opens the app straight to your books", viewModel.lockEnabled, divider = viewModel.lockEnabled) {
+                viewModel.updateLockEnabled(it)
+            }
+            if (viewModel.lockEnabled) {
+                ToggleRow("Use biometrics", "Fingerprint or face, alongside the passcode", viewModel.biometricEnabled, divider = false) {
+                    viewModel.updateBiometricEnabled(it)
+                }
             }
         }
+        if (!viewModel.lockEnabled) return@SettingsSubScreen
         Module {
             ModuleHeader("Lock timeout")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -267,7 +273,9 @@ private fun SettingsSubScreen(title: String, onBack: () -> Unit, content: @Compo
             contentPadding = PaddingValues(start = margin, top = MoneyTheme.spacing.sm, end = margin, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter),
         ) {
-            item("content") { content() }
+            item("content") {
+                Column(verticalArrangement = Arrangement.spacedBy(MoneyTheme.spacing.gutter)) { content() }
+            }
         }
     }
 }

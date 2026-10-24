@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val appLock: AppLock by viewModels {
-        viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet()) } }
+        viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet() && passcodes.isLockEnabled()) } }
     }
     private val quickAddPrefs by lazy { QuickAddPrefs(applicationContext) }
     private val quickAddModel: QuickAddViewModel by viewModels {

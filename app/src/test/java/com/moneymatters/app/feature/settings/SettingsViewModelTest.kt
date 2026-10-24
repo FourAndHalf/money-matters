@@ -126,6 +126,43 @@ class SettingsViewModelTest {
         assertTrue("Dining" in model.profileForm.essentialCategories)
     }
 
+    @Test fun `renaming a category keeps its prefix and carries the essential flag`() = runBlocking {
+        val id = repo.createAccount("Expenses:Groceries", AccountType.Expense)
+        var result: String? = "unset"
+        model.renameCategory(db.ledgerDao().getAccount(id)!!, "  Food  ") { result = it }
+        idle()
+        assertEquals(null, result)
+        assertEquals("Expenses:Food", db.ledgerDao().getAccount(id)!!.name)
+        assertTrue("Food" in model.profileForm.essentialCategories)
+        assertFalse("Groceries" in profiles.profile()!!.essentialCategories)
+    }
+
+    @Test fun `renaming a category refuses a blank or taken name and changes nothing`() = runBlocking {
+        val id = repo.createAccount("Expenses:Groceries", AccountType.Expense)
+        repo.createAccount("Expenses:Dining", AccountType.Expense)
+        val account = db.ledgerDao().getAccount(id)!!
+        var result: String? = null
+        model.renameCategory(account, "   ") { result = it }
+        idle()
+        assertEquals("Give it a name", result)
+        result = null
+        model.renameCategory(account, "Dining") { result = it }
+        idle()
+        assertTrue(result!!.contains("already"))
+        assertEquals("Expenses:Groceries", db.ledgerDao().getAccount(id)!!.name)
+        assertTrue("Groceries" in model.profileForm.essentialCategories)
+    }
+
+    @Test fun `the app lock switch writes straight through and keeps the passcode`() {
+        assertTrue(model.lockEnabled)
+        model.updateLockEnabled(false)
+        assertFalse(model.lockEnabled)
+        assertFalse(passcodes.isLockEnabled())
+        assertTrue(passcodes.isSet())
+        model.updateLockEnabled(true)
+        assertTrue(passcodes.isLockEnabled())
+    }
+
     @Test fun `exportCsv lists every posting with its account and amount`() = runBlocking {
         val bank = repo.createAccount("HDFC Bank", AccountType.Asset)
         val dining = repo.createAccount("Expenses:Dining", AccountType.Expense)
