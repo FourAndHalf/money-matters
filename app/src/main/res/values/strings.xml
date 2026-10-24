@@ -3,6 +3,7 @@
     <string name="app_name">Money Matters</string>
     <string name="widget_net_worth_label">Net worth</string>
     <string name="widget_net_worth_description">Your net worth, with assets and liabilities when it is two rows tall</string>
-    <string name="widget_quick_actions_label">Add and accounts</string>
+    <string name="widget_quick_actions_label">Add and accounts (2×1)</string>
+    <string name="widget_quick_actions_stacked_label">Add and accounts (2×2)</string>
     <string name="widget_quick_actions_description">Add a transaction, or open your accounts</string>
 </resources>
