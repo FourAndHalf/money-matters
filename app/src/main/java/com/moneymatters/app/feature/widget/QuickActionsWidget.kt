@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
@@ -27,11 +29,9 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.text.FontFamily
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
+import com.moneymatters.app.R
 
 private val Wide = DpSize(110.dp, 40.dp)
 private val Square = DpSize(110.dp, 110.dp)
@@ -68,38 +68,34 @@ private fun QuickActionsContent() {
 @Composable
 private fun StackedButtons(add: GlanceModifier, accounts: GlanceModifier) {
     Column(GlanceModifier.fillMaxSize()) {
-        ActionButton("+ Add", filled = true, add.fillMaxWidth().defaultWeight())
+        ActionButton(R.drawable.ic_widget_add, "Add a transaction", filled = true, add.fillMaxWidth().defaultWeight())
         Spacer(GlanceModifier.height(6.dp))
-        ActionButton("Accounts", filled = false, accounts.fillMaxWidth().defaultWeight())
+        ActionButton(R.drawable.ic_widget_accounts, "Accounts", filled = false, accounts.fillMaxWidth().defaultWeight())
     }
 }
 
 @Composable
 private fun SideBySideButtons(add: GlanceModifier, accounts: GlanceModifier) {
     Row(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        ActionButton("+ Add", filled = true, add.defaultWeight().fillMaxHeight())
+        ActionButton(R.drawable.ic_widget_add, "Add a transaction", filled = true, add.defaultWeight().fillMaxHeight())
         Spacer(GlanceModifier.width(6.dp))
-        ActionButton("Accounts", filled = false, accounts.defaultWeight().fillMaxHeight())
+        ActionButton(R.drawable.ic_widget_accounts, "Accounts", filled = false, accounts.defaultWeight().fillMaxHeight())
     }
 }
 
 @Composable
-private fun ActionButton(text: String, filled: Boolean, modifier: GlanceModifier) {
+private fun ActionButton(icon: Int, description: String, filled: Boolean, modifier: GlanceModifier) {
     Box(
         modifier
             .background(widgetColor { if (filled) it.anchor else it.surfaceLowest })
             .cornerRadius(18.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text,
-            style = TextStyle(
-                color = widgetColor { if (filled) it.onAnchor else it.ink },
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace,
-            ),
-            maxLines = 1,
+        Image(
+            ImageProvider(icon),
+            contentDescription = description,
+            colorFilter = ColorFilter.tint(widgetColor { if (filled) it.onAnchor else it.ink }),
+            modifier = GlanceModifier.size(26.dp),
         )
     }
 }
