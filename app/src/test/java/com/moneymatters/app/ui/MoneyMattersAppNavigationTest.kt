@@ -1,5 +1,6 @@
 package com.moneymatters.app.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -28,6 +29,7 @@ import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.settings.AiSettingsStore
 import com.moneymatters.app.feature.settings.SettingsPrefs
 import com.moneymatters.app.feature.settings.SettingsViewModel
+import com.moneymatters.app.feature.widget.LaunchTarget
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import java.time.LocalDate
 import org.junit.Rule
@@ -114,6 +116,33 @@ class MoneyMattersAppNavigationTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Net worth").assertIsDisplayed()
         compose.onNodeWithContentDescription("Quick add").assertIsDisplayed()
+    }
+
+    @Test fun `the widget's Add button lands on Quick Add, from wherever the app was`() {
+        compose.setContent {
+            MoneyMattersTheme {
+                MoneyMattersApp(SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel(), launchTarget = LaunchTarget.AddEntry)
+            }
+        }
+        compose.onAllNodesWithText("Quick add")[0].assertIsDisplayed()
+        compose.onNodeWithContentDescription("Quick add").assertIsNotDisplayed()
+    }
+
+    @Test fun `the widget's Accounts button lands on the Accounts tab and reports it handled`() {
+        var handled = 0
+        compose.setContent {
+            MoneyMattersTheme {
+                MoneyMattersApp(
+                    SampleBooks.state, quickAddModel(), quickAddPrefs(), settingsModel(), investModel(), closeModel(),
+                    launchTarget = LaunchTarget.Accounts, onLaunchHandled = { handled++ },
+                )
+            }
+        }
+        compose.waitForIdle()
+        // Home's "View all" links are gone and the Accounts page's net worth is up.
+        compose.onAllNodesWithText("View all").assertCountEquals(0)
+        compose.onNodeWithText("Net worth").assertIsDisplayed()
+        org.junit.Assert.assertEquals(1, handled)
     }
 
     @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)

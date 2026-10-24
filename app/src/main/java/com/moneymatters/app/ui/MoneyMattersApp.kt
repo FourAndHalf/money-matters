@@ -55,6 +55,7 @@ import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.settings.MoreScreen
 import com.moneymatters.app.feature.settings.SettingsScreen
 import com.moneymatters.app.feature.settings.SettingsViewModel
+import com.moneymatters.app.feature.widget.LaunchTarget
 import com.moneymatters.app.feature.transactions.EditEntryScreen
 import com.moneymatters.app.feature.transactions.TransactionDetailScreen
 import com.moneymatters.app.feature.transactions.TransactionsScreen
@@ -81,7 +82,7 @@ private enum class InvestOverlay { Trade, Price, Dividend, Action, Allot, NewDep
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -101,6 +102,18 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var showAddAccount by rememberSaveable { mutableStateOf(false) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
+    // A widget button: drop whatever is open, then land on the page it names.
+    LaunchedEffect(launchTarget) {
+        val target = launchTarget ?: return@LaunchedEffect
+        openAccountId = null; openTransactionId = null; openHoldingId = null; openDepositId = null; openSipId = null
+        showSettings = false; showMore = false; showClose = false; showPrices = false; showGains = false; showAddAccount = false
+        investOverlay = null
+        when (target) {
+            LaunchTarget.AddEntry -> showQuickAdd = true
+            LaunchTarget.Accounts -> { showQuickAdd = false; tab = ACCOUNTS_TAB }
+        }
+        onLaunchHandled()
+    }
     val c = MoneyTheme.colors
     val canvas = if (c.isDark) Brush.verticalGradient(listOf(c.canvas, c.canvas)) else Brush.verticalGradient(0f to Color(0xFFF0F0F2), 0.45f to c.canvas)
 

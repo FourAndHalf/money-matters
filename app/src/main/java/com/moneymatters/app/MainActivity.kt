@@ -3,6 +3,7 @@ package com.moneymatters.app
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AccelerateInterpolator
@@ -18,6 +19,9 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.moneymatters.app.core.invest.CapitalGainsRules
@@ -38,6 +42,9 @@ import com.moneymatters.app.feature.books.BooksViewModel
 import com.moneymatters.app.feature.invest.InvestViewModel
 import com.moneymatters.app.feature.invest.SipGoal
 import com.moneymatters.app.feature.lock.AppLock
+import com.moneymatters.app.feature.widget.LaunchTarget
+import com.moneymatters.app.feature.widget.WidgetStore
+import com.moneymatters.app.feature.widget.syncNetWorthWidget
 import com.moneymatters.app.feature.lock.LockScreen
 import com.moneymatters.app.feature.onboarding.OnboardingSaver
 import com.moneymatters.app.feature.onboarding.OnboardingScreen
@@ -50,6 +57,10 @@ import com.moneymatters.app.feature.settings.SettingsViewModel
 import com.moneymatters.app.ui.MoneyMattersApp
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val SPLASH_EXIT_DURATION_MS = 420L
@@ -91,6 +102,8 @@ class MainActivity : ComponentActivity() {
     private val appLock: AppLock by viewModels {
         viewModelFactory { initializer { AppLock(passcodes, startLocked = profiles.isSetupComplete() && passcodes.isSet() && passcodes.isLockEnabled()) } }
     }
+    private val widgetStore by lazy { WidgetStore.encrypted(applicationContext) }
+    private var launchTarget by mutableStateOf<LaunchTarget?>(null)
     private val quickAddPrefs by lazy { QuickAddPrefs(applicationContext) }
     private val quickAddModel: QuickAddViewModel by viewModels {
         viewModelFactory { initializer { QuickAddViewModel(LedgerRepository(LedgerDatabaseProvider.get(applicationContext))) } }
@@ -115,6 +128,17 @@ class MainActivity : ComponentActivity() {
         PriceWorker.schedule(applicationContext)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // A widget button's intent; a recreation after rotation must not replay it.
+        if (savedInstanceState == null) launchTarget = LaunchTarget.from(intent)
+        // Keeps the home-screen widget's figures current while the app is open.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                booksModel.books.filterNotNull().map { it.home }.filter { profiles.isSetupComplete() }.collect {
+                    syncNetWorthWidget(applicationContext, widgetStore, it)
+                }
+            }
+        }
 
         splashScreen.setOnExitAnimationListener { splashScreenView ->
             val scaleUp = ObjectAnimator.ofPropertyValuesHolder(
@@ -166,11 +190,17 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }) }
                     }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchTarget = LaunchTarget.from(intent)
     }
 
     override fun onStart() {
