@@ -83,6 +83,9 @@ interface LedgerDao {
 
     @Insert suspend fun insertCreditCard(card: CreditCardEntity)
 
+    @Query("DELETE FROM credit_cards WHERE accountId = :accountId")
+    suspend fun deleteCreditCard(accountId: String)
+
     @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE) suspend fun upsertCreditCard(card: CreditCardEntity)
 
     @Query("SELECT * FROM credit_cards")

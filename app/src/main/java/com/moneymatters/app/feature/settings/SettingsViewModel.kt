@@ -200,6 +200,20 @@ class SettingsViewModel(
         }
     }
 
+    /** Deletes an account added by mistake; [onDone] gets null on success or why it was refused (see [LedgerRepository.deleteAccount]). */
+    fun deleteAccount(id: String, onDone: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                repo.deleteAccount(id)
+                onDone(null)
+            } catch (e: IllegalArgumentException) {
+                onDone(e.message)
+            } catch (e: IllegalStateException) {
+                onDone(e.message)
+            }
+        }
+    }
+
     fun archiveAccount(id: String) {
         viewModelScope.launch { repo.archiveAccount(id) }
     }
