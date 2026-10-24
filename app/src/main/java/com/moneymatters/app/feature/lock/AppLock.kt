@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Whether the app is locked, and the lock screen's keypad state (plan.html → P02). Locked from a
- * cold start whenever a passcode exists, and again once the app has been in the background for
+ * cold start whenever a passcode exists and the lock is on, and again once the app has been in the background for
  * at least [PasscodeStore.lockTimeout]. A [ViewModel] so a rotation doesn't unlock the app.
  */
 class AppLock(
@@ -58,7 +58,7 @@ class AppLock(
     fun onAppForegrounded() {
         val since = backgroundedAt ?: return
         backgroundedAt = null
-        if (store.isSet() && now() - since >= store.lockTimeout().millis) lock()
+        if (store.isSet() && store.isLockEnabled() && now() - since >= store.lockTimeout().millis) lock()
     }
 
     fun lock() {

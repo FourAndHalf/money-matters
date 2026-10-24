@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.moneymatters.app.feature.transactions.plainRupees
 import com.moneymatters.app.core.ledger.AccountKind
+import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.ledger.LedgerSnapshot
@@ -16,6 +17,7 @@ import com.moneymatters.app.core.profile.ProfileStore
 import com.moneymatters.app.core.profile.UserProfile
 import com.moneymatters.app.core.security.LockTimeout
 import com.moneymatters.app.core.security.PasscodeStore
+import com.moneymatters.app.feature.books.displayName
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import com.moneymatters.app.feature.accounts.addAccountWithOpening
@@ -48,6 +50,8 @@ class SettingsViewModel(
         private set
     var lockTimeout by mutableStateOf(passcodes.lockTimeout())
         private set
+    var lockEnabled by mutableStateOf(passcodes.isLockEnabled())
+        private set
 
     var currentPasscode by mutableStateOf("")
     var newPasscode by mutableStateOf("")
@@ -74,6 +78,11 @@ class SettingsViewModel(
                 isSavingProfile = false
             }
         }
+    }
+
+    fun updateLockEnabled(enabled: Boolean) {
+        passcodes.setLockEnabled(enabled)
+        lockEnabled = enabled
     }
 
     fun updateBiometricEnabled(enabled: Boolean) {
@@ -165,6 +174,30 @@ class SettingsViewModel(
 
     fun addAccount(name: String, type: AccountType, kind: AccountKind? = null) {
         viewModelScope.launch { repo.createAccount(name, type, kind = kind) }
+    }
+
+    /**
+     * Renames an expense category, keeping its `Expenses:` prefix and its essential flag; [onDone] gets null on success or the
+     * reason it was refused. Entries follow the rename because they reference the account by id.
+     */
+    fun renameCategory(account: AccountEntity, newName: String, onDone: (String?) -> Unit) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) { onDone("Give it a name"); return }
+        viewModelScope.launch {
+            try {
+                val prefix = if (':' in account.name) account.name.substringBefore(':') + ":" else ""
+                repo.renameAccount(account.id, prefix + trimmed)
+                val old = account.displayName()
+                val essentials = profileForm.essentialCategories
+                if (old in essentials && old != trimmed) {
+                    profileForm = profileForm.copy(essentialCategories = essentials - old + trimmed)
+                    profiles.save(profileForm)
+                }
+                onDone(null)
+            } catch (e: IllegalArgumentException) {
+                onDone(e.message)
+            }
+        }
     }
 
     fun archiveAccount(id: String) {

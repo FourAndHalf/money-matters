@@ -93,6 +93,15 @@ class AppLockTest {
         assertTrue(lock.isLocked)
     }
 
+    @Test fun `with the lock switched off, returning never locks`() {
+        store.setLockEnabled(false)
+        store.setLockTimeout(LockTimeout.Immediately)
+        val lock = newLock(startLocked = false)
+        lock.onAppBackgrounded()
+        lock.onAppForegrounded()
+        assertFalse(lock.isLocked)
+    }
+
     @Test fun `Immediately locks on every return`() {
         store.setLockTimeout(LockTimeout.Immediately)
         val lock = newLock(startLocked = false)

@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.ledger.AccountEntity
@@ -28,6 +30,7 @@ import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
+import com.moneymatters.app.ui.components.RowDivider
 import com.moneymatters.app.ui.components.Toggle
 import com.moneymatters.app.ui.theme.MoneyTheme
 
@@ -41,6 +44,8 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     var showAdd by rememberSaveable { mutableStateOf(false) }
     var newName by rememberSaveable { mutableStateOf("") }
     var newType by rememberSaveable { mutableStateOf(AccountType.Expense) }
+    var addError by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -58,7 +63,7 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             if (showAdd) {
                 item("add-form") {
                     Module {
-                        FormField("Name", newName, onValueChange = { newName = it }, placeholder = "e.g. Groceries")
+                        FormField("Name", newName, onValueChange = { newName = it; addError = null }, placeholder = "e.g. Groceries", error = addError)
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AccountType.entries.forEach { type ->
                                 Pill(type.name, onClick = { newType = type }, style = if (newType == type) PillStyle.Primary else PillStyle.Secondary)
@@ -67,10 +72,15 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                         Pill(
                             "Add",
                             onClick = {
-                                val name = if (newType == AccountType.Expense) "Expenses:$newName" else newName
-                                viewModel.addAccount(name, newType)
-                                newName = ""
-                                showAdd = false
+                                val trimmed = newName.trim()
+                                if (trimmed.isEmpty()) {
+                                    addError = "Give it a name"
+                                } else {
+                                    val name = if (newType == AccountType.Expense) "Expenses:$trimmed" else trimmed
+                                    viewModel.addAccount(name, newType)
+                                    newName = ""
+                                    showAdd = false
+                                }
                             },
                             style = PillStyle.Primary,
                             modifier = Modifier.padding(top = 12.dp),
@@ -82,7 +92,14 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 Module {
                     ModuleHeader("Every account and category")
                     accounts.forEachIndexed { i, account ->
-                        AccountRow(account, isEssential = account.displayName() in essentials, viewModel = viewModel, divider = i < accounts.lastIndex)
+                        AccountRow(
+                            account,
+                            isEssential = account.displayName() in essentials,
+                            viewModel = viewModel,
+                            divider = i < accounts.lastIndex,
+                            isEditing = editingId == account.id,
+                            onEdit = { editingId = if (it) account.id else null },
+                        )
                     }
                 }
             }
@@ -91,13 +108,27 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AccountRow(account: AccountEntity, isEssential: Boolean, viewModel: SettingsViewModel, divider: Boolean) {
-    ListRow(
-        title = account.displayName(),
-        subtitle = account.type.name + (if (account.isArchived) " · archived" else "") + (if (!account.inNetWorth) " · not in net worth" else ""),
-        divider = divider,
-        trailing = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun AccountRow(
+    account: AccountEntity,
+    isEssential: Boolean,
+    viewModel: SettingsViewModel,
+    divider: Boolean,
+    isEditing: Boolean,
+    onEdit: (Boolean) -> Unit,
+) {
+    if (isEditing) {
+        CategoryEditor(account, viewModel, divider, onClose = { onEdit(false) })
+        return
+    }
+    Column {
+        ListRow(
+            title = account.displayName(),
+            subtitle = account.type.name +
+                (if (isEssential) " · essential" else "") +
+                (if (account.isArchived) " · archived" else "") +
+                (if (!account.inNetWorth) " · not in net worth" else ""),
+            divider = false,
+            trailing = {
                 if (account.type == AccountType.Expense) {
                     Toggle(isEssential, onCheckedChange = { viewModel.toggleEssential(account.displayName()) })
                 }
@@ -110,13 +141,43 @@ private fun AccountRow(account: AccountEntity, isEssential: Boolean, viewModel: 
                         height = 28.dp,
                     )
                 }
-                Pill(
-                    if (account.isArchived) "Unarchive" else "Archive",
-                    onClick = { if (account.isArchived) viewModel.unarchiveAccount(account.id) else viewModel.archiveAccount(account.id) },
-                    style = if (account.isArchived) PillStyle.Secondary else PillStyle.Destructive,
-                    height = 28.dp,
-                )
+            },
+        )
+        Row(
+            Modifier.padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (account.type == AccountType.Expense) {
+                Pill("Edit", onClick = { onEdit(true) }, height = 28.dp)
             }
-        },
-    )
+            Pill(
+                if (account.isArchived) "Unarchive" else "Archive",
+                onClick = { if (account.isArchived) viewModel.unarchiveAccount(account.id) else viewModel.archiveAccount(account.id) },
+                style = if (account.isArchived) PillStyle.Secondary else PillStyle.Destructive,
+                height = 28.dp,
+            )
+        }
+        if (divider) RowDivider()
+    }
+}
+
+/** Renames a category in place; the essential flag and past entries stay with it. */
+@Composable
+private fun CategoryEditor(account: AccountEntity, viewModel: SettingsViewModel, divider: Boolean, onClose: () -> Unit) {
+    var name by rememberSaveable(account.id) { mutableStateOf(account.displayName()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column {
+        FormField("Category name", name, onValueChange = { name = it; error = null }, modifier = Modifier.padding(top = 10.dp), error = error)
+        Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill(
+                "Save",
+                onClick = { viewModel.renameCategory(account, name) { problem -> if (problem == null) onClose() else error = problem } },
+                style = PillStyle.Primary,
+                height = 28.dp,
+            )
+            Pill("Cancel", onClick = onClose, height = 28.dp)
+        }
+        if (divider) RowDivider()
+    }
 }
