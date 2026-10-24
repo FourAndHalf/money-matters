@@ -38,6 +38,8 @@ class SettingsViewModel(
     val prefs: SettingsPrefs,
     val ai: AiSettingsStore,
     private val hashing: CoroutineDispatcher = Dispatchers.Default,
+    /** Runs after the app lock is switched on or off, so the home-screen widget can hide or show its amounts. */
+    private val onLockChanged: () -> Unit = {},
 ) : ViewModel() {
 
     var profileForm by mutableStateOf(requireNotNull(profiles.profile()) { "Settings is only reachable after setup" })
@@ -83,6 +85,7 @@ class SettingsViewModel(
     fun updateLockEnabled(enabled: Boolean) {
         passcodes.setLockEnabled(enabled)
         lockEnabled = enabled
+        onLockChanged()
     }
 
     fun updateBiometricEnabled(enabled: Boolean) {
