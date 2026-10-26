@@ -179,6 +179,14 @@ class SettingsViewModelTest {
         assertTrue(passcodes.isLockEnabled())
     }
 
+    @Test fun `a lock switched on elsewhere, like the widget, shows up on refresh`() {
+        model.updateLockEnabled(false)
+        passcodes.setLockEnabled(true)
+        assertFalse(model.lockEnabled)
+        model.refreshLockEnabled()
+        assertTrue(model.lockEnabled)
+    }
+
     private fun deleteAccount(id: String): String? {
         var result: String? = "unset"
         model.deleteAccount(id) { result = it }

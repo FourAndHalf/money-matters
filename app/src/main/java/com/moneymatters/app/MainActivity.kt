@@ -216,6 +216,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        settingsModel.refreshLockEnabled()
         appLock.onAppForegrounded()
     }
 
