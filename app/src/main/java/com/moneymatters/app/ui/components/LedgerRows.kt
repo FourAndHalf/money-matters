@@ -71,9 +71,8 @@ fun amountColor(amount: Paise, isTransfer: Boolean = false): Color {
     }
 }
 
-/** Signed (`−₹486`, `+₹72,000`), except a transfer, which just shows how much moved. */
-fun amountText(amount: Paise, isTransfer: Boolean = false): String =
-    if (isTransfer) Paise(abs(amount.value)).formatInr() else amount.formatInr(signed = true)
+/** How much moved, with no sign: the colour from [amountColor] says which way. */
+fun amountText(amount: Paise): String = Paise(abs(amount.value)).formatInr()
 
 /** A transaction in a list (P06, Home): payee chip, payee over subtitle, signed amount with an optional status badge. */
 @Composable
@@ -96,7 +95,7 @@ fun TransactionRow(
         leading = { GlyphChip(text = chip) },
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
-                Text(amountText(amount, isTransfer), style = MoneyTheme.type.metricTable, color = amountColor(amount, isTransfer), textAlign = TextAlign.End, softWrap = false)
+                Text(amountText(amount), style = MoneyTheme.type.metricTable, color = amountColor(amount, isTransfer), textAlign = TextAlign.End, softWrap = false)
                 if (badge != null) Column(Modifier.padding(top = 4.dp)) { badge() }
             }
         },

@@ -170,7 +170,7 @@ private fun SuspenseModule(state: TransactionsState, onOpenTransaction: (String)
         items.forEachIndexed { i, txn ->
             ListRow(
                 title = txn.payee,
-                subtitle = "${txn.accountName} · ${amountText(txn.amount, txn.isTransfer)}",
+                subtitle = "${txn.accountName} · ${amountText(txn.amount)}",
                 divider = i < items.lastIndex,
                 leading = { GlyphChip(text = txn.chip) },
                 trailing = { Pill("Categorize", { onOpenTransaction(txn.id) }) },

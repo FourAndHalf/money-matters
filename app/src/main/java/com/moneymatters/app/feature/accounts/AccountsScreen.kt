@@ -1,5 +1,7 @@
 package com.moneymatters.app.feature.accounts
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,12 +11,20 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
@@ -26,6 +36,7 @@ import com.moneymatters.app.ui.components.ProgressTrack
 import com.moneymatters.app.ui.components.RowDivider
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
+import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import com.moneymatters.app.ui.theme.MoneyTheme
 
@@ -40,6 +51,7 @@ fun AccountsScreen(
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
+    var openGroup by rememberSaveable { mutableStateOf<String?>(null) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -64,12 +76,22 @@ fun AccountsScreen(
         }
         val stack = state.groups.flatMap { it.items }
         if (stack.isNotEmpty()) {
-            item("stack") { AccountStack(stack, onOpenAccount, Modifier.padding(horizontal = margin), onEditCard) }
+            item("stack") {
+                AccountStack(
+                    stack, onOpenAccount, Modifier.padding(horizontal = margin), onEditCard,
+                    // The group of the account up front opens, and any other one closes.
+                    onShown = { shown -> openGroup = state.groups.firstOrNull { g -> g.items.any { it.id == shown.id } }?.title },
+                )
+            }
         }
         state.groups.forEach { group ->
             item(group.title) {
                 Column(Modifier.padding(horizontal = margin)) {
-                    AccountGroupModule(group, onOpenAccount)
+                    AccountGroupModule(
+                        group, onOpenAccount,
+                        expanded = openGroup == group.title,
+                        onToggle = { openGroup = if (openGroup == group.title) null else group.title },
+                    )
                 }
             }
         }
@@ -84,20 +106,35 @@ fun AccountsScreen(
 }
 
 @Composable
-private fun AccountGroupModule(group: AccountGroup, onOpenAccount: (String) -> Unit) {
+private fun AccountGroupModule(group: AccountGroup, onOpenAccount: (String) -> Unit, expanded: Boolean, onToggle: () -> Unit) {
     Module {
-        ModuleHeader(group.title, subtitle = "${group.items.size} ${if (group.items.size == 1) "account" else "accounts"}")
-        group.items.forEachIndexed { i, account ->
-            AccountRow(
-                name = account.name,
-                subtitle = account.subtitle,
-                kind = account.kind,
-                balance = account.balance,
-                isLiability = account.isLiability,
-                onClick = { onOpenAccount(account.id) },
-                divider = i < group.items.lastIndex,
-                badge = account.badge?.let { b -> { StatusBadge(b.text, b.tone) } },
-            )
+        ModuleHeader(
+            group.title,
+            subtitle = "${group.items.size} ${if (group.items.size == 1) "account" else "accounts"}",
+            modifier = Modifier
+                .clickable(role = Role.Button, onClickLabel = if (expanded) "Collapse ${group.title}" else "Expand ${group.title}", onClick = onToggle),
+            action = {
+                Icon(
+                    MoneyIcons.ChevronDown, null, tint = MoneyTheme.colors.muted,
+                    modifier = Modifier.size(20.dp).rotate(if (expanded) 180f else 0f),
+                )
+            },
+        )
+        AnimatedVisibility(expanded) {
+            Column {
+                group.items.forEachIndexed { i, account ->
+                    AccountRow(
+                        name = account.name,
+                        subtitle = account.subtitle,
+                        kind = account.kind,
+                        balance = account.balance,
+                        isLiability = account.isLiability,
+                        onClick = { onOpenAccount(account.id) },
+                        divider = i < group.items.lastIndex,
+                        badge = account.badge?.let { b -> { StatusBadge(b.text, b.tone) } },
+                    )
+                }
+            }
         }
     }
 }
