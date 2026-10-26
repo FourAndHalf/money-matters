@@ -31,10 +31,11 @@ import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.DecisionKind
 import com.moneymatters.app.core.ledger.PaymentMethod
 import com.moneymatters.app.core.ledger.PlanKind
-import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.feature.books.displayName
 import com.moneymatters.app.feature.books.label
 import com.moneymatters.app.ui.components.AmountPad
+import com.moneymatters.app.ui.components.CollapsibleBody
+import com.moneymatters.app.ui.components.CollapsibleModuleHeader
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.FormField
@@ -42,7 +43,6 @@ import com.moneymatters.app.ui.components.InnerPanel
 import com.moneymatters.app.ui.components.PostingLineRow
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
-import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.MoneyText
 import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
@@ -52,7 +52,7 @@ import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.components.evaluateAmountExpression
 import com.moneymatters.app.ui.theme.MoneyTheme
-import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private sealed interface PickerTarget {
     data object To : PickerTarget
@@ -88,7 +88,8 @@ fun QuickAddScreen(
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
     var pickerQuery by rememberSaveable { mutableStateOf("") }
     var splitMode by rememberSaveable(form.kind) { mutableStateOf(form.splits.isNotEmpty()) }
-    var showPreview by rememberSaveable(form.kind) { mutableStateOf(prefs.shouldAutoShowPreview(form.kind)) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
+    var showJournal by rememberSaveable(form.kind) { mutableStateOf(prefs.shouldAutoShowPreview(form.kind)) }
 
     val postings = postingsFor(form)
     val balanced = isBalanced(postings)
@@ -116,7 +117,7 @@ fun QuickAddScreen(
                     }
                 }
             }
-            item("amount") {
+            item("what") {
                 Module {
                     Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
                     MoneyText(
@@ -159,13 +160,15 @@ fun QuickAddScreen(
                             }
                         }
                     }
-                }
-            }
-            item("payee") {
-                Module {
-                    FormField("Payee", form.payee, onValueChange = { update { f -> f.copy(payee = it) } }, placeholder = "e.g. Swiggy")
+                    FormField(
+                        "Payee",
+                        form.payee,
+                        onValueChange = { update { f -> f.copy(payee = it) } },
+                        modifier = Modifier.padding(top = 16.dp),
+                        placeholder = "e.g. Swiggy",
+                    )
                     if (suggestions.isNotEmpty()) {
-                        Column(Modifier.padding(top = 10.dp)) {
+                        Column(Modifier.padding(top = 6.dp)) {
                             suggestions.forEachIndexed { i, memory ->
                                 ListRow(
                                     title = memory.payee,
@@ -192,125 +195,112 @@ fun QuickAddScreen(
             if (!splitMode) {
                 item("accounts") {
                     Module {
-                        ModuleHeader(form.kind.toLabel)
                         ListRow(
                             title = accountLabel(form.toAccountId),
                             subtitle = form.kind.toLabel,
-                            divider = false,
                             modifier = Modifier.clickable { pickerTarget = PickerTarget.To; pickerQuery = "" },
                         )
-                    }
-                }
-                item("from") {
-                    Module {
-                        ModuleHeader(form.kind.fromLabel)
                         ListRow(
                             title = accountLabel(form.fromAccountId),
                             subtitle = form.kind.fromLabel,
                             divider = false,
                             modifier = Modifier.clickable { pickerTarget = PickerTarget.From; pickerQuery = "" },
                         )
-                    }
-                }
-            }
-            pickerTarget?.let { target ->
-                item("picker") {
-                    val filtered = accounts.filter { account ->
-                        val matchesKind = when (target) {
-                            PickerTarget.To -> form.kind.matchesTo(account)
-                            PickerTarget.From -> form.kind.matchesFrom(account)
-                            is PickerTarget.Split -> true
-                        }
-                        matchesKind && account.displayName().contains(pickerQuery, ignoreCase = true)
-                    }
-                    Module {
-                        SearchField(pickerQuery, { pickerQuery = it }, placeholder = "Search accounts")
-                        Column(Modifier.padding(top = 10.dp)) {
-                            filtered.forEachIndexed { i, account ->
-                                ListRow(
-                                    title = account.displayName(),
-                                    divider = i < filtered.lastIndex,
-                                    modifier = Modifier.clickable {
-                                        when (target) {
-                                            PickerTarget.To -> update { it.copy(toAccountId = account.id) }
-                                            PickerTarget.From -> update { it.copy(fromAccountId = account.id) }
-                                            is PickerTarget.Split -> update { f ->
-                                                f.copy(splits = f.splits.toMutableList().also { it[target.index] = it[target.index].copy(accountId = account.id) })
-                                            }
-                                        }
-                                        pickerTarget = null
-                                    },
-                                )
+                        pickerTarget?.takeIf { it !is PickerTarget.Split }?.let { target ->
+                            AccountPicker(
+                                accounts = accounts.filter { if (target == PickerTarget.To) form.kind.matchesTo(it) else form.kind.matchesFrom(it) },
+                                query = pickerQuery,
+                                onQueryChange = { pickerQuery = it },
+                                modifier = Modifier.padding(top = 10.dp),
+                            ) { account ->
+                                update { if (target == PickerTarget.To) it.copy(toAccountId = account.id) else it.copy(fromAccountId = account.id) }
+                                pickerTarget = null
                             }
                         }
                     }
-                }
-            }
-            item("tags") {
-                Module {
-                    TagRow("Payment method", PaymentMethod.entries, form.paymentMethod, PaymentMethod::label) { update { f -> f.copy(paymentMethod = it) } }
-                    TagRow("Need / want", DecisionKind.entries, form.decision, { it.name }, modifier = Modifier.padding(top = 12.dp)) { update { f -> f.copy(decision = it) } }
-                    TagRow("Planned", PlanKind.entries, form.plan, { it.name }, modifier = Modifier.padding(top = 12.dp)) { update { f -> f.copy(plan = it) } }
                 }
             }
             item("details") {
                 Module {
-                    DateField("Date", form.date, { date -> update { it.copy(date = date) } })
-                    FormField("Note", form.note, onValueChange = { update { f -> f.copy(note = it) } }, modifier = Modifier.padding(top = 12.dp), placeholder = "Optional")
-                }
-            }
-            item("split-toggle") {
-                Pill(
-                    if (splitMode) "Remove split" else "Split into multiple postings",
-                    onClick = {
-                        splitMode = !splitMode
-                        update { it.copy(splits = if (splitMode) listOf(SplitLine(), SplitLine()) else emptyList()) }
-                    },
-                )
-            }
-            if (splitMode) {
-                item("split-editor") {
-                    Module {
-                        ModuleHeader("Postings", subtitle = "Every line needs an account and one of Dr/Cr")
-                        InnerPanel {
-                            form.splits.forEachIndexed { index, line ->
-                                Column(Modifier.padding(vertical = 6.dp)) {
-                                    ListRow(
-                                        title = accountLabel(line.accountId),
-                                        divider = false,
-                                        modifier = Modifier.clickable { pickerTarget = PickerTarget.Split(index); pickerQuery = "" },
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        FormField("Dr", line.debitText, onValueChange = { text -> update { f -> f.copy(splits = f.splits.replaceAt(index) { it.copy(debitText = text, creditText = "") }) } }, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
-                                        FormField("Cr", line.creditText, onValueChange = { text -> update { f -> f.copy(splits = f.splits.replaceAt(index) { it.copy(creditText = text, debitText = "") }) } }, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
-                                        if (form.splits.size > 2) {
-                                            Pill("✕", onClick = { update { f -> f.copy(splits = f.splits.filterIndexed { i, _ -> i != index }) } }, height = 40.dp)
-                                        }
-                                    }
-                                }
-                                if (index < form.splits.lastIndex) RowDivider()
-                            }
-                        }
-                        Row(Modifier.padding(top = 10.dp)) {
-                            Pill("+ Add line", onClick = { update { it.copy(splits = it.splits + SplitLine()) } })
+                    CollapsibleModuleHeader(
+                        "Details",
+                        expanded = showDetails,
+                        onToggle = { showDetails = !showDetails },
+                        subtitle = detailsSummary(form),
+                    )
+                    CollapsibleBody(showDetails) {
+                        Column {
+                            DateField("Date", form.date, { date -> update { it.copy(date = date) } })
+                            FormField("Note", form.note, onValueChange = { update { f -> f.copy(note = it) } }, modifier = Modifier.padding(top = 12.dp), placeholder = "Optional")
+                            TagRow("Payment method", PaymentMethod.entries, form.paymentMethod, PaymentMethod::label, modifier = Modifier.padding(top = 16.dp)) { update { f -> f.copy(paymentMethod = it) } }
+                            TagRow("Need / want", DecisionKind.entries, form.decision, { it.name }, modifier = Modifier.padding(top = 12.dp)) { update { f -> f.copy(decision = it) } }
+                            TagRow("Planned", PlanKind.entries, form.plan, { it.name }, modifier = Modifier.padding(top = 12.dp)) { update { f -> f.copy(plan = it) } }
                         }
                     }
                 }
             }
-            item("preview-toggle") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    StatusBadge(if (balanced) "✓ Balanced" else "Not balanced yet", if (balanced) Tone.Positive else Tone.Negative)
-                    Pill(if (showPreview) "Hide journal preview" else "Show journal preview", onClick = { showPreview = !showPreview })
-                }
-            }
-            if (showPreview) {
-                item("journal-preview") {
-                    Module {
-                        ModuleHeader("Journal", subtitle = "Postings")
-                        InnerPanel {
-                            postings.forEachIndexed { i, posting ->
-                                PostingLineRow(accountLabel(posting.accountId), posting.debit, posting.credit, Modifier.padding(vertical = 5.dp))
-                                if (i < postings.lastIndex) RowDivider(Modifier.padding(vertical = 2.dp))
+            item("journal") {
+                Module {
+                    CollapsibleModuleHeader(
+                        "Journal",
+                        expanded = showJournal,
+                        onToggle = { if (!splitMode) showJournal = !showJournal },
+                        subtitle = if (splitMode) "Split into ${form.splits.size} postings" else "Postings",
+                        action = { StatusBadge(if (balanced) "✓ Balanced" else "Not balanced yet", if (balanced) Tone.Positive else Tone.Negative) },
+                    )
+                    CollapsibleBody(showJournal) {
+                        Column {
+                            if (splitMode) {
+                                InnerPanel {
+                                    form.splits.forEachIndexed { index, line ->
+                                        Column(Modifier.padding(vertical = 6.dp)) {
+                                            ListRow(
+                                                title = accountLabel(line.accountId),
+                                                subtitle = "Every line needs an account and one of Dr/Cr",
+                                                divider = false,
+                                                modifier = Modifier.clickable { pickerTarget = PickerTarget.Split(index); pickerQuery = "" },
+                                            )
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                FormField("Dr", line.debitText, onValueChange = { text -> update { f -> f.copy(splits = f.splits.replaceAt(index) { it.copy(debitText = text, creditText = "") }) } }, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
+                                                FormField("Cr", line.creditText, onValueChange = { text -> update { f -> f.copy(splits = f.splits.replaceAt(index) { it.copy(creditText = text, debitText = "") }) } }, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
+                                                if (form.splits.size > 2) {
+                                                    Pill("✕", onClick = { update { f -> f.copy(splits = f.splits.filterIndexed { i, _ -> i != index }) } }, height = 40.dp)
+                                                }
+                                            }
+                                        }
+                                        if (index < form.splits.lastIndex) RowDivider()
+                                    }
+                                }
+                                pickerTarget?.let { it as? PickerTarget.Split }?.let { target ->
+                                    AccountPicker(
+                                        accounts = accounts,
+                                        query = pickerQuery,
+                                        onQueryChange = { pickerQuery = it },
+                                        modifier = Modifier.padding(top = 10.dp),
+                                    ) { account ->
+                                        update { f -> f.copy(splits = f.splits.replaceAt(target.index) { it.copy(accountId = account.id) }) }
+                                        pickerTarget = null
+                                    }
+                                }
+                            } else {
+                                InnerPanel {
+                                    postings.forEachIndexed { i, posting ->
+                                        PostingLineRow(accountLabel(posting.accountId), posting.debit, posting.credit, Modifier.padding(vertical = 5.dp))
+                                        if (i < postings.lastIndex) RowDivider(Modifier.padding(vertical = 2.dp))
+                                    }
+                                }
+                            }
+                            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Pill(
+                                    if (splitMode) "Remove split" else "Split",
+                                    onClick = {
+                                        splitMode = !splitMode
+                                        pickerTarget = null
+                                        showJournal = true
+                                        update { it.copy(splits = if (splitMode) listOf(SplitLine(), SplitLine()) else emptyList()) }
+                                    },
+                                )
+                                if (splitMode) Pill("+ Add line", onClick = { update { it.copy(splits = it.splits + SplitLine()) } })
                             }
                         }
                     }
@@ -340,6 +330,34 @@ fun QuickAddScreen(
                 modifier = Modifier.weight(1f).alpha(if (canSave) 1f else 0.4f),
                 height = 48.dp,
             )
+        }
+    }
+}
+
+/** One-line summary shown on the collapsed Details header, so the tags stay visible without opening it. */
+private fun detailsSummary(form: QuickAddForm): String = listOfNotNull(
+    form.date.format(DateTimeFormatter.ofPattern("d MMM")),
+    form.paymentMethod?.label(),
+    form.decision?.name,
+    form.plan?.name,
+).joinToString(" · ")
+
+/** Inline search-and-pick list for an account; the caller decides what a pick means. */
+@Composable
+private fun AccountPicker(
+    accounts: List<AccountEntity>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onPick: (AccountEntity) -> Unit,
+) {
+    val filtered = accounts.filter { it.displayName().contains(query, ignoreCase = true) }
+    InnerPanel(modifier) {
+        SearchField(query, onQueryChange, placeholder = "Search accounts")
+        Column(Modifier.padding(top = 6.dp)) {
+            filtered.forEachIndexed { i, account ->
+                ListRow(account.displayName(), divider = i < filtered.lastIndex, modifier = Modifier.clickable { onPick(account) })
+            }
         }
     }
 }
