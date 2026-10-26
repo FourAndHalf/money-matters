@@ -23,6 +23,7 @@ data class TransactionDetail(
     val plan: PlanKind? = null,
     val reason: String? = null,
     val audit: List<AuditEntry> = emptyList(),
+    val isTransfer: Boolean = false,
 ) {
     /** Dr total = Cr total for every entry in this sample set; a real ledger enforces it at write time. */
     val isBalanced: Boolean get() {

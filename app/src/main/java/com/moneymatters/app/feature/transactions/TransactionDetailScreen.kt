@@ -36,6 +36,7 @@ import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.RowDivider
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
+import com.moneymatters.app.ui.components.amountColor
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import com.moneymatters.app.ui.theme.MoneyTheme
 
@@ -105,7 +106,7 @@ private fun AmountHero(detail: TransactionDetail) {
     val c = MoneyTheme.colors
     Module(shape = MoneyTheme.shapes.xl) {
         Text("${detail.category} · ${detail.accountName}", style = MoneyTheme.type.bodySm, color = c.muted)
-        MoneyText(detail.amount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
+        MoneyText(detail.amount, style = MoneyTheme.type.metricHero, showPaise = false, color = amountColor(detail.amount, detail.isTransfer), modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             detail.status.look()?.let { (text, tone, icon) -> StatusBadge(text, tone, icon = icon) }
             detail.decision?.let { StatusBadge(it.name.lowercase().replaceFirstChar(Char::uppercase), Tone.Neutral) }

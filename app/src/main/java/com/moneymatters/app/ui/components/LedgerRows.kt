@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -18,6 +19,7 @@ import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyTheme
+import kotlin.math.abs
 
 /** The account tree's row (P08, Home): kind chip, name over subtitle, balance with an optional badge. */
 @Composable
@@ -58,6 +60,20 @@ private fun AccountKind.glyph() = when (this) {
     else -> null
 }
 
+/** Money out reads red, money in green, and a move between your own accounts (or nothing at all) stays the neutral ink. */
+@Composable
+fun amountColor(amount: Paise, isTransfer: Boolean = false): Color {
+    val c = MoneyTheme.colors
+    return when {
+        isTransfer || amount.value == 0L -> c.ink
+        amount.value < 0 -> c.negative
+        else -> c.positive
+    }
+}
+
+/** How much moved, with no sign: the colour from [amountColor] says which way. */
+fun amountText(amount: Paise): String = Paise(abs(amount.value)).formatInr()
+
 /** A transaction in a list (P06, Home): payee chip, payee over subtitle, signed amount with an optional status badge. */
 @Composable
 fun TransactionRow(
@@ -69,6 +85,7 @@ fun TransactionRow(
     modifier: Modifier = Modifier,
     divider: Boolean = true,
     badge: (@Composable () -> Unit)? = null,
+    isTransfer: Boolean = false,
 ) {
     ListRow(
         title = payee,
@@ -78,7 +95,7 @@ fun TransactionRow(
         leading = { GlyphChip(text = chip) },
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
-                Text(amount.formatInr(signed = true), style = MoneyTheme.type.metricTable, color = MoneyTheme.colors.ink, textAlign = TextAlign.End, softWrap = false)
+                Text(amountText(amount), style = MoneyTheme.type.metricTable, color = amountColor(amount, isTransfer), textAlign = TextAlign.End, softWrap = false)
                 if (badge != null) Column(Modifier.padding(top = 4.dp)) { badge() }
             }
         },

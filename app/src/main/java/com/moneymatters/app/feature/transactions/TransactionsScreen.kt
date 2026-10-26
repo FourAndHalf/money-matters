@@ -1,5 +1,6 @@
 package com.moneymatters.app.feature.transactions
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -42,6 +44,7 @@ import com.moneymatters.app.ui.components.SegmentedControl
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.components.TransactionRow
+import com.moneymatters.app.ui.components.amountText
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -136,7 +139,8 @@ private fun StatusFilterRow(selected: TxnStatus?, onSelect: (TxnStatus?) -> Unit
         "Locked" to TxnStatus.Locked,
         "Prior-period" to TxnStatus.PriorPeriodAdjustment,
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Six pills are wider than a phone, so the row scrolls sideways rather than squeezing or cutting the last ones.
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (label, value) ->
             Pill(
                 label, { onSelect(value) },
@@ -169,7 +173,7 @@ private fun SuspenseModule(state: TransactionsState, onOpenTransaction: (String)
         items.forEachIndexed { i, txn ->
             ListRow(
                 title = txn.payee,
-                subtitle = "${txn.accountName} · ${txn.amount.formatInr(signed = true)}",
+                subtitle = "${txn.accountName} · ${amountText(txn.amount)}",
                 divider = i < items.lastIndex,
                 leading = { GlyphChip(text = txn.chip) },
                 trailing = { Pill("Categorize", { onOpenTransaction(txn.id) }) },
@@ -205,6 +209,7 @@ internal fun SummaryRow(txn: TransactionSummary, onOpenTransaction: (String) -> 
         },
         chip = txn.chip,
         amount = txn.amount,
+        isTransfer = txn.isTransfer,
         onClick = { onOpenTransaction(txn.id) },
         divider = divider,
         badge = txn.status.look()?.let { (text, tone, icon) -> { StatusBadge(text, tone, icon = icon) } },

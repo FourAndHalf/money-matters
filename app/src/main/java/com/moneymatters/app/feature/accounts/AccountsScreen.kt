@@ -13,12 +13,18 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.AccountRow
+import com.moneymatters.app.ui.components.CollapsibleBody
+import com.moneymatters.app.ui.components.CollapsibleModuleHeader
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.NetWorthCard
@@ -40,6 +46,7 @@ fun AccountsScreen(
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
+    var openGroup by rememberSaveable { mutableStateOf<String?>(null) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -64,12 +71,22 @@ fun AccountsScreen(
         }
         val stack = state.groups.flatMap { it.items }
         if (stack.isNotEmpty()) {
-            item("stack") { AccountStack(stack, onOpenAccount, Modifier.padding(horizontal = margin), onEditCard) }
+            item("stack") {
+                AccountStack(
+                    stack, onOpenAccount, Modifier.padding(horizontal = margin), onEditCard,
+                    // The group of the account up front opens, and any other one closes.
+                    onShown = { shown -> openGroup = state.groups.firstOrNull { g -> g.items.any { it.id == shown.id } }?.title },
+                )
+            }
         }
         state.groups.forEach { group ->
             item(group.title) {
                 Column(Modifier.padding(horizontal = margin)) {
-                    AccountGroupModule(group, onOpenAccount)
+                    AccountGroupModule(
+                        group, onOpenAccount,
+                        expanded = openGroup == group.title,
+                        onToggle = { openGroup = if (openGroup == group.title) null else group.title },
+                    )
                 }
             }
         }
@@ -84,20 +101,25 @@ fun AccountsScreen(
 }
 
 @Composable
-private fun AccountGroupModule(group: AccountGroup, onOpenAccount: (String) -> Unit) {
+private fun AccountGroupModule(group: AccountGroup, onOpenAccount: (String) -> Unit, expanded: Boolean, onToggle: () -> Unit) {
     Module {
-        ModuleHeader(group.title, subtitle = "${group.items.size} ${if (group.items.size == 1) "account" else "accounts"}")
-        group.items.forEachIndexed { i, account ->
-            AccountRow(
-                name = account.name,
-                subtitle = account.subtitle,
-                kind = account.kind,
-                balance = account.balance,
-                isLiability = account.isLiability,
-                onClick = { onOpenAccount(account.id) },
-                divider = i < group.items.lastIndex,
-                badge = account.badge?.let { b -> { StatusBadge(b.text, b.tone) } },
-            )
+        CollapsibleModuleHeader(
+            group.title, expanded, onToggle,
+            subtitle = "${group.items.size} ${if (group.items.size == 1) "account" else "accounts"}",
+        )
+        CollapsibleBody(expanded) {
+            group.items.forEachIndexed { i, account ->
+                AccountRow(
+                    name = account.name,
+                    subtitle = account.subtitle,
+                    kind = account.kind,
+                    balance = account.balance,
+                    isLiability = account.isLiability,
+                    onClick = { onOpenAccount(account.id) },
+                    divider = i < group.items.lastIndex,
+                    badge = account.badge?.let { b -> { StatusBadge(b.text, b.tone) } },
+                )
+            }
         }
     }
 }

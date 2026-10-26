@@ -38,6 +38,20 @@ fun periodContaining(date: LocalDate, monthStartDay: Int): Period {
 fun latestEndedPeriod(today: LocalDate, monthStartDay: Int): Period =
     periodContaining(periodStartOn(today, monthStartDay).minusDays(1), monthStartDay)
 
+/**
+ * The month to close next: the one holding the oldest entry that is still open, so a backlog is closed oldest first
+ * (months must close in order). With nothing older open, it is the latest month that has ended.
+ */
+fun nextPeriodToClose(ledger: LedgerSnapshot, today: LocalDate, monthStartDay: Int): Period {
+    val latest = latestEndedPeriod(today, monthStartDay)
+    val oldestOpen = ledger.transactions
+        .filter { it.status in listOf(TransactionStatus.Draft, TransactionStatus.Posted, TransactionStatus.Reconciled) }
+        .minOfOrNull { it.date }
+        ?.let(LocalDate::parse) ?: return latest
+    val period = periodContaining(oldestOpen, monthStartDay)
+    return if (period.start.isBefore(latest.start)) period else latest
+}
+
 /** What to do about a failing checklist item; the screen turns each into a button or a link. */
 enum class CheckFix { None, Prices, Interest, Drafts, Confirm, Reconcile }
 

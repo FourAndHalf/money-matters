@@ -30,6 +30,8 @@ import com.moneymatters.app.core.invest.Compounding
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.ui.components.CollapsibleBody
+import com.moneymatters.app.ui.components.CollapsibleModuleHeader
 import com.moneymatters.app.ui.components.ConfirmDialog
 import com.moneymatters.app.ui.components.DateField
 import com.moneymatters.app.ui.components.DetailTopBar
@@ -259,10 +261,11 @@ internal fun DepositCloseContent(
 
 /** When the fixed deposits mature, a month at a time, each bar sized against the biggest. */
 @Composable
-internal fun MaturityLadderModule(ladder: List<MaturityRung>, modifier: Modifier = Modifier) {
+internal fun MaturityLadderModule(ladder: List<MaturityRung>, modifier: Modifier = Modifier, expanded: Boolean = true, onToggle: () -> Unit = {}) {
     val c = MoneyTheme.colors
     Module(modifier) {
-        ModuleHeader("Maturity ladder", subtitle = "${ladder.sumOf { it.count }} deposits maturing, ${Paise(ladder.sumOf { it.amount.value }).formatInr()} in all")
+        CollapsibleModuleHeader("Maturity ladder", expanded, onToggle, subtitle = "${ladder.sumOf { it.count }} deposits maturing, ${Paise(ladder.sumOf { it.amount.value }).formatInr()} in all")
+        CollapsibleBody(expanded) {
         ladder.forEachIndexed { i, rung ->
             Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.width(74.dp)) {
@@ -272,6 +275,7 @@ internal fun MaturityLadderModule(ladder: List<MaturityRung>, modifier: Modifier
                 ProgressTrack(rung.fraction, Modifier.weight(1f).padding(horizontal = 8.dp))
                 Text(rung.amount.formatInr(), style = MoneyTheme.type.metricTable, color = c.ink, softWrap = false)
             }
+        }
         }
     }
 }

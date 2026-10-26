@@ -54,6 +54,8 @@ class CloseViewModel(
         val period = requireNotNull(state.value?.period)
         close.close(period, typedName, today())
         typedName = ""
+        // Confirmations were for that month's balances; the next month to close starts from none.
+        confirmed.value = emptySet()
     }
 
     private fun run(block: suspend () -> Unit) {

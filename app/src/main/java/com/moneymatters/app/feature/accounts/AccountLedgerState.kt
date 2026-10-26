@@ -35,4 +35,5 @@ data class LedgerEntry(
     val amount: Paise,
     val runningBalance: Paise,
     val status: EntryStatus? = null,
+    val isTransfer: Boolean = false,
 )

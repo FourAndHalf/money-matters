@@ -210,6 +210,21 @@ class InvestScreensTest {
         compose.onNodeWithText("10 Jan 2025 · Locked until 10 Jan 2028").assertIsDisplayed()
     }
 
+    @Test fun `the first section starts open, the others closed, and opening one closes the rest`() {
+        val fund = row("h9", "PPFAS Flexi Cap", "", "123.456", 10_000, 11_000).copy(instrument = com.moneymatters.app.core.invest.Instrument.MutualFund, classLabel = "Equity")
+        val both = state.copy(holdings = state.holdings + fund, pending = listOf(PendingRow("p1", "PPFAS Flexi Cap", "19 Oct 2026", 5_000.rupees)))
+        compose.setContent { MoneyMattersTheme { InvestScreen(both, onOpenHolding = {}) } }
+        // In transit comes first, so it is the open one.
+        compose.onNodeWithText("Allot").assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("Tata Consultancy (TCS)").fetchSemanticsNodes().size)
+        compose.onNodeWithText("Stocks").performClick()
+        compose.onNodeWithText("Tata Consultancy (TCS)").assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("Allot").fetchSemanticsNodes().size)
+        // Tapping the open section closes it, leaving none open.
+        compose.onNodeWithText("Stocks").performClick()
+        assertEquals(0, compose.onAllNodesWithText("Tata Consultancy (TCS)").fetchSemanticsNodes().size)
+    }
+
     private val depositRow = DepositRow("d1", "HDFC FD 1", "7.00% · quarterly", 1_00_000.rupees, 1_03_500.rupees, PriceTag("Matures in 21 days", Tone.Warning))
     private val depositDetail = DepositDetail(
         row = depositRow, rateLabel = "7.00%", compoundingLabel = "Quarterly", startLabel = "1 Jan 2026", maturityLabel = "1 Jan 2027",

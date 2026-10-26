@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,13 +62,15 @@ internal fun AccountSummary.utilisation(): Float? = cardLimit?.takeIf { it.value
 
 /**
  * The account stack: swipe, tap the peeking edge or use the dots to bring another account to the front, and
- * the panel under it shows that account's facts with a way into its ledger.
+ * the panel under it shows that account's facts with a way into its ledger. [onShown] fires with the account at the front.
  */
 @Composable
-fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}) {
+fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}, onShown: (AccountSummary) -> Unit = {}) {
     if (accounts.isEmpty()) return
     var front by rememberSaveable { mutableIntStateOf(0) }
     val index = front.coerceIn(0, accounts.lastIndex)
+    // Tells the caller which account is up front, so the list below can open the group it belongs to.
+    LaunchedEffect(accounts[index].id) { onShown(accounts[index]) }
     Column(modifier) {
         CardStack(
             items = accounts,

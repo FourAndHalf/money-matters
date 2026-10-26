@@ -20,7 +20,9 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -67,6 +69,17 @@ class BooksTest {
 
     private fun books(monthStartDay: Int = 1) = runBlocking { buildBooks(repo.snapshot().first(), today, monthStartDay, ZoneOffset.UTC) }
 
+    @Test fun `Home's account stack holds only bank, cash and credit card accounts, while Accounts lists the rest too`() = runBlocking {
+        val cash = repo.createAccount("Wallet", AccountType.Asset, kind = AccountKind.Cash)
+        val fd = repo.createAccount("SBI FD", AccountType.Asset, kind = AccountKind.FixedDeposit)
+        val loan = repo.createAccount("Car loan", AccountType.Liability, kind = AccountKind.Loan)
+        val fund = repo.createAccount("Index fund", AccountType.Asset, kind = AccountKind.Investment)
+        post(LocalDate.of(2026, 10, 2), "Fund, FD and loan", PostingLine(cash, debit = 1.rupees), PostingLine(equity, credit = 1.rupees))
+        val books = books()
+        assertEquals(setOf(bank, card, cash), books.home.accounts.map { it.id }.toSet())
+        assertEquals(setOf(fd, loan, fund), books.accounts.groups.flatMap { it.items }.map { it.id }.toSet() - books.home.accounts.map { it.id }.toSet())
+    }
+
     @Test fun `account balances count booked entries only, and match the ledger`() = runBlocking {
         val b = books()
         val bankRow = b.accounts.groups.flatMap { it.items }.single { it.id == bank }
@@ -90,12 +103,25 @@ class BooksTest {
         assertEquals(72_000.rupees, rows.getValue("Salary · Oct").amount)
         assertEquals("Salary", rows.getValue("Salary · Oct").category)
         rows.getValue("Card bill").let {
-            assertEquals((-486).rupees, it.amount)
+            // A move between your own accounts: the amount that moved, unsigned, and flagged so screens show it neutral.
+            assertEquals(486.rupees, it.amount)
+            assertTrue(it.isTransfer)
             assertEquals("HDFC Bank", it.accountName)
             assertEquals("Transfer to ICICI Rewards", it.category)
         }
+        assertFalse(rows.getValue("Swiggy").isTransfer)
+        assertFalse(rows.getValue("Salary · Oct").isTransfer)
         assertEquals("Opening balance", rows.getValue("Opening balance: HDFC Bank").category)
         assertEquals(TxnStatus.Draft, rows.getValue("Maybe dinner").status)
+    }
+
+    @Test fun `a transfer is flagged in the account ledgers and left out of the day total`() {
+        val b = books()
+        assertTrue(b.ledgers.getValue(bank).sections.single().entries.first { it.payee == "Card bill" }.isTransfer)
+        assertTrue(b.ledgers.getValue(card).sections.single().entries.first { it.payee == "Card bill" }.isTransfer)
+        assertFalse(b.ledgers.getValue(bank).sections.single().entries.first { it.payee == "Salary · Oct" }.isTransfer)
+        // 19 Oct: Swiggy (−486) plus the card bill, which moves money between accounts and so adds nothing to the day.
+        assertEquals((-486).rupees, b.transactions.groups.first { it.dateLabel == "19 Oct" }.total)
     }
 
     @Test fun `days are newest first, and entries within a day newest first`() {
