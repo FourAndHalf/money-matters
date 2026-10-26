@@ -40,6 +40,7 @@ class WidgetTest {
     @Test fun `each widget button's intent maps to its page, and anything else to none`() {
         assertEquals(LaunchTarget.AddEntry, LaunchTarget.from(launchIntent(context, ACTION_ADD_ENTRY)))
         assertEquals(LaunchTarget.Accounts, LaunchTarget.from(launchIntent(context, ACTION_OPEN_ACCOUNTS)))
+        assertEquals(LaunchTarget.DisableLock, LaunchTarget.from(launchIntent(context, ACTION_DISABLE_LOCK)))
         assertNull(LaunchTarget.from(launchIntent(context)))
         assertNull(LaunchTarget.from(Intent(Intent.ACTION_VIEW)))
         assertNull(LaunchTarget.from(null))
