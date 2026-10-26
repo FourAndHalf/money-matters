@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -22,6 +26,8 @@ import com.moneymatters.app.core.invest.Instrument
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.AmountWithBadge
+import com.moneymatters.app.ui.components.CollapsibleBody
+import com.moneymatters.app.ui.components.CollapsibleModuleHeader
 import com.moneymatters.app.ui.components.GlyphChip
 import com.moneymatters.app.ui.components.ListRow
 import com.moneymatters.app.ui.components.Module
@@ -32,6 +38,11 @@ import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.theme.MoneyTheme
+
+private val HOLDING_SECTIONS = listOf(Instrument.Stock to "Stocks", Instrument.MutualFund to "Mutual funds", Instrument.Bond to "Bonds")
+
+/** Stands for "whichever section is first", until a header is tapped. */
+private const val FIRST_SECTION = "\u0000first"
 
 /** Invest tab (P13): portfolio value and return, then the stocks held, each with its price status. */
 @Composable
@@ -51,6 +62,18 @@ fun InvestScreen(
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
+    // The sections that have a header, top to bottom. The first starts open and opening one closes the rest.
+    val holdingTitles = HOLDING_SECTIONS.filter { (instrument, _) -> state.holdings.any { it.instrument == instrument } }.map { it.second }
+    val sections = listOfNotNull(
+        "in-transit".takeIf { state.pending.isNotEmpty() },
+        "sips".takeIf { state.hasFunds || state.sips.isNotEmpty() },
+        "ladder".takeIf { state.ladder.isNotEmpty() },
+        "deposits".takeIf { state.deposits.isNotEmpty() },
+        "allocation".takeIf { state.analytics.allocation.isNotEmpty() },
+    ) + holdingTitles
+    var chosen by rememberSaveable { mutableStateOf<String?>(FIRST_SECTION) }
+    val open = if (chosen == FIRST_SECTION) sections.firstOrNull() else chosen
+    fun toggle(key: String) { chosen = if (open == key) null else key }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -79,7 +102,8 @@ fun InvestScreen(
             if (state.pending.isNotEmpty()) {
                 item("in-transit") {
                     Module(Modifier.padding(horizontal = margin)) {
-                        ModuleHeader("In transit", subtitle = "Paid for, waiting for units to be allotted")
+                        CollapsibleModuleHeader("In transit", open == "in-transit", { toggle("in-transit") }, subtitle = "Paid for, waiting for units to be allotted")
+                        CollapsibleBody(open == "in-transit") {
                         state.pending.forEachIndexed { i, p ->
                             ListRow(
                                 title = p.holdingName,
@@ -96,13 +120,19 @@ fun InvestScreen(
                                 },
                             )
                         }
+                        }
                     }
                 }
             }
             if (state.hasFunds || state.sips.isNotEmpty()) {
                 item("sips") {
                     Module(Modifier.padding(horizontal = margin)) {
-                        ModuleHeader("SIPs", subtitle = if (state.sips.isEmpty()) "Monthly investments into a fund" else "${state.sips.size} ${if (state.sips.size == 1) "SIP" else "SIPs"}", action = { Pill("+ New", onNewSip, height = 28.dp) })
+                        CollapsibleModuleHeader(
+                            "SIPs", open == "sips", { toggle("sips") },
+                            subtitle = if (state.sips.isEmpty()) "Monthly investments into a fund" else "${state.sips.size} ${if (state.sips.size == 1) "SIP" else "SIPs"}",
+                            action = { Pill("+ New", onNewSip, height = 28.dp) },
+                        )
+                        CollapsibleBody(open == "sips") {
                         state.sipCalendar?.let { SipCalendarBody(it, Modifier.padding(bottom = 12.dp)) }
                         state.sips.forEachIndexed { i, sip ->
                             ListRow(
@@ -121,14 +151,16 @@ fun InvestScreen(
                                 },
                             )
                         }
+                        }
                     }
                 }
             }
-            if (state.ladder.isNotEmpty()) item("ladder") { MaturityLadderModule(state.ladder, Modifier.padding(horizontal = margin)) }
+            if (state.ladder.isNotEmpty()) item("ladder") { MaturityLadderModule(state.ladder, Modifier.padding(horizontal = margin), expanded = open == "ladder", onToggle = { toggle("ladder") }) }
             if (state.deposits.isNotEmpty()) {
                 item("deposits") {
                     Module(Modifier.padding(horizontal = margin)) {
-                        ModuleHeader("Fixed deposits", subtitle = "${state.deposits.size} ${if (state.deposits.size == 1) "deposit" else "deposits"}")
+                        CollapsibleModuleHeader("Fixed deposits", open == "deposits", { toggle("deposits") }, subtitle = "${state.deposits.size} ${if (state.deposits.size == 1) "deposit" else "deposits"}")
+                        CollapsibleBody(open == "deposits") {
                         state.deposits.forEachIndexed { i, d ->
                             ListRow(
                                 title = d.name,
@@ -139,11 +171,12 @@ fun InvestScreen(
                                 trailing = { AmountWithBadge(d.value.formatInr()) { StatusBadge(d.badge.text, d.badge.tone) } },
                             )
                         }
+                        }
                     }
                 }
             }
             if (state.analytics.allocation.isNotEmpty()) {
-                item("allocation") { AllocationModule(state.analytics, onNudgeTarget, onOpenHolding, Modifier.padding(horizontal = margin)) }
+                item("allocation") { AllocationModule(state.analytics, onNudgeTarget, onOpenHolding, Modifier.padding(horizontal = margin), expanded = open == "allocation", onToggle = { toggle("allocation") }) }
             }
             if (state.gainsByYear.isNotEmpty()) {
                 item("gains") {
@@ -172,13 +205,15 @@ fun InvestScreen(
                     }
                 }
             }
-            listOf(Instrument.Stock to "Stocks", Instrument.MutualFund to "Mutual funds", Instrument.Bond to "Bonds").forEach { (instrument, title) ->
+            HOLDING_SECTIONS.forEach { (instrument, title) ->
                 val rows = state.holdings.filter { it.instrument == instrument }
                 if (rows.isNotEmpty()) {
                     item(title) {
                         Module(Modifier.padding(horizontal = margin)) {
-                            ModuleHeader(title, subtitle = "${rows.size} ${if (rows.size == 1) "holding" else "holdings"}")
-                            rows.forEachIndexed { i, row -> HoldingListRow(row, divider = i < rows.lastIndex, onClick = { onOpenHolding(row.id) }) }
+                            CollapsibleModuleHeader(title, open == title, { toggle(title) }, subtitle = "${rows.size} ${if (rows.size == 1) "holding" else "holdings"}")
+                            CollapsibleBody(open == title) {
+                                rows.forEachIndexed { i, row -> HoldingListRow(row, divider = i < rows.lastIndex, onClick = { onOpenHolding(row.id) }) }
+                            }
                         }
                     }
                 }

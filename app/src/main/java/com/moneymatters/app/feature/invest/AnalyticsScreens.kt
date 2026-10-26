@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.BarSegment
+import com.moneymatters.app.ui.components.CollapsibleBody
+import com.moneymatters.app.ui.components.CollapsibleModuleHeader
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.GlyphChip
 import com.moneymatters.app.ui.components.KeyValueRow
@@ -40,10 +42,13 @@ fun AllocationModule(
     onNudgeTarget: (delta: Int) -> Unit,
     onOpenHolding: (holdingId: String) -> Unit,
     modifier: Modifier = Modifier,
+    expanded: Boolean = true,
+    onToggle: () -> Unit = {},
 ) {
     val c = MoneyTheme.colors
     Module(modifier) {
-        ModuleHeader("Allocation", subtitle = analytics.targetEquityPercent?.let { "Equity target $it%" } ?: "Set an equity target to track drift")
+        CollapsibleModuleHeader("Allocation", expanded, onToggle, subtitle = analytics.targetEquityPercent?.let { "Equity target $it%" } ?: "Set an equity target to track drift")
+        CollapsibleBody(expanded) {
         val shades = listOf(c.anchor, c.champagne, c.muted)
         SegmentBar(
             analytics.allocation.mapIndexed { i, slice -> BarSegment(slice.fraction.toFloat(), shades[i % shades.size]) },
@@ -73,6 +78,7 @@ fun AllocationModule(
                 trailing = { StatusBadge(row.percentLabel, Tone.Warning) },
                 modifier = Modifier.padding(top = 4.dp).clickable(role = Role.Button, onClickLabel = "Open ${row.name}") { onOpenHolding(row.holdingId) },
             )
+        }
         }
     }
 }
