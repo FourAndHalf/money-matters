@@ -1,5 +1,6 @@
 package com.moneymatters.app.feature.books
 
+import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.money.rupees
 import com.moneymatters.app.feature.accounts.SampleAccounts
 import com.moneymatters.app.feature.accounts.SampleLedgers
@@ -19,7 +20,7 @@ object SampleBooks {
             periodLabel = "Since 1 Oct",
             income = 72_000.rupees,
             spent = 34_326.rupees,
-            accounts = accounts.groups.flatMap { it.items },
+            accounts = accounts.groups.flatMap { it.items }.filter { it.kind in setOf(AccountKind.Bank, AccountKind.Cash, AccountKind.CreditCard) },
             recent = SampleTransactions.state.groups.flatMap { it.items }.take(5),
             draftCount = 1,
         ),

@@ -67,6 +67,17 @@ class BooksTest {
 
     private fun books(monthStartDay: Int = 1) = runBlocking { buildBooks(repo.snapshot().first(), today, monthStartDay, ZoneOffset.UTC) }
 
+    @Test fun `Home's account stack holds only bank, cash and credit card accounts, while Accounts lists the rest too`() = runBlocking {
+        val cash = repo.createAccount("Wallet", AccountType.Asset, kind = AccountKind.Cash)
+        val fd = repo.createAccount("SBI FD", AccountType.Asset, kind = AccountKind.FixedDeposit)
+        val loan = repo.createAccount("Car loan", AccountType.Liability, kind = AccountKind.Loan)
+        val fund = repo.createAccount("Index fund", AccountType.Asset, kind = AccountKind.Investment)
+        post(LocalDate.of(2026, 10, 2), "Fund, FD and loan", PostingLine(cash, debit = 1.rupees), PostingLine(equity, credit = 1.rupees))
+        val books = books()
+        assertEquals(setOf(bank, card, cash), books.home.accounts.map { it.id }.toSet())
+        assertEquals(setOf(fd, loan, fund), books.accounts.groups.flatMap { it.items }.map { it.id }.toSet() - books.home.accounts.map { it.id }.toSet())
+    }
+
     @Test fun `account balances count booked entries only, and match the ledger`() = runBlocking {
         val b = books()
         val bankRow = b.accounts.groups.flatMap { it.items }.single { it.id == bank }
