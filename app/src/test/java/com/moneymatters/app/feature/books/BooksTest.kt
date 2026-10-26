@@ -20,7 +20,9 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,12 +103,25 @@ class BooksTest {
         assertEquals(72_000.rupees, rows.getValue("Salary · Oct").amount)
         assertEquals("Salary", rows.getValue("Salary · Oct").category)
         rows.getValue("Card bill").let {
-            assertEquals((-486).rupees, it.amount)
+            // A move between your own accounts: the amount that moved, unsigned, and flagged so screens show it neutral.
+            assertEquals(486.rupees, it.amount)
+            assertTrue(it.isTransfer)
             assertEquals("HDFC Bank", it.accountName)
             assertEquals("Transfer to ICICI Rewards", it.category)
         }
+        assertFalse(rows.getValue("Swiggy").isTransfer)
+        assertFalse(rows.getValue("Salary · Oct").isTransfer)
         assertEquals("Opening balance", rows.getValue("Opening balance: HDFC Bank").category)
         assertEquals(TxnStatus.Draft, rows.getValue("Maybe dinner").status)
+    }
+
+    @Test fun `a transfer is flagged in the account ledgers and left out of the day total`() {
+        val b = books()
+        assertTrue(b.ledgers.getValue(bank).sections.single().entries.first { it.payee == "Card bill" }.isTransfer)
+        assertTrue(b.ledgers.getValue(card).sections.single().entries.first { it.payee == "Card bill" }.isTransfer)
+        assertFalse(b.ledgers.getValue(bank).sections.single().entries.first { it.payee == "Salary · Oct" }.isTransfer)
+        // 19 Oct: Swiggy (−486) plus the card bill, which moves money between accounts and so adds nothing to the day.
+        assertEquals((-486).rupees, b.transactions.groups.first { it.dateLabel == "19 Oct" }.total)
     }
 
     @Test fun `days are newest first, and entries within a day newest first`() {

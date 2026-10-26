@@ -18,7 +18,10 @@ typealias PlanKind = com.moneymatters.app.core.ledger.PlanKind
 @Immutable
 data class Posting(val account: String, val debit: Paise? = null, val credit: Paise? = null)
 
-/** A row in the Transactions list (P06). [amount] is negative for money out, positive for money in. */
+/**
+ * A row in the Transactions list (P06). [amount] is negative for money out, positive for money in; for a [isTransfer]
+ * between two of your own accounts it is the (positive) amount moved, which changes no one's net worth.
+ */
 @Immutable
 data class TransactionSummary(
     val id: String,
@@ -32,11 +35,12 @@ data class TransactionSummary(
     val decision: DecisionKind? = null,
     val plan: PlanKind? = null,
     val uncategorized: Boolean = false,
+    val isTransfer: Boolean = false,
 )
 
 @Immutable
 data class DayGroup(val dateLabel: String, val items: List<TransactionSummary>) {
-    val total: Paise get() = items.fold(Paise.Zero) { acc, t -> acc + t.amount }
+    val total: Paise get() = items.filterNot { it.isTransfer }.fold(Paise.Zero) { acc, t -> acc + t.amount }
 }
 
 @Immutable

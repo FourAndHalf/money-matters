@@ -210,6 +210,7 @@ fun buildBooks(
                 amount = Paise(amount),
                 runningBalance = Paise(running),
                 status = t.status.toEntryStatus(),
+                isTransfer = summary.isTransfer,
             )
         }
         val entries = oldestFirst.reversed()
@@ -252,6 +253,7 @@ fun buildBooks(
             plan = t.plan,
             reason = t.memo,
             audit = audit.map { it.toAuditEntry(zone, ::dateLabel) },
+            isTransfer = summary.isTransfer,
         )
     }
 
@@ -287,12 +289,13 @@ fun buildBooks(
 /**
  * How a transaction reads in a list. [TransactionSummary.amount] is its effect on net worth
  * (negative = money out). A transfer between two of your own accounts leaves net worth unchanged,
- * so it shows the amount that left the source account instead.
+ * so it carries the amount that moved, positive, and is flagged [TransactionSummary.isTransfer].
  */
 private fun summarize(t: TransactionEntity, postings: List<PostingEntity>, accounts: Map<String, AccountEntity>): TransactionSummary {
     val legs = postings.mapNotNull { p -> accounts[p.accountId]?.let { it to p } }
     val real = legs.filter { it.first.isReal }
     val other = legs.filter { !it.first.isReal }
+    var isTransfer = false
     val (amount, accountName, category) = if (other.isNotEmpty()) {
         val net = real.sumOf { (_, p) -> (p.debitPaise ?: 0) - (p.creditPaise ?: 0) }
         Triple(net, real.joinToString(", ") { it.first.name }, other.joinToString(", ") { it.first.displayName() })
@@ -302,8 +305,9 @@ private fun summarize(t: TransactionEntity, postings: List<PostingEntity>, accou
     } else {
         val from = real.filter { it.second.creditPaise != null }
         val to = real.filter { it.second.debitPaise != null }
+        isTransfer = true
         Triple(
-            -from.sumOf { it.second.creditPaise ?: 0 },
+            from.sumOf { it.second.creditPaise ?: 0 },
             from.joinToString(", ") { it.first.name },
             "Transfer to " + to.joinToString(", ") { it.first.name },
         )
@@ -320,6 +324,7 @@ private fun summarize(t: TransactionEntity, postings: List<PostingEntity>, accou
         decision = t.decision,
         plan = t.plan,
         uncategorized = other.any { it.first.name == SUSPENSE_ACCOUNT },
+        isTransfer = isTransfer,
     )
 }
 

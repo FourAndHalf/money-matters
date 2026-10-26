@@ -42,6 +42,7 @@ import com.moneymatters.app.ui.components.SegmentedControl
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.components.TransactionRow
+import com.moneymatters.app.ui.components.amountText
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
 import com.moneymatters.app.ui.theme.MoneyTheme
@@ -169,7 +170,7 @@ private fun SuspenseModule(state: TransactionsState, onOpenTransaction: (String)
         items.forEachIndexed { i, txn ->
             ListRow(
                 title = txn.payee,
-                subtitle = "${txn.accountName} · ${txn.amount.formatInr(signed = true)}",
+                subtitle = "${txn.accountName} · ${amountText(txn.amount, txn.isTransfer)}",
                 divider = i < items.lastIndex,
                 leading = { GlyphChip(text = txn.chip) },
                 trailing = { Pill("Categorize", { onOpenTransaction(txn.id) }) },
@@ -205,6 +206,7 @@ internal fun SummaryRow(txn: TransactionSummary, onOpenTransaction: (String) -> 
         },
         chip = txn.chip,
         amount = txn.amount,
+        isTransfer = txn.isTransfer,
         onClick = { onOpenTransaction(txn.id) },
         divider = divider,
         badge = txn.status.look()?.let { (text, tone, icon) -> { StatusBadge(text, tone, icon = icon) } },
