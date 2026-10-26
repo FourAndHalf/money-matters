@@ -82,6 +82,34 @@ class CloseTest {
         assertEquals("October 2026", october.label)
     }
 
+    @Test fun `the next month to close is the one with the oldest open entry, else the latest ended`() {
+        val snapshot = { runBlocking { ledger.snapshot().first() } }
+        assertEquals(november, nextPeriodToClose(snapshot(), LocalDate.of(2026, 12, 2), 1))
+        spend(LocalDate.of(2026, 1, 15), 100)
+        spend(LocalDate.of(2026, 5, 3), 100)
+        assertEquals(Period(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)), nextPeriodToClose(snapshot(), today, 1))
+        // An open entry in the current month isn't a month that can close yet, so only that one leaves November.
+        spend(LocalDate.of(2026, 12, 1), 100)
+        val decemberOnly = snapshot().let { s -> s.copy(transactions = s.transactions.filter { it.date >= "2026-12" }) }
+        assertEquals(november, nextPeriodToClose(decemberOnly, today, 1))
+    }
+
+    @Test fun `a backlog closes oldest month first, January then May, then the latest`() {
+        spend(LocalDate.of(2026, 1, 15), 100)
+        spend(LocalDate.of(2026, 5, 3), 100)
+        spend(LocalDate.of(2026, 11, 3), 100)
+        val january = Period(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
+        val may = Period(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31))
+        fun next() = runBlocking { nextPeriodToClose(ledger.snapshot().first(), today, 1) }
+        assertThrows(CloseNotAllowedException::class.java) { closePeriod(may) } // January is still open
+        for (period in listOf(january, may, november)) {
+            assertEquals(period, next())
+            ready(period)
+            closePeriod(period)
+        }
+        assertEquals(3, runBlocking { db.ledgerDao().getAllClosedPeriods() }.size)
+    }
+
     // ---- Checklist ----
 
     @Test fun `an unreconciled, unconfirmed month fails and a prepared one passes`() {

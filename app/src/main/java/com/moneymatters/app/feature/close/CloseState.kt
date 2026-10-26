@@ -7,6 +7,7 @@ import com.moneymatters.app.core.close.Period
 import com.moneymatters.app.core.close.balanceLines
 import com.moneymatters.app.core.close.buildChecklist
 import com.moneymatters.app.core.close.latestEndedPeriod
+import com.moneymatters.app.core.close.nextPeriodToClose
 import com.moneymatters.app.core.close.verifyChain
 import com.moneymatters.app.core.invest.InvestSnapshot
 import com.moneymatters.app.core.ledger.LedgerSnapshot
@@ -36,14 +37,15 @@ data class CloseState(
 
 fun buildClose(ledger: LedgerSnapshot, invest: InvestSnapshot, today: LocalDate, monthStartDay: Int, confirmed: Set<String>): CloseState {
     val latest = latestEndedPeriod(today, monthStartDay)
-    val alreadyClosed = ledger.closedPeriods.any { it.start == latest.start.toString() }
+    val next = nextPeriodToClose(ledger, today, monthStartDay)
+    val alreadyClosed = ledger.closedPeriods.any { it.start == next.start.toString() }
     val history = verifyChain(ledger.closedPeriods, ledger).reversed().map { c ->
         val start = LocalDate.parse(c.period.start)
         val period = Period(start, LocalDate.parse(c.period.end))
         ClosedRow(period.label, "${start.format(DayMonthYear)} – ${period.end.format(DayMonthYear)}", c.period.hash.take(12), c.ok, c.problem)
     }
     if (alreadyClosed) return CloseState(null, history = history, nextLabel = "${latest.label} is closed; the next month can be closed after ${latest.end.plusMonths(1).format(DayMonthYear)}")
-    val checklist = buildChecklist(ledger, invest, latest, today, confirmed)
-    val balances = balanceLines(ledger, latest).map { BalanceRow(it, it.accountId in confirmed) }
-    return CloseState(latest, checklist.items, balances, checklist.canClose, history)
+    val checklist = buildChecklist(ledger, invest, next, today, confirmed)
+    val balances = balanceLines(ledger, next).map { BalanceRow(it, it.accountId in confirmed) }
+    return CloseState(next, checklist.items, balances, checklist.canClose, history)
 }
