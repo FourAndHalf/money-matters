@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.moneymatters.app.ui.theme.MoneyMattersTheme
@@ -57,9 +58,14 @@ class TransactionsScreenTest {
 
     @Test fun `filtering to Locked status shows only locked transactions`() {
         compose.setContent { MoneyMattersTheme { TransactionsScreen(SampleTransactions.state, onOpenTransaction = {}) } }
-        compose.onNodeWithTag("status-filter-Locked").performClick()
+        compose.onNodeWithTag("status-filter-Locked").performScrollTo().performClick()
         compose.onNodeWithText("Salary · Sep").assertIsDisplayed()
         compose.onAllNodesWithText("Swiggy").assertCountEquals(0)
+    }
+
+    @Test fun `the last status filter is reachable by scrolling the row`() {
+        compose.setContent { MoneyMattersTheme { TransactionsScreen(SampleTransactions.state, onOpenTransaction = {}) } }
+        compose.onNodeWithTag("status-filter-Prior-period").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun `accountant mode shows Dr and Cr postings`() {

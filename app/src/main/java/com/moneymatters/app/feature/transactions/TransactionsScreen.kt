@@ -1,5 +1,6 @@
 package com.moneymatters.app.feature.transactions
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -137,7 +139,8 @@ private fun StatusFilterRow(selected: TxnStatus?, onSelect: (TxnStatus?) -> Unit
         "Locked" to TxnStatus.Locked,
         "Prior-period" to TxnStatus.PriorPeriodAdjustment,
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Six pills are wider than a phone, so the row scrolls sideways rather than squeezing or cutting the last ones.
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (label, value) ->
             Pill(
                 label, { onSelect(value) },
