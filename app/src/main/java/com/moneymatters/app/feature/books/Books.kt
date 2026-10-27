@@ -276,7 +276,7 @@ fun buildBooks(
         periodLabel = "Since ${dateLabel(start)}",
         income = Paise(income),
         spent = Paise(spent),
-        accounts = rows.filter { it.isPinned }.sortedByDescending { it.balance.value },
+        accounts = rows.filter { it.isPinned }.sortedBy { it.name.lowercase() },
         recent = dayGroups.flatMap { it.items }.take(5),
         draftCount = snapshot.transactions.count { it.status == TransactionStatus.Draft },
     )
