@@ -263,8 +263,16 @@ class LedgerRepository(
             // One line per thing that actually changed, each with its before and after, so repeated edits stay readable.
             fun money(p: Paise) = p.formatInr(showPaise = p.value % 100 != 0L)
             fun sides(legs: List<Triple<String, Long?, Long?>>) = legs.map { (account, debit, credit) -> account to (debit != null) }.sortedBy { it.first + it.second }
-            suspend fun accountNames(legs: List<Pair<String, Boolean>>) =
-                legs.joinToString(", ") { (id, isDebit) -> (if (isDebit) "Dr " else "Cr ") + (dao.getAccount(id)?.name ?: id) }
+            suspend fun accountNames(legs: List<Pair<String, Boolean>>): String {
+                val names = mutableListOf<String>()
+
+                for ((id, isDebit) in legs) {
+                    val name = dao.getAccount(id)?.name ?: id
+                    names.add("${if (isDebit) "Dr " else "Cr "}$name")
+                } 
+
+                return names.joinToString(", ")
+            }
             val oldLegs = sides(oldPostings.map { Triple(it.accountId, it.debitPaise, it.creditPaise) })
             val newLegs = sides(postings.map { Triple(it.accountId, it.debit?.value, it.credit?.value) })
             val oldAmount = Paise(oldPostings.sumOf { it.debitPaise ?: 0 })
