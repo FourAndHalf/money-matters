@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -122,15 +123,15 @@ fun QuickAddScreen(
             }
             item("what") {
                 Module {
-                    Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
-                    MoneyText(
-                        form.amount,
-                        style = MoneyTheme.type.metricHero,
-                        showPaise = false,
-                        modifier = Modifier
-                            .padding(top = 6.dp)
-                            .clickable { showAmountPad = !showAmountPad; amountExpression = "" },
-                    )
+                    // The whole row opens the amount field, not just the digits.
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button) { showAmountPad = !showAmountPad; amountExpression = "" },
+                    ) {
+                        Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
+                        MoneyText(form.amount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp))
+                    }
                     if (showAmountPad) {
                         val result = evaluateAmountExpression(amountExpression)?.takeIf { it.value > 0 }
                         fun applyAmount() {
