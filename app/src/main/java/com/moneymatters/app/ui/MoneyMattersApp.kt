@@ -111,7 +111,6 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
         when (target) {
             LaunchTarget.AddEntry -> showQuickAdd = true
             LaunchTarget.Accounts -> { showQuickAdd = false; tab = ACCOUNTS_TAB }
-            LaunchTarget.DisableLock -> settings.updateLockEnabled(false)
         }
         onLaunchHandled()
     }
