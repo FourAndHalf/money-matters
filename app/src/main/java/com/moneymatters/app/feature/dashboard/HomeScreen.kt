@@ -99,9 +99,15 @@ fun HomeScreen(
         padded(margin, "month") {
             Module {
                 ModuleHeader("Month so far", subtitle = state.periodLabel)
-                KeyValueRow("Income", state.income.formatInr(signed = true))
-                KeyValueRow("Spent", (-state.spent).formatInr(signed = true))
-                KeyValueRow("Net", (state.income - state.spent).formatInr(signed = true), divider = false)
+                val net = state.income - state.spent
+                KeyValueRow("Income", state.income.formatInr(signed = true), valueColor = MoneyTheme.colors.positive)
+                KeyValueRow("Spent", (-state.spent).formatInr(signed = true), valueColor = MoneyTheme.colors.negative)
+                KeyValueRow(
+                    "Net",
+                    net.formatInr(signed = true),
+                    divider = false,
+                    valueColor = if (net.value >= 0) MoneyTheme.colors.positive else MoneyTheme.colors.negative,
+                )
             }
         }
         if (state.draftCount > 0) {
