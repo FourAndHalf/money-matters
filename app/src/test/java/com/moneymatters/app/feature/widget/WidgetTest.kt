@@ -37,16 +37,6 @@ class WidgetTest {
         assertEquals(HIDDEN_AMOUNT, Paise(-5_00).widgetText(hidden = true))
     }
 
-    @Test fun `the widget's own mask is off until switched on, and keeps its state`() {
-        val prefs = context.getSharedPreferences("widget_mask_test", Context.MODE_PRIVATE).also { it.edit().clear().commit() }
-        val mask = WidgetMask(prefs)
-        assertEquals(false, mask.isMasked())
-        mask.setMasked(true)
-        assertEquals(true, WidgetMask(prefs).isMasked()) // survives a fresh reader, like a new widget update
-        mask.setMasked(false)
-        assertEquals(false, WidgetMask(prefs).isMasked())
-    }
-
     @Test fun `each widget button's intent maps to its page, and anything else to none`() {
         assertEquals(LaunchTarget.AddEntry, LaunchTarget.from(launchIntent(context, ACTION_ADD_ENTRY)))
         assertEquals(LaunchTarget.Accounts, LaunchTarget.from(launchIntent(context, ACTION_OPEN_ACCOUNTS)))

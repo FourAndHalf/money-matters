@@ -11,25 +11,6 @@ private const val KEY_ASSETS = "assets"
 private const val KEY_LIABILITIES = "liabilities"
 private const val KEY_UPDATED_AT = "updated_at"
 
-/**
- * Whether the user has switched the widget's figures off with the toggle on the card. Its own setting: it never touches the
- * app lock, and the lock being on masks the figures whatever this says. Not a secret (the card shows the state), so plain
- * prefs, which also keeps a tap on the toggle fast: no keystore in the way.
- */
-class WidgetMask(private val prefs: SharedPreferences) {
-    fun isMasked(): Boolean = prefs.getBoolean(KEY_MASKED, false)
-
-    fun setMasked(masked: Boolean) {
-        prefs.edit().putBoolean(KEY_MASKED, masked).commit()
-    }
-
-    companion object {
-        fun of(context: Context) = WidgetMask(context.getSharedPreferences("widget_mask", Context.MODE_PRIVATE))
-    }
-}
-
-private const val KEY_MASKED = "masked"
-
 /** The figures the net worth widget shows, as the app last saw them. */
 data class WidgetSnapshot(val netWorth: Paise, val assets: Paise, val liabilities: Paise, val updatedAtMillis: Long)
 

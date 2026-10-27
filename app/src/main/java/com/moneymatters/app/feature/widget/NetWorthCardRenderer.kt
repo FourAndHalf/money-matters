@@ -28,8 +28,6 @@ internal const val FULL_CARD_MIN_HEIGHT_DP = 110f
 private const val FULL_NATURAL_HEIGHT = 160f
 private const val COMPACT_NATURAL_HEIGHT = 89f
 private const val CORNER = 28f
-private const val TOGGLE_WIDTH = 30f
-private const val TOGGLE_HEIGHT = 18f
 
 /**
  * Paints Home's net worth card (same font, sizes, colours, split bar) into a bitmap. Widgets are RemoteViews, which can't load
@@ -73,7 +71,6 @@ internal object NetWorthCardRenderer {
             val top = (height - natural) / 2 + pad
             val contentWidth = width - 2 * pad
             text("Net worth", pad, top, 15f, 11f, regular, colors.muted)
-            lockToggle(top, on = hidden)
             if (snapshot == null) {
                 text("Open Money Matters to start", pad, top + 21f, 40f, 13f, regular, colors.ink, fitWidth = contentWidth)
                 return
@@ -91,17 +88,6 @@ internal object NetWorthCardRenderer {
             text(amount(snapshot.assets, hidden), pad, rowTop + 15f, 18f, 13f, medium, colors.ink, spacing = -0.01f)
             text("Liabilities", width - pad, rowTop, 15f, 11f, regular, colors.muted, alignEnd = true)
             text(amount(snapshot.liabilities, hidden), width - pad, rowTop + 15f, 18f, 13f, medium, colors.negative, spacing = -0.01f, alignEnd = true)
-        }
-
-        /** The app-lock switch at the top right, on the label row. On means the lock is on and the figures are hidden. */
-        private fun lockToggle(labelTop: Float, on: Boolean) {
-            val left = width - pad - TOGGLE_WIDTH
-            val top = labelTop + (15f - TOGGLE_HEIGHT) / 2
-            val track = RectF(left, top, left + TOGGLE_WIDTH, top + TOGGLE_HEIGHT)
-            canvas.drawRoundRect(track, TOGGLE_HEIGHT / 2, TOGGLE_HEIGHT / 2, fill(if (on) colors.anchor else colors.outline))
-            val knobRadius = TOGGLE_HEIGHT / 2 - 2f
-            val knobX = if (on) track.right - 2f - knobRadius else track.left + 2f + knobRadius
-            canvas.drawCircle(knobX, track.centerY(), knobRadius, fill(Color.White))
         }
 
         private fun amount(value: Paise, hidden: Boolean) = if (hidden) HIDDEN_AMOUNT else value.formatInr()
