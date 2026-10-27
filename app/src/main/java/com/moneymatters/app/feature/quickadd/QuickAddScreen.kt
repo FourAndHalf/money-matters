@@ -121,65 +121,76 @@ fun QuickAddScreen(
                     }
                 }
             }
-            item("what") {
-                Module {
-                    // The whole row opens the amount field, not just the digits.
+            item("amount") {
+                // Zero card padding so the tap area is the whole card; the padding moves inside the clickable Column.
+                Module(contentPadding = 0.dp) {
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .clickable(role = Role.Button) { showAmountPad = !showAmountPad; amountExpression = "" },
+                            .clickable(enabled = !showAmountPad, role = Role.Button) { showAmountPad = true; amountExpression = "" }
+                            .padding(MoneyTheme.spacing.cardPadding),
                     ) {
-                        Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
-                        MoneyText(form.amount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp))
-                    }
-                    if (showAmountPad) {
-                        val result = evaluateAmountExpression(amountExpression)?.takeIf { it.value > 0 }
-                        fun applyAmount() {
-                            if (result != null) update { it.copy(amount = result) }
-                            showAmountPad = false
+                        // Open, the header row closes it again.
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = showAmountPad, role = Role.Button) { showAmountPad = false },
+                        ) {
+                            Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
+                            MoneyText(form.amount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp))
                         }
-                        // Opens the system keyboard straight away; the operator pills cover keyboards without + − × ÷.
-                        LaunchedEffect(Unit) { amountFocus.requestFocus() }
-                        Column(Modifier.padding(top = 14.dp)) {
-                            FormField(
-                                "Amount, or a sum like 120+45×2",
-                                amountExpression,
-                                onValueChange = { amountExpression = it },
-                                placeholder = "0",
-                                keyboardType = KeyboardType.Decimal,
-                                focusRequester = amountFocus,
-                                onDone = ::applyAmount,
-                            )
-                            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf("+", "−", "×", "÷").forEach { op ->
+                        if (showAmountPad) {
+                            val result = evaluateAmountExpression(amountExpression)?.takeIf { it.value > 0 }
+                            fun applyAmount() {
+                                if (result != null) update { it.copy(amount = result) }
+                                showAmountPad = false
+                            }
+                            // Opens the system keyboard straight away; the operator pills cover keyboards without + − × ÷.
+                            LaunchedEffect(Unit) { amountFocus.requestFocus() }
+                            Column(Modifier.padding(top = 14.dp)) {
+                                FormField(
+                                    "Amount, or a sum like 120+45×2",
+                                    amountExpression,
+                                    onValueChange = { amountExpression = it },
+                                    placeholder = "0",
+                                    keyboardType = KeyboardType.Decimal,
+                                    focusRequester = amountFocus,
+                                    onDone = ::applyAmount,
+                                )
+                                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf("+", "−", "×", "÷").forEach { op ->
+                                        Pill(
+                                            op,
+                                            { if (amountExpression.isNotEmpty() && amountExpression.last() !in "+−×÷") amountExpression += op },
+                                            modifier = Modifier.weight(1f),
+                                            height = 40.dp,
+                                        )
+                                    }
+                                }
+                                if (result != null && amountExpression.any { it in "+−×÷-*/xX" }) {
+                                    Text("= ${result.formatInr(showPaise = result.value % 100 != 0L)}", style = MoneyTheme.type.metricCard, color = MoneyTheme.colors.muted, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                                }
+                                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Pill("Cancel", { showAmountPad = false }, modifier = Modifier.weight(1f), height = 44.dp)
                                     Pill(
-                                        op,
-                                        { if (amountExpression.isNotEmpty() && amountExpression.last() !in "+−×÷") amountExpression += op },
-                                        modifier = Modifier.weight(1f),
-                                        height = 40.dp,
+                                        "Done",
+                                        ::applyAmount,
+                                        style = PillStyle.Primary,
+                                        modifier = Modifier.weight(1f).alpha(if (result != null) 1f else 0.4f),
+                                        height = 44.dp,
                                     )
                                 }
                             }
-                            if (result != null && amountExpression.any { it in "+−×÷-*/xX" }) {
-                                Text("= ${result.formatInr(showPaise = result.value % 100 != 0L)}", style = MoneyTheme.type.metricCard, color = MoneyTheme.colors.muted, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-                            }
-                            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Pill("Cancel", { showAmountPad = false }, modifier = Modifier.weight(1f), height = 44.dp)
-                                Pill(
-                                    "Done",
-                                    ::applyAmount,
-                                    style = PillStyle.Primary,
-                                    modifier = Modifier.weight(1f).alpha(if (result != null) 1f else 0.4f),
-                                    height = 44.dp,
-                                )
-                            }
                         }
                     }
+                }
+            }
+            item("payee") {
+                Module {
                     FormField(
                         "Payee",
                         form.payee,
                         onValueChange = { update { f -> f.copy(payee = it) } },
-                        modifier = Modifier.padding(top = 16.dp),
                         placeholder = "e.g. Swiggy",
                     )
                     if (suggestions.isNotEmpty()) {
