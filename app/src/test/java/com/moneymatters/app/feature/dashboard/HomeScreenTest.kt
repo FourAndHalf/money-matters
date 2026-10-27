@@ -46,7 +46,7 @@ class HomeScreenTest {
         show(SampleBooks.state.home)
         compose.onNodeWithText("Net worth").assertIsDisplayed()
         compose.onNodeWithText("Month so far").assertIsDisplayed()
-        compose.onNodeWithText("+₹72,000").assertIsDisplayed()
+        compose.onAllNodesWithText("₹72,000")[0].assertIsDisplayed()
         compose.onNodeWithText("1 draft waiting").assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/home_light.png")
     }

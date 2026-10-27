@@ -38,6 +38,7 @@ import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyTheme
+import kotlin.math.abs
 
 
 /** Simple Home (plan.html → P03, Phase 1): balances and the open period's totals, straight from the ledger. */
@@ -100,11 +101,11 @@ fun HomeScreen(
             Module {
                 ModuleHeader("Month so far", subtitle = state.periodLabel)
                 val net = state.income - state.spent
-                KeyValueRow("Income", state.income.formatInr(signed = true), valueColor = MoneyTheme.colors.positive)
-                KeyValueRow("Spent", (-state.spent).formatInr(signed = true), valueColor = MoneyTheme.colors.negative)
+                KeyValueRow("Income", state.income.formatInr(), valueColor = MoneyTheme.colors.positive)
+                KeyValueRow("Spent", state.spent.formatInr(), valueColor = MoneyTheme.colors.negative)
                 KeyValueRow(
                     "Net",
-                    net.formatInr(signed = true),
+                    Paise(abs(net.value)).formatInr(),
                     divider = false,
                     valueColor = if (net.value >= 0) MoneyTheme.colors.positive else MoneyTheme.colors.negative,
                 )
