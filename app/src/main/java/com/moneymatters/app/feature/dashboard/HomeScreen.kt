@@ -38,6 +38,7 @@ import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
 import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyTheme
+import kotlin.math.abs
 
 
 /** Simple Home (plan.html → P03, Phase 1): balances and the open period's totals, straight from the ledger. */
@@ -66,6 +67,7 @@ fun HomeScreen(
     onOpenAccounts: () -> Unit,
     onOpenAccount: (accountId: String) -> Unit,
     onEditCard: (AccountSummary) -> Unit = {},
+    onTogglePin: (AccountSummary) -> Unit = {},
     onOpenTransactions: () -> Unit,
     onOpenTransaction: (id: String) -> Unit,
     modifier: Modifier = Modifier,
@@ -99,9 +101,15 @@ fun HomeScreen(
         padded(margin, "month") {
             Module {
                 ModuleHeader("Month so far", subtitle = state.periodLabel)
-                KeyValueRow("Income", state.income.formatInr(signed = true))
-                KeyValueRow("Spent", (-state.spent).formatInr(signed = true))
-                KeyValueRow("Net", (state.income - state.spent).formatInr(signed = true), divider = false)
+                val net = state.income - state.spent
+                KeyValueRow("Income", state.income.formatInr(), valueColor = MoneyTheme.colors.positive)
+                KeyValueRow("Spent", state.spent.formatInr(), valueColor = MoneyTheme.colors.negative)
+                KeyValueRow(
+                    "Net",
+                    Paise(abs(net.value)).formatInr(),
+                    divider = false,
+                    valueColor = if (net.value >= 0) MoneyTheme.colors.positive else MoneyTheme.colors.negative,
+                )
             }
         }
         if (state.draftCount > 0) {
@@ -120,7 +128,7 @@ fun HomeScreen(
         padded(margin, "accounts") {
             Column {
                 ModuleHeader("Accounts", subtitle = if (state.accounts.size > 1) "Swipe the stack" else null, modifier = Modifier.padding(start = 2.dp, top = 8.dp), action = { Pill("View all", onOpenAccounts) })
-                if (state.accounts.isEmpty()) Module { EmptyLine("No accounts yet.") } else AccountStack(state.accounts, onOpenAccount, onEditCard = onEditCard)
+                if (state.accounts.isEmpty()) Module { EmptyLine("No pinned accounts. Pin one from its card in Accounts.") } else AccountStack(state.accounts, onOpenAccount, onEditCard = onEditCard, onTogglePin = onTogglePin)
             }
         }
         padded(margin, "recent") {

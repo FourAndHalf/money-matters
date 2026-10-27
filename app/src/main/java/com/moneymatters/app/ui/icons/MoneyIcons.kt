@@ -61,6 +61,10 @@ object MoneyIcons {
         outline("Use biometrics", "M6.5 7.5a7 7 0 0 1 11 0M5 12a7 7 0 0 1 .6-2.8M19 12c0 3-.6 5.3-1.6 7M8.5 19.5c-.9-1.9-1.4-4.4-1.4-7.5a4.9 4.9 0 0 1 9.8 0c0 1.2-.1 2.3-.2 3.3M12 12c0 3.3.5 6 1.5 8M10.5 21c-.6-1-1-2.2-1.2-3.5")
     }
 
+    private const val PIN_PATH = "M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
+    val Pin by lazy { outline("Pin", PIN_PATH) }
+    val PinFilled by lazy { outline("Pinned", PIN_PATH, filled = true) }
+
     val Settings by lazy {
         outline(
             "Settings",
@@ -68,11 +72,11 @@ object MoneyIcons {
         )
     }
 
-    private fun outline(name: String, path: String, width: Float = 1.6f): ImageVector =
+    private fun outline(name: String, path: String, width: Float = 1.6f, filled: Boolean = false): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
             .addPath(
                 pathData = addPathNodes(path),
-                fill = null,
+                fill = if (filled) SolidColor(Color.Black) else null,
                 stroke = SolidColor(Color.Black),
                 strokeLineWidth = width,
                 strokeLineCap = StrokeCap.Round,

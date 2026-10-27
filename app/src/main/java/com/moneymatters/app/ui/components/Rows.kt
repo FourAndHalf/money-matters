@@ -55,12 +55,18 @@ fun KeyValueRow(
 }
 
 @Composable
-fun KeyValueRow(key: String, value: String, modifier: Modifier = Modifier, divider: Boolean = true) {
+fun KeyValueRow(
+    key: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    divider: Boolean = true,
+    valueColor: Color = MoneyTheme.colors.ink,
+) {
     KeyValueRow(key, modifier, divider) {
         Text(
             value,
             style = MoneyTheme.type.ledgerMono.copy(fontWeight = MoneyTheme.type.metricTable.fontWeight),
-            color = MoneyTheme.colors.ink,
+            color = valueColor,
             textAlign = TextAlign.End,
         )
     }

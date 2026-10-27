@@ -43,6 +43,7 @@ fun AccountsScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     onEditCard: (AccountSummary) -> Unit = {},
+    onTogglePin: (AccountSummary) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -76,6 +77,7 @@ fun AccountsScreen(
                     stack, onOpenAccount, Modifier.padding(horizontal = margin), onEditCard,
                     // The group of the account up front opens, and any other one closes.
                     onShown = { shown -> openGroup = state.groups.firstOrNull { g -> g.items.any { it.id == shown.id } }?.title },
+                    onTogglePin = onTogglePin,
                 )
             }
         }

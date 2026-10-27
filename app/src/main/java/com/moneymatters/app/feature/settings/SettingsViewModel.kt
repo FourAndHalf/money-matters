@@ -234,6 +234,10 @@ class SettingsViewModel(
         viewModelScope.launch { repo.setInNetWorth(id, inNetWorth) }
     }
 
+    fun setPinned(id: String, pinned: Boolean) {
+        viewModelScope.launch { repo.setPinned(id, pinned) }
+    }
+
     fun toggleEssential(category: String) {
         val current = profileForm.essentialCategories
         profileForm = profileForm.copy(essentialCategories = if (category in current) current - category else current + category)

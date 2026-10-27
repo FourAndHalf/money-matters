@@ -63,9 +63,10 @@ internal fun AccountSummary.utilisation(): Float? = cardLimit?.takeIf { it.value
 /**
  * The account stack: swipe, tap the peeking edge or use the dots to bring another account to the front, and
  * the panel under it shows that account's facts with a way into its ledger. [onShown] fires with the account at the front.
+ * A pin sits in each card's top-right corner when [onTogglePin] is given.
  */
 @Composable
-fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}, onShown: (AccountSummary) -> Unit = {}) {
+fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}, onShown: (AccountSummary) -> Unit = {}, onTogglePin: ((AccountSummary) -> Unit)? = null) {
     if (accounts.isEmpty()) return
     var front by rememberSaveable { mutableIntStateOf(0) }
     val index = front.coerceIn(0, accounts.lastIndex)
@@ -89,6 +90,8 @@ fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: Stri
                 footLeft = account.cardLimit?.let { "Limit ${it.formatInr()}" } ?: if (account.entryCount == 0) "No entries yet" else "${account.entryCount} ${if (account.entryCount == 1) "entry" else "entries"}",
                 footRight = util?.let { "${(it * 100).toInt()}% used" } ?: "",
                 glyph = account.kind.glyph(),
+                pinned = account.isPinned,
+                onTogglePin = onTogglePin?.let { toggle -> { toggle(account) } },
             )
         }
         if (accounts.size > 1) {

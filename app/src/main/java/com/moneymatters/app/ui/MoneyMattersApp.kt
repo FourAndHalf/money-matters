@@ -308,6 +308,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         onOpenAccounts = { tab = ACCOUNTS_TAB },
                         onOpenAccount = { id -> openAccountId = id },
                         onEditCard = { settings.startEditCard(it.id, it.name, it.cardLimit, it.statementDay) },
+                        onTogglePin = { settings.setPinned(it.id, !it.isPinned) },
                         onOpenTransactions = { tab = TXNS_TAB },
                         onOpenTransaction = { id -> openTransactionId = id },
                         onOpenSettings = { showSettings = true },
@@ -323,6 +324,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         accounts,
                         onOpenAccount = { id -> openAccountId = id },
                         onEditCard = { settings.startEditCard(it.id, it.name, it.cardLimit, it.statementDay) },
+                        onTogglePin = { settings.setPinned(it.id, !it.isPinned) },
                         contentPadding = PaddingValues(bottom = 132.dp),
                     )
                     INVEST_TAB -> investState?.let {

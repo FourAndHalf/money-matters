@@ -70,7 +70,7 @@ class CorporateActionsV4 : AutoMigrationSpec
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
         ClosedPeriodEntity::class, CreditCardEntity::class,
     ],
-    version = 11,
+    version = 12,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -92,6 +92,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 9, to = 10),
         // v11: bonds carry a coupon and a maturity date.
         AutoMigration(from = 10, to = 11),
+        // v12: accounts can be pinned to Home.
+        AutoMigration(from = 11, to = 12),
     ],
 )
 @TypeConverters(LedgerConverters::class)
