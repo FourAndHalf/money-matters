@@ -20,7 +20,7 @@ object SampleBooks {
             periodLabel = "Since 1 Oct",
             income = 72_000.rupees,
             spent = 34_326.rupees,
-            accounts = accounts.groups.flatMap { it.items }.filter { it.kind in setOf(AccountKind.Bank, AccountKind.Cash, AccountKind.CreditCard) },
+            accounts = accounts.groups.flatMap { it.items }.filter { it.kind in setOf(AccountKind.Bank, AccountKind.Cash, AccountKind.CreditCard) }.map { it.copy(isPinned = true) },
             recent = SampleTransactions.state.groups.flatMap { it.items }.take(5),
             draftCount = 1,
         ),

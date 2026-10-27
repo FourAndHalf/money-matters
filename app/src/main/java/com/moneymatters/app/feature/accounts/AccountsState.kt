@@ -32,6 +32,8 @@ data class AccountSummary(
     /** Credit cards with details only: the limit and the day the statement is cut. */
     val cardLimit: Paise? = null,
     val statementDay: Int? = null,
+    /** Pinned accounts are the ones Home's account section shows. */
+    val isPinned: Boolean = false,
 )
 
 @Immutable

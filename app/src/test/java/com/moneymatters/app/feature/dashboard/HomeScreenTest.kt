@@ -64,7 +64,7 @@ class HomeScreenTest {
 
     @Test fun `an empty ledger says so instead of showing zeros everywhere`() {
         show(buildBooks(LedgerSnapshot(emptyList(), emptyList(), emptyList(), emptyList()), LocalDate.of(2026, 10, 20)).home)
-        compose.onNodeWithText("No accounts yet.").assertIsDisplayed()
+        compose.onNodeWithText("No pinned accounts. Pin one from its card in Accounts.").assertIsDisplayed()
         compose.onNodeWithText("No transactions yet. Tap + to add one.").assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/home_empty.png")
     }

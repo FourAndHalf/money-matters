@@ -77,10 +77,12 @@ class EndToEndInvestTest {
         val i = invest.snapshot().first()
         val invState = buildInvest(l, i, today, rules)
         val books = buildBooks(l, today, invest = i)
+        assertTrue(books.home.accounts.isEmpty()) // nothing pinned yet
         assertTrue(invState.holdings.isNotEmpty())
         assertEquals(3, invState.holdings.size)
         assertEquals(2, invState.deposits.size)
         assertEquals(2, invState.ladder.size)
-        assertTrue(books.home.accounts.isNotEmpty())
+        ledger.setPinned(bank, true)
+        assertEquals(listOf(bank), buildBooks(ledger.snapshot().first(), today, invest = i).home.accounts.map { it.id })
     }
 }

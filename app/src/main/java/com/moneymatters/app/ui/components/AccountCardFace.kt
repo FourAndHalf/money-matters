@@ -1,6 +1,7 @@
 package com.moneymatters.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,11 +21,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.ui.icons.MoneyIcons
 import com.moneymatters.app.ui.theme.MoneyTheme
 
 enum class CardFinish { Pearl, Graphite, Silver, Champagne, Smoke }
@@ -49,6 +53,8 @@ fun BoxScope.AccountCardFace(
     footLeft: String,
     footRight: String,
     glyph: String?,
+    pinned: Boolean = false,
+    onTogglePin: (() -> Unit)? = null,
 ) {
     val f = finish.colors()
     val t = MoneyTheme.type
@@ -75,10 +81,22 @@ fun BoxScope.AccountCardFace(
                 Text(typeLabel.uppercase(), style = t.labelUppercase, color = f.ink.copy(alpha = 0.62f))
                 Text(name, style = t.headlineMd, color = f.ink, modifier = Modifier.padding(top = 3.dp))
             }
-            if (glyph == null) {
-                EmvChip(f.ink)
-            } else {
-                Text(glyph, style = t.metricCard, color = f.ink.copy(alpha = 0.7f))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (glyph == null) {
+                    EmvChip(f.ink)
+                } else {
+                    Text(glyph, style = t.metricCard, color = f.ink.copy(alpha = 0.7f))
+                }
+                if (onTogglePin != null) {
+                    Icon(
+                        if (pinned) MoneyIcons.PinFilled else MoneyIcons.Pin,
+                        contentDescription = if (pinned) "Unpin $name from Home" else "Pin $name to Home",
+                        tint = f.ink.copy(alpha = if (pinned) 0.9f else 0.6f),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(role = Role.Button, onClick = onTogglePin),
+                    )
+                }
             }
         }
         Column {

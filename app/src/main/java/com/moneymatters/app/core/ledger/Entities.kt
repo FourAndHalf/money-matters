@@ -26,6 +26,8 @@ data class AccountEntity(
     val kind: AccountKind? = null,
     /** False for assets tracked but kept out of net worth, like EPF. Defaults to counted. */
     @ColumnInfo(defaultValue = "1") val inNetWorth: Boolean = true,
+    /** Pinned accounts are the only ones Home's account section shows. */
+    @ColumnInfo(defaultValue = "0") val isPinned: Boolean = false,
 )
 
 /** Mirrors `TxnAction`'s lifecycle in feature/transactions, one level down (DB, not UI). */

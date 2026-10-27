@@ -110,6 +110,12 @@ class LedgerRepository(
         dao.updateAccount(account.copy(inNetWorth = inNetWorth))
     }
 
+    /** Pins an account to Home's account section, or takes it off again. */
+    suspend fun setPinned(id: String, pinned: Boolean) {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        dao.updateAccount(account.copy(isPinned = pinned))
+    }
+
     suspend fun unarchiveAccount(id: String) {
         val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
         dao.updateAccount(account.copy(isArchived = false))

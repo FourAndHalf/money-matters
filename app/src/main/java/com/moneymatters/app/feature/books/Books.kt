@@ -82,9 +82,6 @@ fun PaymentMethod.label() = when (this) {
     PaymentMethod.Cash -> "Cash"
 }
 
-/** Home's Accounts stack is for everyday money; deposits, investments and loans live under View all. */
-private val HOME_ACCOUNT_KINDS = setOf(AccountKind.Bank, AccountKind.Cash, AccountKind.CreditCard)
-
 /** `Expenses:Dining` → `Dining`; `Equity:Opening` → `Opening balance`. Real accounts keep their name. */
 fun AccountEntity.displayName(): String = when {
     type == AccountType.Equity && name == "Equity:Opening" -> "Opening balance"
@@ -161,6 +158,7 @@ fun buildBooks(
             entryCount = count,
             cardLimit = cardsById[a.id]?.let { Paise(it.limitPaise) },
             statementDay = cardsById[a.id]?.statementDay,
+            isPinned = a.isPinned,
         )
     }
     val groupOrder = listOf(
@@ -278,7 +276,7 @@ fun buildBooks(
         periodLabel = "Since ${dateLabel(start)}",
         income = Paise(income),
         spent = Paise(spent),
-        accounts = rows.filter { it.kind in HOME_ACCOUNT_KINDS }.sortedByDescending { it.balance.value },
+        accounts = rows.filter { it.isPinned }.sortedByDescending { it.balance.value },
         recent = dayGroups.flatMap { it.items }.take(5),
         draftCount = snapshot.transactions.count { it.status == TransactionStatus.Draft },
     )

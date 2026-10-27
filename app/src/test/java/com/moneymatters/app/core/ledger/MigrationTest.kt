@@ -64,7 +64,7 @@ class MigrationTest {
             assertNull(t.decision)
             assertNull(t.paymentMethod)
             assertNull(db.ledgerDao().getAccount("bank")!!.kind)
-            assertEquals(11, db.openHelper.readableDatabase.version) // 1 → 2 → … → 11 in one open
+            assertEquals(12, db.openHelper.readableDatabase.version) // 1 → 2 → … → 12 in one open
         }
         db.close()
     }
@@ -85,7 +85,7 @@ class MigrationTest {
             assertEquals(true, db.ledgerDao().getAccount("bank")!!.inNetWorth)
             assertNull(db.ledgerDao().getPostingsForTransaction("t1").first().units)
             assertNull(db.investDao().holdingForAccount("bank"))
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -104,7 +104,7 @@ class MigrationTest {
             assertEquals(180_000L, action.amountPaise)
             assertNull(action.ratioMicro)
             assertNull(action.transactionId)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -120,7 +120,7 @@ class MigrationTest {
         runBlocking {
             assertEquals("h1", db.investDao().holdingForAccount("a1")!!.id)
             assertEquals(0, db.investDao().getAllPending().size)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -138,7 +138,7 @@ class MigrationTest {
             assertEquals(10_000_000L, fd.principalPaise)
             assertNull(fd.closedOn)
             assertNull(fd.openTransactionId)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -156,7 +156,7 @@ class MigrationTest {
         runBlocking {
             assertEquals(1_000_000L, db.investDao().getSipPlan("s1")!!.amountPaise)
             assertEquals(0, db.investDao().getAllSipSkips().size)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -173,7 +173,7 @@ class MigrationTest {
         runBlocking {
             assertEquals(11_680_000L, db.investDao().getAllPrices().single().price)
             assertEquals(0, db.investDao().getAllFetchLog().size)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -189,7 +189,7 @@ class MigrationTest {
         runBlocking {
             assertEquals("Lunch", db.ledgerDao().getTransaction("t1")!!.payee)
             assertEquals(0, db.ledgerDao().getAllClosedPeriods().size)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -204,7 +204,7 @@ class MigrationTest {
         runBlocking {
             assertEquals("HDFC Regalia", db.ledgerDao().getAccount("c1")!!.name)
             assertEquals(0, db.ledgerDao().getAllCreditCards().size)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
@@ -222,7 +222,7 @@ class MigrationTest {
             assertEquals("INFY", holding.symbol)
             assertEquals(null, holding.couponBps)
             assertEquals(null, holding.maturityDate)
-            assertEquals(11, db.openHelper.readableDatabase.version)
+            assertEquals(12, db.openHelper.readableDatabase.version)
         }
         db.close()
     }
