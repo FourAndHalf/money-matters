@@ -88,7 +88,7 @@ class SettingsViewModel(
         onLockChanged()
     }
 
-    /** The widget can switch the lock on while this model is alive, so re-read it when the app comes back. */
+    /** Re-reads the lock setting when the app comes back, in case it changed while this model was alive. */
     fun refreshLockEnabled() {
         lockEnabled = passcodes.isLockEnabled()
     }

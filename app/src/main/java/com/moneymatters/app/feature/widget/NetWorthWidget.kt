@@ -1,7 +1,6 @@
 package com.moneymatters.app.feature.widget
 
 import android.content.Context
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -50,11 +49,12 @@ class NetWorthWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val (snapshot, lock) = withContext(Dispatchers.IO) {
+        val (snapshot, mask) = withContext(Dispatchers.IO) {
             val passcodes = PasscodeStore.encrypted(context)
-            WidgetStore.encrypted(context).read() to LockState(passcodes.isSet(), passcodes.isSet() && passcodes.isLockEnabled())
+            val appLockOn = passcodes.isSet() && passcodes.isLockEnabled()
+            WidgetStore.encrypted(context).read() to MaskState(appLockOn, userMasked = WidgetMask.of(context).isMasked())
         }
-        provideContent { NetWorthContent(snapshot, lock) }
+        provideContent { NetWorthContent(snapshot, mask) }
     }
 }
 
@@ -64,43 +64,42 @@ class NetWorthWidgetReceiver : GlanceAppWidgetReceiver() {
 
 internal const val HIDDEN_AMOUNT = "₹ ••••••"
 
-/** [hidden] is the lock being on (and so the figures masked); [hasPasscode] says whether it can be switched on at all. */
-private data class LockState(val hasPasscode: Boolean, val hidden: Boolean)
+/**
+ * Why the figures are masked, if they are. With the app's encryption lock on they always are, and the toggle is stuck on until
+ * the lock is switched off in the app. With the lock off, the toggle on the card decides, and flipping it never touches the lock.
+ */
+private data class MaskState(val appLockOn: Boolean, val userMasked: Boolean) {
+    val hidden: Boolean get() = appLockOn || userMasked
+}
 
-/** Switches the app lock on from the widget, which masks the figures too. Switching it off goes through the app and its passcode. */
-class EnableLockCallback : ActionCallback {
+/** Flips the card's own mask toggle. The app lock is not involved, so this is one small write and a redraw. */
+class ToggleMaskCallback : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         try {
-            withContext(Dispatchers.IO) { PasscodeStore.encrypted(context).setLockEnabled(true) }
-        } catch (e: Exception) {
-            // A keystore hiccup must not leave the card showing a stale switch; log it and redraw from what is really stored.
-            Log.e("NetWorthWidget", "Couldn't switch the app lock on from the widget", e)
+            withContext(Dispatchers.IO) { WidgetMask.of(context).let { it.setMasked(!it.isMasked()) } }
         } finally {
             NetWorthWidget().updateAll(context)
         }
     }
 }
 
-/** With the app lock on, a home screen shouldn't read out the books: every figure becomes [HIDDEN_AMOUNT]. */
+/** Masked (by the app lock or the card's toggle), a home screen doesn't read out the books: every figure becomes [HIDDEN_AMOUNT]. */
 internal fun Paise.widgetText(hidden: Boolean = false) = if (hidden) HIDDEN_AMOUNT else formatInr()
 
 @Composable
-private fun NetWorthContent(snapshot: WidgetSnapshot?, lock: LockState) {
-    val hidden = lock.hidden
+private fun NetWorthContent(snapshot: WidgetSnapshot?, mask: MaskState) {
+    val hidden = mask.hidden
     val context = LocalContext.current
     val size = LocalSize.current
     val card = remember(size, snapshot, hidden) { NetWorthCardRenderer.render(context, size, snapshot, hidden) }
     val description = when {
         snapshot == null -> "Net worth"
-        hidden -> "Net worth, hidden while the app lock is on"
+        mask.appLockOn -> "Net worth, hidden while the app lock is on"
+        hidden -> "Net worth, hidden. Tap the switch to show it"
         else -> "Net worth ${snapshot.netWorth.widgetText()}, assets ${snapshot.assets.widgetText()}, liabilities ${snapshot.liabilities.widgetText()}"
     }
-    // On: off needs the passcode, so it opens the app. Off: switch the lock on in place. No passcode yet: just open the app.
-    val toggleAction = when {
-        lock.hidden -> actionStartActivity(launchIntent(context, ACTION_DISABLE_LOCK))
-        lock.hasPasscode -> actionRunCallback<EnableLockCallback>()
-        else -> actionStartActivity(launchIntent(context))
-    }
+    // App lock on: the switch is stuck on, so a tap on it just opens the app like the rest of the card. Otherwise it flips the mask.
+    val toggleAction = if (mask.appLockOn) actionStartActivity(launchIntent(context)) else actionRunCallback<ToggleMaskCallback>()
     Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
         Image(
             ImageProvider(card),
