@@ -1,6 +1,7 @@
 package com.moneymatters.app.feature.widget
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -24,6 +25,7 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.ContentScale
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.size
 import androidx.glance.color.ColorProvider
@@ -68,8 +70,14 @@ private data class LockState(val hasPasscode: Boolean, val hidden: Boolean)
 /** Switches the app lock on from the widget, which masks the figures too. Switching it off goes through the app and its passcode. */
 class EnableLockCallback : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        withContext(Dispatchers.IO) { PasscodeStore.encrypted(context).setLockEnabled(true) }
-        NetWorthWidget().updateAll(context)
+        try {
+            withContext(Dispatchers.IO) { PasscodeStore.encrypted(context).setLockEnabled(true) }
+        } catch (e: Exception) {
+            // A keystore hiccup must not leave the card showing a stale switch; log it and redraw from what is really stored.
+            Log.e("NetWorthWidget", "Couldn't switch the app lock on from the widget", e)
+        } finally {
+            NetWorthWidget().updateAll(context)
+        }
     }
 }
 
@@ -100,6 +108,7 @@ private fun NetWorthContent(snapshot: WidgetSnapshot?, lock: LockState) {
             contentScale = ContentScale.FillBounds,
             modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity(launchIntent(context))),
         )
-        Box(GlanceModifier.size(width = 72.dp, height = 44.dp).clickable(toggleAction)) {}
+        // Invisible, over the switch drawn in the card. Generous, since a thumb misses a 30×18dp switch; the Spacer gives the view content.
+        Box(GlanceModifier.size(width = 96.dp, height = 48.dp).clickable(toggleAction)) { Spacer(GlanceModifier.fillMaxSize()) }
     }
 }
