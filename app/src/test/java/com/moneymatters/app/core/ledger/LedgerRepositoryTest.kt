@@ -90,7 +90,36 @@ class LedgerRepositoryTest {
             repo.edit(id, LocalDate.of(2026, 10, 20), "Swiggy (corrected)", listOf(PostingLine(dining, debit = 500.rupees), PostingLine(bank, credit = 500.rupees)))
             assertEquals(500.rupees, repo.accountBalance(dining))
             val audit = repo.auditLogFor(id).first()
-            assertEquals(listOf("Created", "Edited"), audit.map { it.action })
+            // The payee, date and amount changed, each logged on its own with its own before and after.
+            assertEquals(listOf("Created", "Edited", "Edited", "Edited"), audit.map { it.action })
+            val edits = audit.filter { it.action == "Edited" }.associateBy { it.summary }
+            assertEquals("Swiggy" to "Swiggy (corrected)", edits.getValue("Payee").let { it.before to it.after })
+            assertEquals("Amount", edits.getValue("Amount").summary)
+        }
+    }
+
+    @Test fun `editing only the amount logs the old and new amount, and repeated edits each log their own change`() {
+        val id = spend()
+        runBlocking {
+            val date = LocalDate.of(2026, 10, 19)
+            val first = repo.auditLogFor(id).first().size
+            repo.edit(id, date, "Swiggy", listOf(PostingLine(dining, debit = 700.rupees), PostingLine(bank, credit = 700.rupees)))
+            repo.edit(id, date, "Swiggy", listOf(PostingLine(dining, debit = 900.rupees), PostingLine(bank, credit = 900.rupees)))
+            val edits = repo.auditLogFor(id).first().filter { it.action == "Edited" }
+            assertEquals(listOf("Amount", "Amount"), edits.map { it.summary })
+            assertEquals(listOf("₹700", "₹900"), edits.map { it.after })
+            assertEquals("₹700", edits[1].before) // the second edit starts from the first one's result
+            assertEquals(first + 2, repo.auditLogFor(id).first().size)
+        }
+    }
+
+    @Test fun `an edit that changes nothing writes no audit line`() {
+        val id = spend()
+        runBlocking {
+            val before = repo.auditLogFor(id).first().size
+            val t = db.ledgerDao().getTransaction(id)!!
+            repo.edit(id, LocalDate.parse(t.date), t.payee, listOf(PostingLine(dining, debit = 486.rupees), PostingLine(bank, credit = 486.rupees)), memo = t.memo)
+            assertEquals(before, repo.auditLogFor(id).first().size)
         }
     }
 

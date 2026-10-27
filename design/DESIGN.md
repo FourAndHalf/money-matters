@@ -325,7 +325,7 @@ Generous, consistent rounding:
 - 52px height, white fill, 1px `#DADADD` border, `md` radius.
 - The label sits above the field in `label-regular` muted.
 - Focus: a 1.5px charcoal border, no glow.
-- Amount entry uses `metric-hero-mobile` and a calculator keypad sheet.
+- Amount entry shows the amount in `metric-hero-mobile`; tapping it opens the system number keyboard in a form field, with a `+ − × ÷` pill row so values can be chained (`120+45×2`) and a live `= ₹…` result. Done sets the amount.
 
 ### Data visualization
 - **Bar charts:** dense, thin vertical bars (2–3px wide, 2px gaps) in `#C9C9CD`. The current or selected period is charcoal `#2A2A2D`. A dark callout pill floats above the highlighted bar. No gridlines; just a muted axis row of month labels with the active one in ink.

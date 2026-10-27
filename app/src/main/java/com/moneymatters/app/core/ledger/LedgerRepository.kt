@@ -252,15 +252,30 @@ class LedgerRepository(
         requireUnitsOnHoldingLegs(postings)
         requireOpenDate(date)
         database.withTransaction {
-            dao.updateTransaction(
-                existing.copy(
-                    date = date.toString(), payee = payee, memo = memo,
-                    decision = tags.decision, plan = tags.plan, paymentMethod = tags.paymentMethod,
-                ),
+            val oldPostings = dao.getPostingsForTransaction(transactionId)
+            val updated = existing.copy(
+                date = date.toString(), payee = payee, memo = memo,
+                decision = tags.decision, plan = tags.plan, paymentMethod = tags.paymentMethod,
             )
+            dao.updateTransaction(updated)
             dao.deletePostingsForTransaction(transactionId)
             dao.insertPostings(postings.toEntities(transactionId))
-            audit(transactionId, "Edited", payee, before = existing.payee, after = payee)
+            // One line per thing that actually changed, each with its before and after, so repeated edits stay readable.
+            fun money(p: Paise) = p.formatInr(showPaise = p.value % 100 != 0L)
+            fun sides(legs: List<Triple<String, Long?, Long?>>) = legs.map { (account, debit, credit) -> account to (debit != null) }.sortedBy { it.first + it.second }
+            suspend fun accountNames(legs: List<Pair<String, Boolean>>) =
+                legs.joinToString(", ") { (id, isDebit) -> (if (isDebit) "Dr " else "Cr ") + (dao.getAccount(id)?.name ?: id) }
+            val oldLegs = sides(oldPostings.map { Triple(it.accountId, it.debitPaise, it.creditPaise) })
+            val newLegs = sides(postings.map { Triple(it.accountId, it.debit?.value, it.credit?.value) })
+            val oldAmount = Paise(oldPostings.sumOf { it.debitPaise ?: 0 })
+            val newAmount = Paise(postings.sumOf { it.debit?.value ?: 0 })
+            fun tagText(t: TransactionEntity) = listOfNotNull(t.decision?.name, t.plan?.name, t.paymentMethod?.name).joinToString(" · ").ifEmpty { "None" }
+            if (existing.payee != payee) audit(transactionId, "Edited", "Payee", before = existing.payee, after = payee)
+            if (existing.date != date.toString()) audit(transactionId, "Edited", "Date", before = existing.date, after = date.toString())
+            if (oldAmount != newAmount) audit(transactionId, "Edited", "Amount", before = money(oldAmount), after = money(newAmount))
+            if (oldLegs != newLegs) audit(transactionId, "Edited", "Accounts", before = accountNames(oldLegs), after = accountNames(newLegs))
+            if (existing.memo != memo) audit(transactionId, "Edited", "Note", before = existing.memo ?: "None", after = memo ?: "None")
+            if (tagText(existing) != tagText(updated)) audit(transactionId, "Edited", "Tags", before = tagText(existing), after = tagText(updated))
         }
     }
 

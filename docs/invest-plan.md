@@ -65,7 +65,7 @@ New code lives in `core/invest` (pure, tested math) and `feature/invest` (state 
 
 - **Portfolio (P13)**: market value, cost, unrealised gain (Rs and %), XIRR; sections Stocks, Mutual funds, FDs, each row with a price-status badge; In Transit list; buy/sell/SIP/dividend/new-FD actions. Allocation, drift and concentration cards land in slice 6.
 - **Holding detail (P14)**: stock/MF = units, average cost, lots table (age, short/long, lock-in, exit-load end), price chart, transactions, XIRR, "tax if sold today". FD = principal, rate, maturity value, accrued interest, break-today value, TDS, auto-renew.
-- **Buy/sell/SIP/FD forms**: use `ui/components` (AmountPad, FormField, SegmentedControl). Existing Quick Add Investment types are rerouted to these forms.
+- **Buy/sell/SIP/FD forms**: use `ui/components` (FormField, SegmentedControl). Existing Quick Add Investment types are rerouted to these forms.
 - **Prices (P15)**: status bar per source, snapshot table, manual entry, download log.
 - Opening holdings: an "Add existing holding" flow that accepts several lots (date, units, cost), because tax needs real purchase dates. Onboarding gets an optional holdings step later.
 

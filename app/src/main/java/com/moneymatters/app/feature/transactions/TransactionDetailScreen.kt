@@ -28,6 +28,7 @@ import com.moneymatters.app.core.money.formatInr
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.InnerPanel
 import com.moneymatters.app.ui.components.PostingLineRow
+import com.moneymatters.app.ui.components.AuditRow
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.components.ModuleHeader
 import com.moneymatters.app.ui.components.MoneyText
@@ -143,21 +144,10 @@ private fun JournalModule(detail: TransactionDetail) {
 @Composable
 private fun AuditModule(audit: List<AuditEntry>) {
     if (audit.isEmpty()) return
-    val c = MoneyTheme.colors
     Module {
         ModuleHeader("Audit history", subtitle = "Every change, before and after")
         audit.forEachIndexed { i, entry ->
-            Column(Modifier.padding(vertical = 8.dp)) {
-                Text(entry.whenLabel, style = MoneyTheme.type.labelUppercase, color = c.muted)
-                Text(entry.summary, style = MoneyTheme.type.bodyMd, color = c.ink, modifier = Modifier.padding(top = 2.dp))
-                if (entry.before != null && entry.after != null) {
-                    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.before, style = MoneyTheme.type.ledgerMono, color = c.muted)
-                        Text("→", style = MoneyTheme.type.ledgerMono, color = c.muted)
-                        Text(entry.after, style = MoneyTheme.type.ledgerMono, color = c.ink)
-                    }
-                }
-            }
+            AuditRow(entry.whenLabel, entry.summary, before = entry.before, after = entry.after)
             if (i < audit.lastIndex) RowDivider()
         }
     }

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,15 @@ internal fun AccountKind.glyph(): String? = when (this) {
     AccountKind.Investment -> "↗"
 }
 
+/** Banks first, then cash, cards, deposits, investments and loans: the order cards are stacked in. */
+private val STACK_ORDER = listOf(
+    AccountKind.Bank, AccountKind.Cash, AccountKind.CreditCard,
+    AccountKind.FixedDeposit, AccountKind.Investment, AccountKind.Loan,
+)
+
+/** Groups [this] by kind in [STACK_ORDER]; the sort is stable, so the caller's order holds within a kind. */
+internal fun List<AccountSummary>.inStackOrder(): List<AccountSummary> = sortedBy { STACK_ORDER.indexOf(it.kind) }
+
 private fun AccountSummary.amountLabel() = when {
     isLiability -> "Owed"
     kind == AccountKind.FixedDeposit -> "Value"
@@ -66,8 +76,9 @@ internal fun AccountSummary.utilisation(): Float? = cardLimit?.takeIf { it.value
  * A pin sits in each card's top-right corner when [onTogglePin] is given.
  */
 @Composable
-fun AccountStack(accounts: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}, onShown: (AccountSummary) -> Unit = {}, onTogglePin: ((AccountSummary) -> Unit)? = null) {
-    if (accounts.isEmpty()) return
+fun AccountStack(accountList: List<AccountSummary>, onOpenAccount: (accountId: String) -> Unit, modifier: Modifier = Modifier, onEditCard: (AccountSummary) -> Unit = {}, onShown: (AccountSummary) -> Unit = {}, onTogglePin: ((AccountSummary) -> Unit)? = null) {
+    if (accountList.isEmpty()) return
+    val accounts = remember(accountList) { accountList.inStackOrder() }
     var front by rememberSaveable { mutableIntStateOf(0) }
     val index = front.coerceIn(0, accounts.lastIndex)
     // Tells the caller which account is up front, so the list below can open the group it belongs to.

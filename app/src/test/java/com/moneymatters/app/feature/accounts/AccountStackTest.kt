@@ -37,6 +37,16 @@ class AccountStackTest {
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/accounts_stack_bank.png")
     }
 
+    @Test fun `cards stack banks first, then cash, credit cards, deposits, investments and loans`() {
+        fun acct(id: String, kind: AccountKind, name: String) = AccountSummary(id, kind, name, "", 1.rupees)
+        val mixed = listOf(
+            acct("loan", AccountKind.Loan, "Car loan"), acct("fd", AccountKind.FixedDeposit, "SBI FD"),
+            acct("card", AccountKind.CreditCard, "Regalia"), acct("inv", AccountKind.Investment, "Index fund"),
+            acct("cash", AccountKind.Cash, "Wallet"), acct("bank2", AccountKind.Bank, "SBI"), acct("bank1", AccountKind.Bank, "HDFC"),
+        )
+        assertEquals(listOf("bank2", "bank1", "cash", "card", "fd", "inv", "loan"), mixed.inStackOrder().map { it.id }) // stable within a kind
+    }
+
     @Test fun `a card's panel shows utilisation, what is available and its statement day`() {
         compose.setContent { MoneyMattersTheme { AccountStack(listOf(card), onOpenAccount = {}) } }
         compose.onNodeWithText("25% used").assertIsDisplayed()
