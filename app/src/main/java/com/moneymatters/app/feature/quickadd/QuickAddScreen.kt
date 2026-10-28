@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,10 +23,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -89,6 +92,7 @@ fun QuickAddScreen(
     var showAmountPad by rememberSaveable { mutableStateOf(false) }
     var amountExpression by rememberSaveable { mutableStateOf("") }
     val amountFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
     var pickerQuery by rememberSaveable { mutableStateOf("") }
     var splitMode by rememberSaveable(form.kind) { mutableStateOf(form.splits.isNotEmpty()) }
@@ -101,7 +105,8 @@ fun QuickAddScreen(
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
 
-    Column(modifier.fillMaxSize()) {
+    // imePadding: the app draws edge to edge, so without it the keyboard would cover the amount buttons.
+    Column(modifier.fillMaxSize().imePadding()) {
         Column(Modifier.padding(top = status.calculateTopPadding())) {
             DetailTopBar(title = "Quick add", subtitle = form.kind.label, onBack = onClose)
         }
@@ -145,8 +150,13 @@ fun QuickAddScreen(
                                 if (result != null) update { it.copy(amount = result) }
                                 showAmountPad = false
                             }
-                            // Opens the system keyboard straight away; the operator pills cover keyboards without + − × ÷.
-                            LaunchedEffect(Unit) { amountFocus.requestFocus() }
+                            // Focus once the field is on screen (not in the frame it appears in), then ask for the keyboard
+                            // explicitly: focus alone doesn't always raise it. The operator pills cover keyboards without + − × ÷.
+                            LaunchedEffect(Unit) {
+                                withFrameNanos { }
+                                runCatching { amountFocus.requestFocus() }
+                                keyboard?.show()
+                            }
                             Column(Modifier.padding(top = 14.dp)) {
                                 FormField(
                                     "Amount, or a sum like 120+45×2",
