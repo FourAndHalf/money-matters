@@ -13,11 +13,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -44,8 +49,10 @@ fun FormField(
     testTag: String? = null,
     focusRequester: FocusRequester? = null,
     onDone: (() -> Unit)? = null,
+    onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
     val c = MoneyTheme.colors
+    var focused by remember { mutableStateOf(false) }
     val textStyle: TextStyle = MoneyTheme.type.bodyLg.copy(color = c.ink)
     Column(modifier.fillMaxWidth()) {
         Text(label, style = MoneyTheme.type.labelRegular, color = if (error != null) c.negative else c.muted)
@@ -56,7 +63,8 @@ fun FormField(
                 .height(52.dp)
                 .clip(MoneyTheme.shapes.md)
                 .background(c.surfaceLowest)
-                .border(1.dp, if (error != null) c.negative else c.outline, MoneyTheme.shapes.md)
+                // DESIGN.md: focus is a 1.5dp charcoal border, no glow.
+                .border(if (focused) 1.5.dp else 1.dp, if (error != null) c.negative else if (focused) c.anchor else c.outline, MoneyTheme.shapes.md)
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -75,6 +83,7 @@ fun FormField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                    .onFocusChanged { focused = it.isFocused; onFocusChange?.invoke(it.isFocused) }
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
             )
         }
