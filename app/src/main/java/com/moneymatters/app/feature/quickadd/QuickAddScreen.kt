@@ -17,17 +17,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -89,10 +88,11 @@ fun QuickAddScreen(
     val accountsById = accounts.associateBy(AccountEntity::id)
     fun accountLabel(id: String?) = id?.let { accountsById[it]?.displayName() } ?: "Choose"
 
-    var showAmountPad by rememberSaveable { mutableStateOf(false) }
     var amountExpression by rememberSaveable { mutableStateOf("") }
     val amountFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    var amountFocused by remember { mutableStateOf(false) }
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
     var pickerQuery by rememberSaveable { mutableStateOf("") }
     var splitMode by rememberSaveable(form.kind) { mutableStateOf(form.splits.isNotEmpty()) }
@@ -127,69 +127,66 @@ fun QuickAddScreen(
                 }
             }
             item("amount") {
+                val result = evaluateAmountExpression(amountExpression)?.takeIf { it.value > 0 }
+                fun applyAmount() {
+                    if (result != null) {
+                        update { it.copy(amount = result) }
+                        amountExpression = ""
+                        focusManager.clearFocus()
+                    } else if (amountExpression.isBlank()) {
+                        focusManager.clearFocus()
+                    }
+                }
                 // Zero card padding so the tap area is the whole card; the padding moves inside the clickable Column.
                 Module(contentPadding = 0.dp) {
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = !showAmountPad, role = Role.Button) { showAmountPad = true; amountExpression = "" }
-                            .padding(MoneyTheme.spacing.cardPadding),
-                    ) {
-                        // Open, the header row closes it again.
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = showAmountPad, role = Role.Button) { showAmountPad = false },
-                        ) {
-                            Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
-                            MoneyText(form.amount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp))
-                        }
-                        if (showAmountPad) {
-                            val result = evaluateAmountExpression(amountExpression)?.takeIf { it.value > 0 }
-                            fun applyAmount() {
-                                if (result != null) update { it.copy(amount = result) }
-                                showAmountPad = false
-                            }
-                            // Focus once the field is on screen (not in the frame it appears in), then ask for the keyboard
-                            // explicitly: focus alone doesn't always raise it. The operator pills cover keyboards without + − × ÷.
-                            LaunchedEffect(Unit) {
-                                withFrameNanos { }
-                                runCatching { amountFocus.requestFocus() }
+                            // Focus is asked for here, inside the tap itself, so the system treats the keyboard as user-requested.
+                            .clickable(role = Role.Button) {
+                                amountFocus.requestFocus()
                                 keyboard?.show()
                             }
-                            Column(Modifier.padding(top = 14.dp)) {
-                                FormField(
-                                    "Amount, or a sum like 120+45×2",
-                                    amountExpression,
-                                    onValueChange = { amountExpression = it },
-                                    placeholder = "0",
-                                    keyboardType = KeyboardType.Decimal,
-                                    focusRequester = amountFocus,
-                                    onDone = ::applyAmount,
-                                )
-                                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf("+", "−", "×", "÷").forEach { op ->
-                                        Pill(
-                                            op,
-                                            { if (amountExpression.isNotEmpty() && amountExpression.last() !in "+−×÷") amountExpression += op },
-                                            modifier = Modifier.weight(1f),
-                                            height = 40.dp,
-                                        )
-                                    }
-                                }
-                                if (result != null && amountExpression.any { it in "+−×÷-*/xX" }) {
-                                    Text("= ${result.formatInr(showPaise = result.value % 100 != 0L)}", style = MoneyTheme.type.metricCard, color = MoneyTheme.colors.muted, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-                                }
-                                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Pill("Cancel", { showAmountPad = false }, modifier = Modifier.weight(1f), height = 44.dp)
+                            .padding(MoneyTheme.spacing.cardPadding),
+                    ) {
+                        Text("Amount", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted)
+                        MoneyText(form.amount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp))
+                        // Always on the card (never added after the tap), so there is always something to focus. Type a number
+                        // or a sum; the operator pills cover keyboards without + − × ÷.
+                        FormField(
+                            "Type an amount, or a sum like 120+45×2",
+                            amountExpression,
+                            onValueChange = { amountExpression = it },
+                            modifier = Modifier.padding(top = 14.dp),
+                            placeholder = "0",
+                            keyboardType = KeyboardType.Decimal,
+                            focusRequester = amountFocus,
+                            onDone = ::applyAmount,
+                            onFocusChange = { amountFocused = it },
+                        )
+                        if (amountFocused) {
+                            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("+", "−", "×", "÷").forEach { op ->
                                     Pill(
-                                        "Done",
-                                        ::applyAmount,
-                                        style = PillStyle.Primary,
-                                        modifier = Modifier.weight(1f).alpha(if (result != null) 1f else 0.4f),
-                                        height = 44.dp,
+                                        op,
+                                        { if (amountExpression.isNotEmpty() && amountExpression.last() !in "+−×÷") amountExpression += op },
+                                        modifier = Modifier.weight(1f),
+                                        height = 40.dp,
                                     )
                                 }
+                            }
+                            if (result != null && amountExpression.any { it in "+−×÷-*/xX" }) {
+                                Text("= ${result.formatInr(showPaise = result.value % 100 != 0L)}", style = MoneyTheme.type.metricCard, color = MoneyTheme.colors.muted, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                            }
+                            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Pill("Cancel", { amountExpression = ""; focusManager.clearFocus() }, modifier = Modifier.weight(1f), height = 44.dp)
+                                Pill(
+                                    "Done",
+                                    ::applyAmount,
+                                    style = PillStyle.Primary,
+                                    modifier = Modifier.weight(1f).alpha(if (result != null || amountExpression.isBlank()) 1f else 0.4f),
+                                    height = 44.dp,
+                                )
                             }
                         }
                     }
