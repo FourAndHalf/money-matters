@@ -53,6 +53,8 @@ import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddScreen
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.budgets.BudgetsViewModel
+import com.moneymatters.app.feature.reconcile.ReconcileScreen
+import com.moneymatters.app.feature.reconcile.ReconcileViewModel
 import com.moneymatters.app.feature.recurring.RecurringViewModel
 import com.moneymatters.app.feature.settings.MoreScreen
 import com.moneymatters.app.feature.settings.SettingsScreen
@@ -84,7 +86,7 @@ private enum class InvestOverlay { Trade, Price, Dividend, Action, Allot, NewDep
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null, budgets: BudgetsViewModel? = null) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null, budgets: BudgetsViewModel? = null, reconcile: ReconcileViewModel? = null) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -101,6 +103,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var showPrices by rememberSaveable { mutableStateOf(false) }
     var showGains by rememberSaveable { mutableStateOf(false) }
     var showClose by rememberSaveable { mutableStateOf(false) }
+    var showReconcile by rememberSaveable { mutableStateOf(false) }
     var showAddAccount by rememberSaveable { mutableStateOf(false) }
     var investOverlay by rememberSaveable { mutableStateOf<InvestOverlay?>(null) }
     val investState = invest.state.collectAsState().value
@@ -258,9 +261,17 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 )
             }
             // Drilling into an account, a transaction or Quick Add hides the tab bar.
+            openLedger != null && showReconcile && reconcile != null -> {
+                val back = { showReconcile = false; reconcile.close() }
+                BackHandler(onBack = back)
+                ReconcileScreen(reconcile, onBack = back)
+            }
             openLedger != null -> {
                 BackHandler { openAccountId = null }
-                AccountLedgerScreen(openLedger, onBack = { openAccountId = null })
+                AccountLedgerScreen(
+                    openLedger, onBack = { openAccountId = null },
+                    onReconcile = { if (reconcile != null) { reconcile.open(openLedger.accountId); showReconcile = true } },
+                )
             }
             quickAdd.editForm != null -> {
                 BackHandler { quickAdd.cancelEdit() }
