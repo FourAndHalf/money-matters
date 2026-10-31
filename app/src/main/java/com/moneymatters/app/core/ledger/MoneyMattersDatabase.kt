@@ -64,6 +64,12 @@ class LedgerConverters {
     @TypeConverter fun fromCompounding(value: Compounding) = value.name
     @TypeConverter fun toCompounding(value: String) = Compounding.valueOf(value)
 
+    @TypeConverter fun fromLiquidityTier(value: LiquidityTier?) = value?.name
+    @TypeConverter fun toLiquidityTier(value: String?) = value?.let(LiquidityTier::valueOf)
+
+    @TypeConverter fun fromAccountGoal(value: AccountGoal?) = value?.name
+    @TypeConverter fun toAccountGoal(value: String?) = value?.let(AccountGoal::valueOf)
+
     @TypeConverter fun fromBudgetPeriod(value: BudgetPeriod) = value.name
     @TypeConverter fun toBudgetPeriod(value: String) = BudgetPeriod.valueOf(value)
 
@@ -85,7 +91,7 @@ class CorporateActionsV4 : AutoMigrationSpec
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
         ClosedPeriodEntity::class, CreditCardEntity::class, RecurringRuleEntity::class, BudgetEntity::class, LoanEntity::class, LoanPaymentEntity::class,
     ],
-    version = 15,
+    version = 16,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -115,6 +121,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 13, to = 14),
         // v15: loan terms and the EMIs paid through the app.
         AutoMigration(from = 14, to = 15),
+        // v16: accounts carry a liquidity tier and a goal, both optional.
+        AutoMigration(from = 15, to = 16),
     ],
 )
 @TypeConverters(LedgerConverters::class)

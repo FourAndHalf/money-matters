@@ -28,7 +28,17 @@ data class AccountEntity(
     @ColumnInfo(defaultValue = "1") val inNetWorth: Boolean = true,
     /** Pinned accounts are the only ones Home's account section shows. */
     @ColumnInfo(defaultValue = "0") val isPinned: Boolean = false,
+    /** How quickly the money can be turned into cash. Null means "work it out from the account's kind" (see [effectiveTier]). */
+    val liquidityTier: LiquidityTier? = null,
+    /** The goal this account's balance counts towards, if any. */
+    val goal: AccountGoal? = null,
 )
+
+/** How quickly an asset turns into cash, which is how the runway ladder steps through them (plan.html → Leeway & runway). */
+enum class LiquidityTier { Cash, Deposits, Markets, Locked }
+
+/** The two goals the plan names. A goal table replaces this when Goals (P16) arrives; accounts then point at a row instead. */
+enum class AccountGoal { EmergencyFund, WealthGoal }
 
 /** Mirrors `TxnAction`'s lifecycle in feature/transactions, one level down (DB, not UI). */
 enum class TransactionStatus { Draft, Posted, Reconciled, Locked, PriorPeriodAdjustment }
