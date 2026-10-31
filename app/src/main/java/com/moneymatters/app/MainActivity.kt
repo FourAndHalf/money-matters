@@ -33,6 +33,7 @@ import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.core.invest.PriceSourcePrefs
 import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.PriceWorker
+import com.moneymatters.app.core.budget.BudgetRepository
 import com.moneymatters.app.core.ledger.LedgerDatabaseProvider
 import com.moneymatters.app.core.ledger.LedgerRepository
 import com.moneymatters.app.core.recurring.RecurringRepository
@@ -52,6 +53,7 @@ import com.moneymatters.app.feature.lock.LockScreen
 import com.moneymatters.app.feature.onboarding.OnboardingSaver
 import com.moneymatters.app.feature.onboarding.OnboardingScreen
 import com.moneymatters.app.feature.onboarding.OnboardingWizard
+import com.moneymatters.app.feature.budgets.BudgetsViewModel
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.recurring.RecurringViewModel
@@ -104,6 +106,9 @@ class MainActivity : ComponentActivity() {
     private val recurringRepo by lazy { RecurringRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo) }
     private val recurringModel: RecurringViewModel by viewModels {
         viewModelFactory { initializer { RecurringViewModel(recurringRepo, ledgerRepo) } }
+    }
+    private val budgetsModel: BudgetsViewModel by viewModels {
+        viewModelFactory { initializer { BudgetsViewModel(BudgetRepository(LedgerDatabaseProvider.get(applicationContext)), ledgerRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) } }
     }
     private val closeModel: CloseViewModel by viewModels {
         viewModelFactory {
@@ -223,7 +228,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel, budgets = budgetsModel) }
                     }
                 }
             }
