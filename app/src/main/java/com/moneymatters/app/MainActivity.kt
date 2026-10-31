@@ -59,6 +59,7 @@ import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
 import com.moneymatters.app.feature.reconcile.ReconcileViewModel
 import com.moneymatters.app.feature.recurring.RecurringViewModel
+import com.moneymatters.app.feature.reports.ReportsViewModel
 import com.moneymatters.app.feature.settings.AiSettingsStore
 import com.moneymatters.app.feature.settings.SettingsPrefs
 import com.moneymatters.app.feature.settings.SettingsViewModel
@@ -114,6 +115,9 @@ class MainActivity : ComponentActivity() {
     }
     private val reconcileModel: ReconcileViewModel by viewModels {
         viewModelFactory { initializer { ReconcileViewModel(ledgerRepo, ReconcileRepository(ledgerRepo)) } }
+    }
+    private val reportsModel: ReportsViewModel by viewModels {
+        viewModelFactory { initializer { ReportsViewModel(ledgerRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) } }
     }
     private val closeModel: CloseViewModel by viewModels {
         viewModelFactory {
@@ -233,7 +237,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel, budgets = budgetsModel, reconcile = reconcileModel) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel, budgets = budgetsModel, reconcile = reconcileModel, reports = reportsModel) }
                     }
                 }
             }

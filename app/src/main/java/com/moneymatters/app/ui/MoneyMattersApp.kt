@@ -56,6 +56,7 @@ import com.moneymatters.app.feature.budgets.BudgetsViewModel
 import com.moneymatters.app.feature.reconcile.ReconcileScreen
 import com.moneymatters.app.feature.reconcile.ReconcileViewModel
 import com.moneymatters.app.feature.recurring.RecurringViewModel
+import com.moneymatters.app.feature.reports.ReportsViewModel
 import com.moneymatters.app.feature.settings.MoreScreen
 import com.moneymatters.app.feature.settings.SettingsScreen
 import com.moneymatters.app.feature.settings.SettingsViewModel
@@ -86,7 +87,7 @@ private enum class InvestOverlay { Trade, Price, Dividend, Action, Allot, NewDep
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null, budgets: BudgetsViewModel? = null, reconcile: ReconcileViewModel? = null) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null, budgets: BudgetsViewModel? = null, reconcile: ReconcileViewModel? = null, reports: ReportsViewModel? = null) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -311,7 +312,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             }
             showMore -> {
                 BackHandler { showMore = false }
-                MoreScreen(settings, onClose = { showMore = false }, onOpenClose = { showClose = true }, recurring = recurring, budgets = budgets)
+                MoreScreen(settings, onClose = { showMore = false }, onOpenClose = { showClose = true }, recurring = recurring, budgets = budgets, reports = reports)
             }
             else -> {
                 when (tab) {

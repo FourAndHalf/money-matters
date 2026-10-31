@@ -20,12 +20,14 @@ import androidx.compose.ui.unit.dp
 import com.moneymatters.app.feature.budgets.BudgetsScreen
 import com.moneymatters.app.feature.budgets.BudgetsViewModel
 import com.moneymatters.app.feature.recurring.RecurringScreen
+import com.moneymatters.app.feature.reports.ReportsScreen
+import com.moneymatters.app.feature.reports.ReportsViewModel
 import com.moneymatters.app.feature.recurring.RecurringViewModel
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.theme.MoneyTheme
 
-private enum class MoreSection { Backup, AuditLog, Recurring, Budgets }
+private enum class MoreSection { Backup, AuditLog, Recurring, Budgets, Reports }
 
 /** The More tab: things you do with your books (close a month, back up, inspect the log), as opposed to Settings' preferences. */
 @Composable
@@ -36,6 +38,7 @@ fun MoreScreen(
     modifier: Modifier = Modifier,
     recurring: RecurringViewModel? = null,
     budgets: BudgetsViewModel? = null,
+    reports: ReportsViewModel? = null,
 ) {
     var section by rememberSaveable { mutableStateOf<MoreSection?>(null) }
 
@@ -44,6 +47,7 @@ fun MoreScreen(
         when (it) {
             MoreSection.Backup -> BackupRestoreScreen(viewModel, onBack = { section = null })
             MoreSection.AuditLog -> AuditLogScreen(viewModel, onBack = { section = null })
+            MoreSection.Reports -> if (reports != null) ReportsScreen(reports, onBack = { section = null }) else section = null
             MoreSection.Budgets -> if (budgets != null) BudgetsScreen(budgets, onBack = { section = null }) else section = null
             MoreSection.Recurring -> if (recurring != null) RecurringScreen(recurring, onBack = { section = null }) else section = null
         }
@@ -63,6 +67,11 @@ fun MoreScreen(
             item("close") {
                 Module {
                     SettingsRow("Month-end close", "Reconcile, confirm balances and lock a finished month", divider = false, onClick = onOpenClose)
+                }
+            }
+            if (reports != null) item("reports") {
+                Module {
+                    SettingsRow("Reports", "Income statement, balance sheet and trial balance", divider = false) { section = MoreSection.Reports }
                 }
             }
             if (budgets != null) item("budgets") {
