@@ -52,6 +52,7 @@ import com.moneymatters.app.feature.invest.TradeScreen
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddScreen
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
+import com.moneymatters.app.feature.recurring.RecurringViewModel
 import com.moneymatters.app.feature.settings.MoreScreen
 import com.moneymatters.app.feature.settings.SettingsScreen
 import com.moneymatters.app.feature.settings.SettingsViewModel
@@ -82,7 +83,7 @@ private enum class InvestOverlay { Trade, Price, Dividend, Action, Allot, NewDep
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -298,7 +299,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             }
             showMore -> {
                 BackHandler { showMore = false }
-                MoreScreen(settings, onClose = { showMore = false }, onOpenClose = { showClose = true })
+                MoreScreen(settings, onClose = { showMore = false }, onOpenClose = { showClose = true }, recurring = recurring)
             }
             else -> {
                 when (tab) {

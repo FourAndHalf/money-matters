@@ -17,15 +17,23 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymatters.app.feature.recurring.RecurringScreen
+import com.moneymatters.app.feature.recurring.RecurringViewModel
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.theme.MoneyTheme
 
-private enum class MoreSection { Backup, AuditLog }
+private enum class MoreSection { Backup, AuditLog, Recurring }
 
 /** The More tab: things you do with your books (close a month, back up, inspect the log), as opposed to Settings' preferences. */
 @Composable
-fun MoreScreen(viewModel: SettingsViewModel, onClose: () -> Unit, onOpenClose: () -> Unit, modifier: Modifier = Modifier) {
+fun MoreScreen(
+    viewModel: SettingsViewModel,
+    onClose: () -> Unit,
+    onOpenClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    recurring: RecurringViewModel? = null,
+) {
     var section by rememberSaveable { mutableStateOf<MoreSection?>(null) }
 
     section?.let {
@@ -33,6 +41,7 @@ fun MoreScreen(viewModel: SettingsViewModel, onClose: () -> Unit, onOpenClose: (
         when (it) {
             MoreSection.Backup -> BackupRestoreScreen(viewModel, onBack = { section = null })
             MoreSection.AuditLog -> AuditLogScreen(viewModel, onBack = { section = null })
+            MoreSection.Recurring -> if (recurring != null) RecurringScreen(recurring, onBack = { section = null }) else section = null
         }
         return
     }
@@ -50,6 +59,11 @@ fun MoreScreen(viewModel: SettingsViewModel, onClose: () -> Unit, onOpenClose: (
             item("close") {
                 Module {
                     SettingsRow("Month-end close", "Reconcile, confirm balances and lock a finished month", divider = false, onClick = onOpenClose)
+                }
+            }
+            if (recurring != null) item("recurring") {
+                Module {
+                    SettingsRow("Recurring entries", "Salary, rent, EMIs and subscriptions, booked on their dates", divider = false) { section = MoreSection.Recurring }
                 }
             }
             item("backup") {

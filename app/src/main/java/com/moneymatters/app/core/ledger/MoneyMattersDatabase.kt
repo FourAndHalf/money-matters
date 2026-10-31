@@ -23,6 +23,9 @@ import com.moneymatters.app.core.invest.PriceFetchLogEntity
 import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.SipPlanEntity
 import com.moneymatters.app.core.invest.SipSkipEntity
+import com.moneymatters.app.core.recurring.Frequency
+import com.moneymatters.app.core.recurring.RecurringDao
+import com.moneymatters.app.core.recurring.RecurringRuleEntity
 
 class LedgerConverters {
     @TypeConverter fun fromAccountType(value: AccountType) = value.name
@@ -55,6 +58,9 @@ class LedgerConverters {
     @TypeConverter fun fromCompounding(value: Compounding) = value.name
     @TypeConverter fun toCompounding(value: String) = Compounding.valueOf(value)
 
+    @TypeConverter fun fromFrequency(value: Frequency) = value.name
+    @TypeConverter fun toFrequency(value: String) = Frequency.valueOf(value)
+
     @TypeConverter fun fromCorporateActionKind(value: CorporateActionKind) = value.name
     @TypeConverter fun toCorporateActionKind(value: String) = CorporateActionKind.valueOf(value)
 }
@@ -68,9 +74,9 @@ class CorporateActionsV4 : AutoMigrationSpec
         AccountEntity::class, TransactionEntity::class, PostingEntity::class, AuditLogEntity::class,
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
-        ClosedPeriodEntity::class, CreditCardEntity::class,
+        ClosedPeriodEntity::class, CreditCardEntity::class, RecurringRuleEntity::class,
     ],
-    version = 12,
+    version = 13,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -94,10 +100,13 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 10, to = 11),
         // v12: accounts can be pinned to Home.
         AutoMigration(from = 11, to = 12),
+        // v13: recurring rules.
+        AutoMigration(from = 12, to = 13),
     ],
 )
 @TypeConverters(LedgerConverters::class)
 abstract class MoneyMattersDatabase : RoomDatabase() {
     abstract fun ledgerDao(): LedgerDao
     abstract fun investDao(): InvestDao
+    abstract fun recurringDao(): RecurringDao
 }
