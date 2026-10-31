@@ -230,7 +230,7 @@ fun buildBooks(
         compareByDescending<TransactionEntity> { it.date }.thenByDescending { firstAuditMillis(auditByTxn[it.id]) },
     )
     val dayGroups = newestFirst.groupBy { it.date }.map { (date, txns) ->
-        DayGroup(dateLabel(LocalDate.parse(date)), txns.map { summaries.getValue(it.id) })
+        DayGroup(dateLabel(LocalDate.parse(date)), txns.map { summaries.getValue(it.id) }, LocalDate.parse(date))
     }
     val transactionsState = TransactionsState(dayGroups, accounts = realAccounts.map { it.name }.sorted())
 
