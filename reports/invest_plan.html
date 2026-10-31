@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invest Engine Plan</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0efeb;
+    --text: #1d1d1b;
+    --muted: #5f5e5a;
+    --border: #dcdad3;
+    --accent: #1f6f5c;
+    --accent-soft: #e2f0eb;
+    --warn: #9a5b00;
+    --warn-soft: #fbefdc;
+    --danger: #a3302a;
+    --danger-soft: #f8e4e2;
+    --code-bg: #f3f2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514;
+      --surface: #1e1e1c;
+      --surface-2: #262624;
+      --text: #ebe9e3;
+      --muted: #a3a19a;
+      --border: #3a3936;
+      --accent: #6cc4a8;
+      --accent-soft: #1d3a32;
+      --warn: #e8b05c;
+      --warn-soft: #3a2d17;
+      --danger: #e8837c;
+      --danger-soft: #3a1f1d;
+      --code-bg: #232321;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151514;
+    --surface: #1e1e1c;
+    --surface-2: #262624;
+    --text: #ebe9e3;
+    --muted: #a3a19a;
+    --border: #3a3936;
+    --accent: #6cc4a8;
+    --accent-soft: #1d3a32;
+    --warn: #e8b05c;
+    --warn-soft: #3a2d17;
+    --danger: #e8837c;
+    --danger-soft: #3a1f1d;
+    --code-bg: #232321;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); max-width: 1240px; margin: 0 auto; }
+  nav.toc {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    padding: 32px 16px; border-right: 1px solid var(--border); font-size: 14px;
+  }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: 6px; }
+  nav.toc a:hover { background: var(--surface-2); color: var(--text); }
+  nav.toc .group { margin: 16px 0 4px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  main { padding: 32px 40px 80px; min-width: 0; }
+  header.hero { margin-bottom: 40px; }
+  header.hero h1 { font-size: 32px; margin: 0 0 8px; }
+  header.hero p { color: var(--muted); margin: 0 0 8px; max-width: 75ch; }
+  section { margin: 0 0 56px; scroll-margin-top: 16px; }
+  h2 { font-size: 24px; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  h4 { font-size: 15px; margin: 18px 0 6px; }
+  p, li { max-width: 80ch; }
+  .muted { color: var(--muted); }
+  .table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.id { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; white-space: nowrap; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.catalogue td:nth-child(2) { min-width: 170px; }
+  table.catalogue td:nth-child(3) { min-width: 240px; }
+  table.catalogue td:nth-child(4) { min-width: 200px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .92em; }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.danger { border-color: var(--danger); background: var(--danger-soft); }
+  .callout p { margin: 4px 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card h4 { margin-top: 0; }
+  .card p { font-size: 14px; margin: 4px 0; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 14px; }
+  .phase {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; margin: 16px 0;
+  }
+  .phase h3 { margin-top: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .phase .id { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .phase ul, .phase ol { padding-left: 20px; margin: 6px 0; }
+  .phase li { font-size: 15px; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); font-weight: 500; white-space: nowrap; }
+  .tag.det { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .tag.stat { background: var(--surface-2); color: var(--text); }
+  .tag.inf { background: transparent; }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+  .tag.no { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+  .flow { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; margin: 8px 0 16px; }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; }
+  @media (max-width: 860px) {
+    .layout { display: block; }
+    nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+    main { padding: 24px 16px 64px; }
+    header.hero h1 { font-size: 26px; }
+  }
+  @media (max-width: 640px) {
+    table.catalogue, table.catalogue tbody, table.catalogue tr, table.catalogue td { display: block; width: 100%; }
+    table.catalogue tr:first-child { display: none; }
+    table.catalogue tr { border-bottom: 1px solid var(--border); padding: 8px 0; }
+    table.catalogue tr:last-child { border-bottom: none; }
+    table.catalogue td { border-bottom: none; padding: 4px 12px; min-width: 0 !important; }
+    table.catalogue td:nth-child(n+3)::before { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    table.catalogue td:nth-child(3)::before { content: "Trigger"; }
+    table.catalogue td:nth-child(4)::before { content: "Inputs"; }
+    table.catalogue td:nth-child(5)::before { content: "Action · tier · alert"; }
+    table.catalogue td:nth-child(6)::before { content: "Phase"; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <div class="group">Foundation</div>
+    <a href="#summary">Summary</a>
+    <a href="#principles">Principles</a>
+    <a href="#relentless">What "relentless" means</a>
+    <a href="#decisions">Decisions to record</a>
+    <div class="group">Catalogue</div>
+    <a href="#catalogue">Opportunity catalogue</a>
+    <a href="#cat-contribute">C · Contribution &amp; cash</a>
+    <a href="#cat-allocation">A · Allocation &amp; risk</a>
+    <a href="#cat-cost">K · Cost</a>
+    <a href="#cat-tax">T · Tax</a>
+    <a href="#cat-fd">F · Deposits &amp; bonds</a>
+    <a href="#cat-discipline">D · Discipline &amp; hygiene</a>
+    <a href="#cat-execution">E · Execution helpers</a>
+    <a href="#excluded">X · Excluded by design</a>
+    <a href="#coverage">Coverage check</a>
+    <div class="group">Engine</div>
+    <a href="#architecture">Architecture</a>
+    <a href="#record">Opportunity record</a>
+    <a href="#scoring">Scoring &amp; ranking</a>
+    <a href="#ips">Investment policy (IPS)</a>
+    <a href="#tiers">Approval tiers</a>
+    <a href="#alerts">Alerts &amp; budget</a>
+    <a href="#liveness">Liveness &amp; journal</a>
+    <a href="#llm">AI narration</a>
+    <a href="#ui">Screens</a>
+    <div class="group">Build</div>
+    <a href="#data">Data model &amp; versioned data</a>
+    <a href="#phases">Phases &amp; slices</a>
+    <a href="#testing">Testing</a>
+    <a href="#verify">Facts to verify</a>
+    <a href="#risks">Risks</a>
+    <a href="#open">Open questions</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <h1>Invest engine: build plan</h1>
+      <p>How to turn the Invest tab into an engine that checks the whole portfolio every day for opportunities, ranks them in after-tax rupees, interrupts you only when something has a deadline, and records what you decided. It builds on <code>reports/Invest tab recommendation engine.md</code> and the research notes behind it. It also extends <code>docs/plan.html</code> and <code>docs/invest-plan.md</code>.</p>
+      <p>Status: proposal, 29 Oct 2026. Nothing here is a settled decision until it is recorded in <code>docs/plan.html</code> (Phase 0). This is a design for a personal tool, not financial advice.</p>
+    </header>
+
+    <!-- ============================================================ -->
+    <section id="summary">
+      <h2>Summary</h2>
+      <p>The engine is a <strong>deterministic rule enforcer on the device</strong>. Each rule reads the ledger, the lots, prices, deposits, SIPs, goals and a signed investment policy. Each rule either produces an <em>opportunity</em> (a typed record with rupee amounts in <code>Paise</code>, inputs with as-of dates, and the rule that fired) or stays silent. Opportunities are ranked by expected after-tax benefit minus cost and sorted into three alert classes. The app suggests the action, hands off to your broker or platform to carry it out, and records the trade in the books when you confirm it. It never places orders.</p>
+      <div class="cards">
+        <div class="card"><h4>45 opportunities, 7 families</h4><p>Contribution and cash, allocation and risk, cost, tax, deposits and bonds, discipline, and execution helpers. A separate list of 8 signals is excluded on purpose.</p></div>
+        <div class="card"><h4>19 can start with no schema change</h4><p>Phase 1 uses functions that already exist: <code>drift</code>, <code>concentrations</code>, <code>harvestRoom</code>, <code>taxIfSoldToday</code>, <code>equityYears</code>, <code>maturityLadder</code>, <code>sipInstalments</code> and <code>lockUntil</code>.</p></div>
+        <div class="card"><h4>The biggest lever is contribution</h4><p>₹1 Cr by 20 Nov 2029 needs about ₹2.33–2.44L a month. Measuring and steering how much you can invest each month (C1, C2) is worth more than every cost and tax rule put together.</p></div>
+        <div class="card"><h4>Six phases</h4><p>0 Decide → 1 Advisor v1 → 2 Memory and goals → 3 Daily loop → 4 Universe and narration → 5 Explicit add-ons. Each slice is its own <code>feature/</code> branch with tests.</p></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="principles">
+      <h2>Principles</h2>
+      <ol>
+        <li><strong>Rules, not forecasts.</strong> The engine acts on cost, tax and discipline, where the payoff is near-certain. It never predicts prices. Evidence: SPIVA India YE2025 (75–84% of active large-cap funds trail over 1–10 years), factor drawdowns of 68–79%, McLean–Pontiff decay of 58% after publication, LLM extrapolation bias, and SEBI's F&amp;O loss studies.</li>
+        <li><strong>Numbers in code, words from the model.</strong> Every amount is integer <code>Paise</code> computed in Kotlin from versioned data. An optional LLM only narrates, and its numbers are checked against the record.</li>
+        <li><strong>Suggest and record, never place orders.</strong> SEBI's retail algo framework (in force 1 Apr 2026) requires a static IP and a 2FA login every day for API orders. Mutual fund and FD booking have no individual API. Automation means mandates and broker-side orders that you set up once. The app reminds you and reconciles.</li>
+        <li><strong>Check everything, interrupt rarely.</strong> All rules run on every holding every day. Push notifications go out only for deadlines, and within a budget. A price move alone never triggers a push (FCA: notifications raised trading by about 11%; Robinhood alerts by about 25% in the next 15 minutes).</li>
+        <li><strong>Prove it ran and prove it was right.</strong> Every scan is logged, fixtures must keep firing, and every proposal is scored against doing nothing (lessons from Betterment's $9M SEC case and Knight Capital).</li>
+        <li><strong>Personal use only.</strong> Recommendations for yourself are outside the SEBI Investment Adviser and Research Analyst rules. Publishing them, charging for them or sharing them as a strategy is not.</li>
+        <li><strong>AGENTS.md holds.</strong> Balanced entries, integer paise, immutable closed months, tax figures in versioned per-year data, tests for any tax logic, and UI built from <code>MoneyTheme</code> tokens and <code>ui/components</code>.</li>
+      </ol>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="relentless">
+      <h2>What "relentless" means here</h2>
+      <p>On Android, "relentless" can't mean scanning more often. WorkManager's 15-minute floor is only a suggestion. The "rare" standby bucket allows 10 minutes of jobs a day, and on Android 13+ an app unused for 8 days becomes "restricted" and gets one job a day. Nothing in the catalogue changes faster than daily: NAVs publish once a day, FD rates monthly, tax deadlines yearly. So relentless means four guarantees:</p>
+      <div class="table-wrap"><table>
+        <tr><th>Guarantee</th><th>How it is met</th><th>Phase</th></tr>
+        <tr><td><strong>Coverage:</strong> every rule, every holding, every day</td><td>One daily <code>AdviceWorker</code> run, chained after any price refresh. The Invest tab also runs the engine live whenever it opens.</td><td>1 (live), 3 (daily)</td></tr>
+        <tr><td><strong>No missed deadlines</strong></td><td>Deadline-class alerts escalate on a schedule: 31 Mar harvest window, FD maturity, carry-forward expiry, GTT expiry.</td><td>3</td></tr>
+        <tr><td><strong>Proof of life</strong></td><td>A <code>scan_run</code> log, a "Scanned today" badge that turns to the warning colour after 3 missed days, and bundled self-test fixtures run on every scan.</td><td>3</td></tr>
+        <tr><td><strong>Proof of value</strong></td><td>A decision journal scores accepted and ignored proposals at 30, 90 and 365 days against doing nothing.</td><td>2</td></tr>
+      </table></div>
+      <p>An Invest home-screen widget (beside the three existing Glance widgets) shows the top open opportunity and the last scan date. Apps with an active widget are exempt from Android's restricted bucket, so the widget also keeps the daily job reliable.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="decisions">
+      <h2>Decisions to record in plan.html (Phase 0)</h2>
+      <div class="table-wrap"><table>
+        <tr><th>#</th><th>Decision</th><th>Proposed wording</th><th>Why</th></tr>
+        <tr><td class="id">D-1</td><td>Engine scope</td><td>"Invest advisor: rules-based, on device, suggest-and-record. No order placement. Personal use only."</td><td>SEBI algo rules, no MF/FD APIs, IA/RA regulations, "estimates only, not advice" (plan.html:176)</td></tr>
+        <tr><td class="id">D-2</td><td>Network surface</td><td>"New sources are added one at a time by decision: the AMFI scheme master (Phase 4), TER data (Phase 4), FD rates (Phase 4), exchange RSS (Phase 5)."</td><td>The manifest says "Everything else works offline"; NSE terms ban automated collection</td></tr>
+        <tr><td class="id">D-3</td><td>Thresholds move to policy</td><td>"Drift band, concentration limit, emergency multiple and the other limits live in a user-signed investment policy. Tax figures (ELSS lock, exemption, DICGC limit, UPI AutoPay limit) live in versioned data."</td><td>AGENTS.md; plan.html already calls the 10% limit "(editable)"</td></tr>
+        <tr><td class="id">D-4</td><td>Alerts</td><td>"Weekly digest; immediate alerts only for deadlines, at most 1 a day and 3 a week; never for price moves."</td><td>Matches the P19 rule "immediate alerts only for urgent items"</td></tr>
+        <tr><td class="id">D-5</td><td>Paper mode first</td><td>"The advisor runs in paper mode for its first 8 weeks."</td><td>Forward test before relying on it</td></tr>
+        <tr><td class="id">D-6</td><td>Backend</td><td>"No backend stays. Revisit only for intraday stock events (E3) by explicit decision."</td><td>plan.html:163</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="catalogue">
+      <h2>Opportunity catalogue</h2>
+      <p>Every opportunity named in the research report, plus every item from the research notes' opportunity taxonomy, has an ID below. Each row gives the trigger, the inputs (whether they exist today), the action and approval tier, the alert class and the phase. Proposed defaults are marked <em>default</em>; they belong in the IPS and are not fixed.</p>
+      <div class="legend">
+        <span><span class="tag det">Deterministic</span> payoff computable to the rupee</span>
+        <span><span class="tag stat">Statistical</span> long-horizon evidence</span>
+        <span><span class="tag inf">Inform</span> no rupee claim; context only</span>
+        <span><span class="tag">T0 / T1 / T2</span> approval tier (see <a href="#tiers">tiers</a>)</span>
+        <span><span class="tag">Deadline / Digest / Quiet</span> alert class (see <a href="#alerts">alerts</a>)</span>
+      </div>
+
+      <h3 id="cat-contribute">C · Contribution and cash</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">C1</td><td><strong>Monthly investable amount (X)</strong> and where it goes <span class="tag det">Deterministic</span></td><td>Monthly, after the month-start day: X = income − Need spend − Want spend − sinking funds − emergency top-up, from the last 2–3 months (plan.html:387-392). Then split X: emergency fund first, then underweight class, then goal SIPs.</td><td>Income and Need/Want-tagged postings exist (<code>DecisionKind</code>). Missing: sinking funds, goal table.</td><td>"Invest ₹X this month: ₹a debt, ₹b equity" · T1 · Digest</td><td>2</td></tr>
+        <tr><td class="id">C2</td><td><strong>Goal contribution gap</strong> <span class="tag det">Deterministic</span></td><td>Required monthly (<code>requiredMonthlyContribution</code>) vs current SIPs + X. Shows projected value at the deadline, the shortfall, and a "markets fall 30% that year" line (plan.html:395-399).</td><td>Math exists (<code>DashboardMath.kt:54</code>). The goal is hard-coded at DOB + 30 and 12% (<code>MainActivity.kt:92</code>); needs a goal table and an editable assumed return.</td><td>Show gap; offer C3 or SIP change · T1 · Digest (monthly)</td><td>2</td></tr>
+        <tr><td class="id">C3</td><td><strong>SIP step-up</strong> <span class="tag stat">Statistical</span></td><td>SIP anniversary, or take-home changes by ≥ 5% (<em>default</em>), or C2 shows a gap.</td><td>SIP plans exist. Take-home is in the profile; salary-change detection needs income postings.</td><td>Deep link to platform, then update <code>sip_plan</code> · T1 · Digest</td><td>2</td></tr>
+        <tr><td class="id">C4</td><td><strong>Mandate headroom</strong> <span class="tag det">Deterministic</span></td><td>A proposed step-up would take a debit above the mandate cap (UPI AutoPay ₹1L per MF debit without re-authentication; eNACH cap as set).</td><td>Missing: <code>mandateCapPaise</code> on <code>sip_plan</code>; limit in versioned data.</td><td>"Raise the mandate first" · T2 (new mandate = never automated) · Quiet</td><td>2</td></tr>
+        <tr><td class="id">C5</td><td><strong>Emergency fund first</strong> <span class="tag det">Deterministic</span></td><td>Liquid + earmarked FD value &lt; max(₹5L, 9 × essential monthly spend) (plan.html:380-385). Surplus goes here first unless turned off.</td><td>Balances by account kind and <code>essentialCategories</code> exist. The ₹5L target is a plan constant; it moves to IPS.</td><td>Route new money to EF / FD ladder (F2) · T1 · Digest</td><td>1 (basic), 2 (goal table)</td></tr>
+        <tr><td class="id">C6</td><td><strong>Idle cash above target</strong> <span class="tag det">Deterministic</span></td><td>Bank + cash balance &gt; EF target + bills, EMIs and SIPs due before next payday + buffer, for 14 days (<em>default</em>) in a row.</td><td>Balances exist. Bills due need recurring rules (P11); until then, SIPs due plus a fixed buffer.</td><td>Deploy via C8/C9 · T1 · Digest. A bank auto-sweep set up by you is T0; the app only records it.</td><td>1</td></tr>
+        <tr><td class="id">C7</td><td><strong>Where to park cash</strong> by horizon and slab <span class="tag det">Deterministic</span></td><td>Money needed in &lt; 3 months: savings or liquid. 3–12 months: liquid fund or FD. Over 12 months and 30% slab: arbitrage fund (≈ 6.1% vs 4.9% after tax in the cited 7% example).</td><td>Missing: slab rate (profile), cash horizon (goal table). Fund category only; specific schemes come in Phase 4.</td><td>Category suggestion · T1 · Digest</td><td>2</td></tr>
+        <tr><td class="id">C8</td><td><strong>Invest a lump sum now, don't stagger</strong> <span class="tag stat">Statistical</span></td><td>When C6 or a windfall frees a large amount (&gt; 3 × monthly SIP, <em>default</em>): default to investing within the allocation now. Offer a 3–6 month STP only if you've set that preference.</td><td>Same as C6.</td><td>Part of the C6 card · T1 · Digest</td><td>1</td></tr>
+        <tr><td class="id">C9</td><td><strong>New money to the underweight class</strong> <span class="tag stat">Statistical</span></td><td>Any planned inflow (SIP, X, idle cash) while drift ≠ 0: send it to the underweight class first ("rebalance with new money first", plan.html:348).</td><td><code>allocation</code> and <code>drift</code> exist (<code>Analytics.kt:38-56</code>).</td><td>"Direct this month's ₹ to debt" · T1 · Digest</td><td>1</td></tr>
+      </table></div>
+
+      <h3 id="cat-allocation">A · Allocation and risk</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">A1</td><td><strong>Rebalance on a band breach</strong> <span class="tag stat">Statistical</span></td><td>At the scheduled check (semi-annual, <em>default</em>): |drift| ≥ band (5 pts). First try to close the gap with C9 inflows over the next 3 months. If that can't, sell only partway, back to the band edge minus 1 pt (Vanguard 200→175 bp idea). Lots are chosen to minimise tax, and the tax cost is shown.</td><td><code>drift</code>, <code>taxIfSoldToday</code> exist. Band in IPS.</td><td>Sell list with tax · T1 (T2 if tax &gt; materiality × 10) · Digest</td><td>1</td></tr>
+        <tr><td class="id">A2</td><td><strong>Goal-horizon glide path</strong> <span class="tag stat">Statistical</span></td><td>Each goal's equity share follows its horizon: EF 0%; &lt; 3 years mostly debt; 3–7 years 40–60%; 7+ years 70–85% (plan.html:400-408). The overall target is the sum across goals. Quarterly, or when a goal crosses a horizon boundary, propose the new target; you set the final number.</td><td>Missing: goal table, per-goal targets, goal–holding link (<code>SipPlanEntity.goalId</code> exists unused).</td><td>Propose new IPS target (IPS change, so cooling-off) · T2 · Digest</td><td>2</td></tr>
+        <tr><td class="id">A3</td><td><strong>Single-stock concentration</strong> <span class="tag stat">Statistical</span></td><td>A stock &gt; 10% of equity held (editable).</td><td><code>concentrations</code> exists (<code>Analytics.kt:57</code>). Make the limit editable (IPS).</td><td>Trim suggestion with tax, or "stop adding" · T2 · Digest</td><td>1</td></tr>
+        <tr><td class="id">A4</td><td><strong>Sector concentration</strong> <span class="tag stat">Statistical</span></td><td>A sector &gt; 25% of direct equity (<em>default</em>).</td><td>Missing: sector field (instrument master).</td><td>Inform / stop adding · T2 · Quiet</td><td>4</td></tr>
+        <tr><td class="id">A5</td><td><strong>Fund overlap / consolidate funds</strong> <span class="tag stat">Statistical</span></td><td>Two held funds overlap &gt; 50% by weight (<em>default</em>). Consolidation is proposed only when net of exit load and tax it saves cost (the cheaper of the two stays).</td><td>Missing: fund portfolio disclosures. No data source yet (invest-plan.md:80).</td><td>Consolidate · T1 · Quiet</td><td>5</td></tr>
+        <tr><td class="id">A6</td><td><strong>Factor fund exposure and drawdown</strong> <span class="tag inf">Inform</span></td><td>You hold a momentum, alpha, quality, value or low-vol index fund: show its share of equity and its historical worst drawdown (Momentum 30 about 68%, Alpha 50 about 79%). Never "rotate into the best recent factor".</td><td>Missing: scheme category from the instrument master.</td><td>Inform only · Quiet</td><td>4</td></tr>
+      </table></div>
+
+      <h3 id="cat-cost">K · Cost</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">K1</td><td><strong>Regular → direct plan switch</strong> <span class="tag det">Deterministic</span></td><td>A held scheme is a Regular plan and its Direct twin exists. Benefit = TER gap × value × years to goal. Cost = exit load (if inside the window) + capital-gains tax now (a switch is a redemption). Propose only if benefit − cost &gt; materiality and payback &lt; 2 years (<em>default</em>). Typical saving: 0.65–1.0 pp a year in active equity.</td><td>Missing: AMFI scheme master with plan type and Direct twin, TER data. The AMFI file already arrives weekly and is thrown away (<code>PriceUpdater.kt:97-135</code>).</td><td>Switch via platform, then record sell + buy · T1 · Digest</td><td>4</td></tr>
+        <tr><td class="id">K2</td><td><strong>Active large-cap → index alternative</strong> <span class="tag stat">Statistical</span></td><td>A held active large-cap fund: show the cost and SPIVA context against a Nifty 50/100 index fund (75–84% of active large-cap funds trail over 1–10 years). For mid/small-cap, inform only (majority beat the benchmark in 2025).</td><td>Missing: scheme category, TER, index-fund list (instrument master).</td><td>Large-cap: T1 · Digest. Mid/small: Quiet</td><td>4</td></tr>
+        <tr><td class="id">K3</td><td><strong>Expense-ratio gap</strong> <span class="tag det">Deterministic</span></td><td>A held fund's TER is ≥ 0.5 pp (<em>default</em>) above the cheapest same-category direct fund. Rupees a year shown; switch cost netted as in K1.</td><td>Missing: TER data, categories.</td><td>T1 · Quiet (folded into digest monthly)</td><td>4</td></tr>
+        <tr><td class="id">K4</td><td><strong>Exit-load window ended</strong> <span class="tag det">Deterministic</span></td><td>A lot passes <code>acquiredOn + exitLoadDays</code> while a parked A1, K1 or A5 proposal was waiting on it.</td><td><code>exitLoadDays</code> and <code>exitLoadBps</code> exist on holdings.</td><td>Re-raise the parked proposal · Digest</td><td>1</td></tr>
+      </table></div>
+
+      <h3 id="cat-tax">T · Tax</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">T1</td><td><strong>LTCG gain harvest</strong> up to ₹1.25L <span class="tag det">Deterministic</span></td><td>From 1 Feb (<em>default</em>) to 31 Mar: remaining exemption &gt; materiality and unlocked long-term units have gains. Propose selling the lots that use the room best and buying back the same day. Saves up to 12.5% × ₹1.25L = ₹15,625 of future tax a year per PAN. Lots priced before 31 Jan 2018 use their FMV (T7). Exit loads and the holding-clock reset are shown.</td><td><code>harvestRoom</code> (<code>InvestState.kt:293</code>), <code>taxIfSoldToday</code>, <code>fmv2018Paise</code> exist.</td><td>Sell and rebuy list · T1 · Digest from 1 Feb; <strong>Deadline</strong> in the last 14 days of March</td><td>1</td></tr>
+        <tr><td class="id">T2</td><td><strong>Tax-loss harvest / set-off</strong> <span class="tag det">Deterministic</span></td><td>Gains realised this year (STCG or LTCG above the exemption) and holdings with unrealised losses. Benefit = tax saved under Indian set-off rules: STCL against STCG or LTCG; LTCL against LTCG only. India has no wash-sale rule, but sham transactions can be challenged; verify before shipping.</td><td><code>equityYears</code> set-off and carry-forward exist (<code>EquityTax.kt:33</code>). Equity only today.</td><td>T1 · Digest; Deadline in the last 14 days of March</td><td>1</td></tr>
+        <tr><td class="id">T3</td><td><strong>Wait to turn long-term</strong> <span class="tag det">Deterministic</span></td><td>Any sell proposal (or a manual sell being entered) touches lots ≤ 12 months old that become long-term within 30 days (<em>default</em>). Show the 20% vs 12.5% difference in rupees and the date to wait for.</td><td><code>gainTerm</code>, lots exist.</td><td>Adjusts other proposals; shown inline on the sell form · Quiet</td><td>1</td></tr>
+        <tr><td class="id">T4</td><td><strong>ELSS lock-in ending</strong> <span class="tag inf">Inform</span></td><td>An ELSS instalment's <code>lockUntil</code> falls within 30 days. Its units become free; review alongside A1/K1/T1. Never an automatic sell.</td><td><code>lockUntil</code> on lots exists. The 3-year lock moves from code to versioned data.</td><td>Inform · Digest</td><td>1</td></tr>
+        <tr><td class="id">T5</td><td><strong>Regime-aware ELSS / 80C (s.123)</strong> <span class="tag det">Deterministic</span></td><td>New regime: suppress any "ELSS for tax" logic. Old regime: show remaining 80C/s.123 room before 31 Mar with ELSS as one option.</td><td><code>taxRegime</code> in profile exists. Missing: deductions data (P20 not built), new-Act section labels.</td><td>Inform · Digest in Jan–Mar</td><td>2</td></tr>
+        <tr><td class="id">T6</td><td><strong>Debt funds are slab-taxed</strong> <span class="tag det">Deterministic</span></td><td>Any proposal that sells a debt-fund lot uses slab tax whatever the holding period (bought after 1 Apr 2023). It also feeds C7: for long horizons at high slabs, arbitrage over debt funds.</td><td>Slab bucket exists in <code>splitGain</code>. Missing: slab rate.</td><td>Cost component in scoring · no alert of its own</td><td>1 (cost), 2 (slab)</td></tr>
+        <tr><td class="id">T7</td><td><strong>Grandfathered 2018 lots</strong> <span class="tag det">Deterministic</span></td><td>Lots bought before 1 Feb 2018 use the higher of cost and the 31 Jan 2018 FMV in T1/T2/A1 calculations; flag any lot missing its FMV.</td><td><code>fmv2018Paise</code> exists. New-Act section for grandfathering is unverified.</td><td>Correctness input; Quiet flag for missing FMV</td><td>1</td></tr>
+        <tr><td class="id">T8</td><td><strong>Carried-forward loss expiring</strong> <span class="tag det">Deterministic</span></td><td>A brought-forward loss is in its last allowed year (8-year limit). Book enough gains before 31 Mar to use it.</td><td><code>equityYears</code> carries losses with expiry.</td><td>T1 · Digest; Deadline in the last 14 days of March</td><td>1</td></tr>
+        <tr><td class="id">T9</td><td><strong>SGB and buyback rules</strong> <span class="tag inf">Inform</span></td><td>Budget 2026: the SGB exemption applies only to original-issue bonds held to maturity; buyback proceeds are taxed as capital gains. Relevant only if SGBs or buyback tenders are ever tracked.</td><td>Not tracked instruments.</td><td>Parked; tax data only</td><td>Parked</td></tr>
+      </table></div>
+
+      <h3 id="cat-fd">F · Deposits and bonds</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">F1</td><td><strong>FD maturing: decide what happens</strong> <span class="tag det">Deterministic</span></td><td>Maturity within 30 days, escalating at 7 days. Options: let it auto-renew (check the new rate), move it to a goal or the EF, rebalance (C9), or a better insured rate (F4).</td><td><code>fixed_deposit</code>, <code>autoRenew</code>, <code>maturityValue</code> exist.</td><td>Choose; the app records close/renew · T1 · Digest at 30 days, <strong>Deadline</strong> at 7</td><td>1</td></tr>
+        <tr><td class="id">F2</td><td><strong>FD ladder gaps</strong> <span class="tag det">Deterministic</span></td><td>The EF is held in FDs that mature in a lump, or there is no rung within 3 months. Suggest a ladder (plan: 5 × ₹1L).</td><td><code>maturityLadder</code> exists (<code>InvestState.kt:484</code>).</td><td>Ladder plan · T1 · Quiet</td><td>1</td></tr>
+        <tr><td class="id">F3</td><td><strong>Deposit-insurance concentration</strong> <span class="tag det">Deterministic</span></td><td>FDs + savings at one bank &gt; ₹5L per depositor (DICGC, per bank, across deposit types).</td><td>Missing: institution on accounts and FDs; limit in versioned data.</td><td>Spread proposal · T1 · Digest</td><td>2</td></tr>
+        <tr><td class="id">F4</td><td><strong>Better insured FD rate</strong> <span class="tag det">Deterministic</span></td><td>An insured bank or SFB offers ≥ 50 bp (<em>default</em>) more at a comparable tenure, net of the break penalty and tax at your slab. Also used at F1.</td><td>Missing: curated FD-rate data (versioned, refreshed weekly).</td><td>T1 · Digest</td><td>4</td></tr>
+        <tr><td class="id">F5</td><td><strong>Uninsured FD flag</strong> <span class="tag inf">Inform</span></td><td>An NBFC or corporate FD: not DICGC-insured. Show its credit rating and treat it as credit risk, not as cash.</td><td>Missing: institution type and rating.</td><td>Quiet</td><td>2</td></tr>
+        <tr><td class="id">F6</td><td><strong>FD interest TDS projection</strong> <span class="tag inf">Inform</span></td><td>Projected FD interest this year at a bank crosses the TDS threshold. Show the expected TDS so it's not a surprise (claimed back via ITR).</td><td>Accrual exists. Missing: threshold in versioned data.</td><td>Quiet</td><td>2</td></tr>
+        <tr><td class="id">F7</td><td><strong>Bond maturity and coupon</strong> <span class="tag det">Deterministic</span></td><td>A bond matures or pays a coupon within 30 days: put it on the ladder and decide what happens to the money (as F1).</td><td><code>maturityDate</code>, <code>couponBps</code> exist; bonds aren't on the ladder yet (invest-plan.md:124).</td><td>T1 · Digest</td><td>2</td></tr>
+      </table></div>
+
+      <h3 id="cat-discipline">D · Discipline and hygiene</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">D1</td><td><strong>Missed SIP</strong> with goal-date effect <span class="tag det">Deterministic</span></td><td>An instalment is Missed (past <code>SIP_GRACE_DAYS</code>). Show its effect on the goal date (<code>missedImpact</code>).</td><td><code>sipInstalments</code>, <code>missedImpact</code> exist.</td><td>Pay or skip · T1 · <strong>Deadline</strong> (one push)</td><td>1</td></tr>
+        <tr><td class="id">D2</td><td><strong>Allotment overdue</strong> <span class="tag det">Deterministic</span></td><td>An In Transit order has had no allotment for more than 5 working days (<em>default</em>).</td><td><code>PendingAllotmentEntity</code> exists.</td><td>Check platform, allot or cancel · Digest</td><td>1</td></tr>
+        <tr><td class="id">D3</td><td><strong>Price health before acting</strong> <span class="tag det">Deterministic</span></td><td>An open proposal depends on a holding whose price is Stale, Failed, Mismatch or Suspicious. Opening the card forces a refresh, and the action is blocked until the price is fresh or you confirm a manual one.</td><td>Price status and <code>PriceUpdater.refresh</code> exist.</td><td>Gate on other proposals · Quiet</td><td>1</td></tr>
+        <tr><td class="id">D4</td><td><strong>Investment reason and revisit</strong> <span class="tag inf">Inform</span></td><td>A buy or sell is saved without a reason (goal, thesis, holding period), or a stated revisit date arrives (plan.html:311).</td><td>Missing: reason fields.</td><td>Prompt · Quiet; revisit in Digest</td><td>2</td></tr>
+        <tr><td class="id">D5</td><td><strong>Reconcile with statements</strong> <span class="tag det">Deterministic</span></td><td>An imported CAS (CAMS/KFintech/MF Central, NSDL/CDSL) or broker holdings disagree with the app's units. Treat the platform's P&amp;L as data to check, not as truth (platform FIFO errors have been reported).</td><td>Missing: CAS import (plan Phase 5).</td><td>Fix entries · T1 · Digest</td><td>5</td></tr>
+        <tr><td class="id">D6</td><td><strong>Scanner not running</strong> <span class="tag det">Deterministic</span></td><td>No successful <code>scan_run</code> for 3 days, or a self-test fixture failed.</td><td>Missing: <code>scan_run</code> (Phase 3).</td><td>Badge turns to warning colour; one push · Deadline</td><td>3</td></tr>
+      </table></div>
+
+      <h3 id="cat-execution">E · Execution helpers</h3>
+      <div class="table-wrap"><table class="catalogue">
+        <tr><th>ID</th><th>Opportunity</th><th>Trigger</th><th>Inputs</th><th>Action · tier · alert</th><th>Phase</th></tr>
+        <tr><td class="id">E1</td><td><strong>GTT expiry and re-arm</strong> <span class="tag det">Deterministic</span></td><td>A recorded GTT expires within 7 days (one-year validity), or a corporate action (split, bonus, dividend &gt; 5%) is due that will cancel it.</td><td>Missing: GTT records (manual entry).</td><td>Re-place identical GTT at the broker · T0 when identical; otherwise T1 · Deadline</td><td>5</td></tr>
+        <tr><td class="id">E2</td><td><strong>Watchlist price level</strong> <span class="tag inf">Inform</span></td><td>A price level you set yourself on a watchlist instrument is crossed at end of day. Delivered in the digest, never as a push. For action, place a GTT at the broker.</td><td>Missing: watchlist table, prices for unheld instruments.</td><td>Digest only</td><td>5</td></tr>
+        <tr><td class="id">E3</td><td><strong>Corporate events on holdings</strong> <span class="tag inf">Inform</span></td><td>Results, dividends, splits, buybacks, pledges or insider deals for a held stock, from the exchange RSS feeds. Feeds the corporate-action entry flow and E1.</td><td>Missing: RSS fetch (network decision D-2).</td><td>Digest; corporate actions prefilled for confirmation</td><td>5</td></tr>
+        <tr><td class="id">E4</td><td><strong>Broker read-only holdings</strong> <span class="tag det">Deterministic</span></td><td>Holdings from a broker read API (for example Upstox's 1-year analytics token) disagree with the books. A source for D5.</td><td>Missing: broker integration (reads work from any IP).</td><td>Fix entries · Digest</td><td>5</td></tr>
+      </table></div>
+
+      <h3 id="excluded">X · Excluded by design</h3>
+      <p>The engine never produces these. They are listed so the exclusion is a decision, not an omission.</p>
+      <div class="table-wrap"><table>
+        <tr><th>ID</th><th>Signal</th><th>Why not</th></tr>
+        <tr><td class="id">X1</td><td>F&amp;O, margin, intraday trades</td><td>SEBI: 93% of individual F&amp;O traders lost money over FY22–24; 71% of intraday traders lost in FY23. Out of scope in plan.html:713. Hard-banned in the IPS.</td></tr>
+        <tr><td class="id">X2</td><td>Stock picks and screens for new stocks</td><td>No evidence a personal rule set beats an index after tax and costs. Recommending unheld securities edges toward research.</td></tr>
+        <tr><td class="id">X3</td><td>Factor rotation ("move to the factor that led")</td><td>Leadership flipped over 2021–26; drawdowns of 68–79%; 58% decay after publication. A6 discloses factor exposure instead.</td></tr>
+        <tr><td class="id">X4</td><td>LLM-generated ideas or forecasts</td><td>Over-extrapolation and optimism bias; memorisation spoils backtests; no India evidence.</td></tr>
+        <tr><td class="id">X5</td><td>Technical-analysis or news-driven trades</td><td>Short holding periods attract 20% STCG plus costs; trading frequency lowers returns (Barber–Odean: 11.4% vs 18.5%).</td></tr>
+        <tr><td class="id">X6</td><td>Push alerts on price moves</td><td>Raise trading (FCA about 11%; Robinhood about 25%).</td></tr>
+        <tr><td class="id">X7</td><td>Fund picking by trailing returns</td><td>SPIVA shows weak persistence; category leadership is cyclical.</td></tr>
+        <tr><td class="id">X8</td><td>Mean-variance optimisation</td><td>Expected-return estimates are too noisy at personal scale; simple goal-horizon bands are more robust.</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="coverage">
+      <h2>Coverage check</h2>
+      <p>Each opportunity named in the report and its summary, mapped to its ID, so nothing is dropped.</p>
+      <div class="table-wrap"><table>
+        <tr><th>Named in the research</th><th>ID</th></tr>
+        <tr><td>Regular-to-direct plan switches</td><td>K1</td></tr>
+        <tr><td>New money steered to the underweight asset class</td><td>C9</td></tr>
+        <tr><td>Using the ₹1.25 lakh equity LTCG exemption before 31 March</td><td>T1</td></tr>
+        <tr><td>Idle cash above the emergency target</td><td>C6, C5</td></tr>
+        <tr><td>FD maturities</td><td>F1</td></tr>
+        <tr><td>Deposit-insurance (DICGC ₹5L per bank) concentration</td><td>F3</td></tr>
+        <tr><td>Missed SIPs</td><td>D1</td></tr>
+        <tr><td>ELSS lock-ins ending</td><td>T4</td></tr>
+        <tr><td>Concentration breach</td><td>A3 (stock), A4 (sector)</td></tr>
+        <tr><td>"How much can I invest, and where should it go?" / investable X</td><td>C1</td></tr>
+        <tr><td>₹1 Cr goal needing about ₹2.3L a month</td><td>C2</td></tr>
+        <tr><td>Arbitrage vs liquid fund for high-slab, 12+ month money</td><td>C7</td></tr>
+        <tr><td>Investing a lump sum at once vs spreading it</td><td>C8</td></tr>
+        <tr><td>Rebalancing with 5-point bands, partway back, cash flows first</td><td>A1, C9</td></tr>
+        <tr><td>Goal-horizon allocation and glide path</td><td>A2</td></tr>
+        <tr><td>Index alternatives for active large-cap funds</td><td>K2</td></tr>
+        <tr><td>Expense-ratio / cost reduction</td><td>K3, K1</td></tr>
+        <tr><td>Exit-load-free date reached</td><td>K4</td></tr>
+        <tr><td>Fund overlap and consolidating funds</td><td>A5</td></tr>
+        <tr><td>Factor tilts as satellite with drawdown warnings</td><td>A6 (and X3)</td></tr>
+        <tr><td>Tax-loss harvesting and set-off</td><td>T2</td></tr>
+        <tr><td>Avoiding 20% STCG churn / minimum holding period</td><td>T3</td></tr>
+        <tr><td>Suppressing ELSS-for-tax for new-regime users</td><td>T5</td></tr>
+        <tr><td>Debt funds taxed at slab rate</td><td>T6</td></tr>
+        <tr><td>31 Jan 2018 grandfathering</td><td>T7</td></tr>
+        <tr><td>Losses carried forward up to 8 years</td><td>T8</td></tr>
+        <tr><td>SGB original-issue rule, buyback taxation</td><td>T9</td></tr>
+        <tr><td>SIP step-up</td><td>C3</td></tr>
+        <tr><td>Mandate limits (UPI AutoPay ₹1L, eNACH)</td><td>C4</td></tr>
+        <tr><td>FD ladder (5 × ₹1L)</td><td>F2</td></tr>
+        <tr><td>FD rate shopping across insured banks</td><td>F4</td></tr>
+        <tr><td>NBFC FDs not insured</td><td>F5</td></tr>
+        <tr><td>FD TDS projection</td><td>F6</td></tr>
+        <tr><td>Bond maturity on the ladder</td><td>F7</td></tr>
+        <tr><td>FD auto-renewal / reinvestment</td><td>F1</td></tr>
+        <tr><td>Investment reason on every trade, revisit later</td><td>D4</td></tr>
+        <tr><td>No action on a stale price</td><td>D3</td></tr>
+        <tr><td>Allotment / In Transit follow-up</td><td>D2</td></tr>
+        <tr><td>CAS reconciliation</td><td>D5</td></tr>
+        <tr><td>Proof the scanner ran (Betterment lesson)</td><td>D6</td></tr>
+        <tr><td>GTT re-arm monitor</td><td>E1</td></tr>
+        <tr><td>Watchlist price triggers</td><td>E2</td></tr>
+        <tr><td>Exchange RSS events (results, insider deals, corporate actions)</td><td>E3</td></tr>
+        <tr><td>Broker read-only holdings</td><td>E4</td></tr>
+        <tr><td>Sweeping cash into a liquid fund (Tier 0)</td><td>C6 (bank or platform auto-sweep only; the app records it)</td></tr>
+        <tr><td>SIP instalments on existing mandates (Tier 0)</td><td>D1, C3 (the app records and reconciles)</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="architecture">
+      <h2>Architecture</h2>
+      <p>The engine follows the existing layering: pure math in <code>core/invest</code>, state and screens in <code>feature/invest</code>. It also follows the plan's insights pipeline: "Ledger → Rules engine (on device, deterministic) → Facts JSON → AI → Weekly summary" (plan.html:432).</p>
+      <pre class="flow">LedgerSnapshot ─┐
+InvestSnapshot ─┤
+Goals, Profile ─┼─► core/invest/advice/opportunities(...)  ──► List&lt;Opportunity&gt;   (pure, no I/O)
+Policy (IPS)  ──┤          │ one function per rule (C1 … E4)
+TaxRules/data ──┤          ▼
+today ──────────┘     score() · classify() · applyPolicy()   (paise, integer math)
+                               │
+           ┌───────────────────┼───────────────────────────┐
+           ▼                   ▼                           ▼
+   InvestState.advice   AdviceWorker (daily)        Facts JSON (P19)
+   Invest tab module    → opportunity table          → optional AI narration
+   + detail sheet       → scan_run log               → weekly digest
+                        → notifications (budgeted)
+                        → widget row</pre>
+      <ul>
+        <li><strong>Package:</strong> <code>core/invest/advice/</code> with <code>Opportunity.kt</code> (types), <code>Policy.kt</code> (IPS), <code>Scoring.kt</code>, <code>Rules*.kt</code> grouped by family (<code>RulesContribution</code>, <code>RulesAllocation</code>, <code>RulesCost</code>, <code>RulesTax</code>, <code>RulesDeposits</code>, <code>RulesDiscipline</code>), and <code>Engine.kt</code> (<code>opportunities()</code>).</li>
+        <li><strong>Entry point:</strong> <code>fun opportunities(ledger: LedgerSnapshot, invest: InvestSnapshot, rules: CapitalGainsRules, policy: InvestmentPolicy, goals: List&lt;Goal&gt;, profile: UserProfile, today: LocalDate): List&lt;Opportunity&gt;</code>. In Phase 1, <code>goals</code> is derived from the profile's two flags.</li>
+        <li><strong>Reuse, not rewrite:</strong> rules call <code>valuations</code>, <code>allocation</code>, <code>drift</code>, <code>concentrations</code>, <code>taxIfSoldToday</code>, <code>equityYears</code>, <code>depositValuation</code>, <code>maturityLadder</code> (moved from <code>feature/invest</code> to <code>core/invest</code>), <code>sipInstalments</code> and <code>requiredMonthlyContribution</code> (moved from <code>feature/dashboard</code> to <code>core</code>).</li>
+        <li><strong>Performance:</strong> <code>buildInvest</code> recomputes everything on each snapshot and calls <code>taxIfSoldToday</code> per holding twice. Compute valuations and tax previews once per snapshot and pass them to the rules.</li>
+        <li><strong>No new network in Phases 1–3.</strong> Phase 4 adds sources one at a time by decision (D-2).</li>
+      </ul>
+    </section>
+
+    <section id="record">
+      <h2>Opportunity record</h2>
+      <pre><code>enum class OpportunityType { C1, C2, …, E4 }          // catalogue IDs
+enum class EvidenceTier { Deterministic, Statistical, Inform }
+enum class ApprovalTier { T0, T1, T2 }
+enum class AlertClass { Deadline, Digest, Quiet }
+
+data class Opportunity(
+    val key: String,                 // stable identity, e.g. "T1:2026-27", "F1:fd-42"
+    val type: OpportunityType,
+    val subject: Subject,            // Portfolio, Holding(id), Deposit(id), Sip(id), Goal(id)
+    val benefit: Paise,              // expected after-tax benefit; Zero for Inform
+    val cost: Paise,                 // tax now + exit load + charges
+    val evidence: EvidenceTier,
+    val deadline: LocalDate?,
+    val action: ProposedAction,      // legs with Paise and Units; never Double
+    val tier: ApprovalTier,
+    val alert: AlertClass,
+    val inputs: List&lt;InputFact&gt;,     // label, value, asOf, priceStatus
+    val rule: RuleRef,               // rule id, IPS version and clause, tax-data version
+    val ifIgnored: Paise?,           // cost of doing nothing, where computable
+)</code></pre>
+      <ul>
+        <li><code>key</code> lets the daily scan update an existing proposal instead of creating a duplicate, and lets dismissals and mutes stick.</li>
+        <li><code>ProposedAction</code> mirrors the repository calls it would book once confirmed: <code>sell</code>, <code>buy</code>, <code>orderFund</code>, <code>openDeposit</code>, <code>closeDeposit(renew)</code>, SIP change. A confirmed action goes through those calls, so every entry still balances.</li>
+        <li>All card text is a template filled from the record's fields, so the text can't disagree with the numbers.</li>
+      </ul>
+    </section>
+
+    <section id="scoring">
+      <h2>Scoring and ranking</h2>
+      <ol>
+        <li><strong>Net benefit</strong> = <code>benefit − cost</code>, in paise.</li>
+        <li><strong>Confidence</strong> by evidence tier, in basis points: Deterministic 10,000; Statistical 6,000 (<em>default</em>); Inform has no rupee score.</li>
+        <li><strong>Score</strong> = <code>net × confidenceBps / 10,000</code>, rounded half-up with <code>BigInteger</code>, the same way as <code>proRata</code>.</li>
+        <li><strong>Materiality floor:</strong> drop anything with score &lt; ₹500 (<em>default</em>, IPS). Hygiene items (D1–D3, D6, F1, T4) are exempt.</li>
+        <li><strong>Policy filter:</strong> drop or downgrade anything that would breach the IPS (turnover cap, minimum holding period, banned instruments, caps).</li>
+        <li><strong>Order:</strong> Deadline class first, by deadline. Then Digest by score. Quiet items are listed but never ranked into the digest's top 5.</li>
+      </ol>
+      <p>"Do nothing" is a first-class option on every card, with <code>ifIgnored</code> shown when it can be computed (for example the T1 tax you'd pay later, or K1's yearly TER drag).</p>
+      <p>Phase 2 adds a learning step: per-type confidence is adjusted from the journal's realised-versus-estimated ratio, capped within ±20% and logged as a policy-version change.</p>
+    </section>
+
+    <section id="ips">
+      <h2>Investment policy (IPS) as code</h2>
+      <p>A versioned, user-signed object the engine must satisfy before it proposes anything. Tightening a field takes effect immediately; loosening one takes effect after a 72-hour cooling-off.</p>
+      <div class="table-wrap"><table>
+        <tr><th>Field</th><th>Default</th><th>Used by</th><th>Today</th></tr>
+        <tr><td>Target equity % per goal (sum = overall)</td><td>From goal horizon</td><td>A1, A2, C9</td><td>Single int in <code>AllocationPrefs</code></td></tr>
+        <tr><td>Drift band (pts) and partial-rebalance destination</td><td>5 / band − 1</td><td>A1</td><td><code>DRIFT_ALERT_POINTS</code> constant</td></tr>
+        <tr><td>Rebalance check cadence</td><td>Every 6 months</td><td>A1</td><td>—</td></tr>
+        <tr><td>Single-stock cap (% of equity)</td><td>10</td><td>A3</td><td><code>CONCENTRATION_LIMIT_PERCENT</code></td></tr>
+        <tr><td>Sector cap (% of direct equity)</td><td>25</td><td>A4</td><td>—</td></tr>
+        <tr><td>Emergency fund: multiple of essential spend, floor</td><td>9×, ₹5,00,000</td><td>C5, C6, F2</td><td>Plan constants</td></tr>
+        <tr><td>Idle-cash buffer and persistence</td><td>1 month of essentials, 14 days</td><td>C6</td><td>—</td></tr>
+        <tr><td>Materiality floor</td><td>₹500</td><td>All ranked</td><td>—</td></tr>
+        <tr><td>Max yearly turnover (% of portfolio sold)</td><td>20%</td><td>A1, K1, A5</td><td>—</td></tr>
+        <tr><td>Minimum holding before a gain sale</td><td>Long-term date (except T1 and T2)</td><td>T3, A1</td><td>—</td></tr>
+        <tr><td>Harvest window start</td><td>1 Feb</td><td>T1, T2, T8</td><td>Plan: "Feb/Mar"</td></tr>
+        <tr><td>Alert budget</td><td>1/day, 3/week; digest on Sunday</td><td>Alerts</td><td>—</td></tr>
+        <tr><td>Paper mode until</td><td>Install + 8 weeks</td><td>All</td><td>—</td></tr>
+        <tr><td>Banned: F&amp;O, margin, intraday</td><td>Always on, not editable</td><td>X1</td><td>plan.html:713</td></tr>
+      </table></div>
+      <p class="muted">Tax-law figures (ELSS lock years, exemption, rates, DICGC limit, UPI AutoPay limit, TDS threshold) are <strong>not</strong> IPS fields. They live in versioned data files (see <a href="#data">Data model</a>).</p>
+    </section>
+
+    <section id="tiers">
+      <h2>Approval tiers</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Tier</th><th>Meaning</th><th>Examples</th><th>What the app does</th></tr>
+        <tr><td><strong>T0</strong></td><td>Already runs without a click, outside the app</td><td>SIP instalments on mandates; FD auto-renewal; bank or platform auto-sweep; re-placing an identical GTT</td><td>Records, reconciles, flags anything that didn't happen (D1, D2)</td></tr>
+        <tr><td><strong>T1</strong></td><td>One tap to approve</td><td>Harvests, in-band rebalances, FD reinvest, direct switch, deploy idle cash</td><td>Shows the computation, deep-links to the platform, then books the trade with <code>buy</code>/<code>sell</code>/<code>orderFund</code> once you confirm the fills</td></tr>
+        <tr><td><strong>T2</strong></td><td>Approve with a written reason</td><td>New stock, breaching a cap, selling at a large tax cost, new mandate, glide-path target change</td><td>Requires a reason (fills D4) before booking</td></tr>
+        <tr><td><strong>Never</strong></td><td>Not automatable</td><td>Leverage, derivatives, IPS loosening without cooling-off, storing a TOTP seed for daily broker login</td><td>Refused</td></tr>
+      </table></div>
+    </section>
+
+    <section id="alerts">
+      <h2>Alerts and budget</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Class</th><th>Delivery</th><th>Members</th></tr>
+        <tr><td><strong>Deadline</strong></td><td>Push now, within budget (1/day, 3/week). Escalates once, never repeats daily.</td><td>T1/T2/T8 in the last 14 days of March, F1 at 7 days, D1, D6, E1 at 7 days</td></tr>
+        <tr><td><strong>Digest</strong></td><td>Weekly summary on Sunday: top 5 by score plus everything new. Becomes the P19 weekly review.</td><td>Most C, A, K, T, F items</td></tr>
+        <tr><td><strong>Quiet</strong></td><td>Inbox only, no notification</td><td>A4, A5, A6, K3, T3, F2, F5, F6, D3, D4</td></tr>
+      </table></div>
+      <ul>
+        <li>Dismissing a type 3 times mutes it (plan.html:437); muted types still appear in the inbox under "Muted".</li>
+        <li>No streaks, confetti, scores or "you missed X%" copy. Colour only for meaning, small (DESIGN.md:175-177).</li>
+        <li>Needs a notification channel and <code>POST_NOTIFICATIONS</code> (Android 13+); the Settings "Notifications" row becomes real.</li>
+      </ul>
+    </section>
+
+    <section id="liveness">
+      <h2>Liveness, paper mode and the decision journal</h2>
+      <ul>
+        <li><strong>Scan log:</strong> each run writes <code>scan_run</code> (started, finished, rules version, policy version, tax-data version, opportunities found, self-test result, error).</li>
+        <li><strong>Self-test:</strong> a small bundled fixture portfolio with known answers runs on every scan. If any expected opportunity fails to fire, D6 fires.</li>
+        <li><strong>Badge:</strong> "Scanned today" on the Invest module and widget; warning colour after 3 days without a run.</li>
+        <li><strong>Kill switch:</strong> one toggle pauses every proposal and alert. It trips by itself on ledger imbalance, a failed self-test or 3 consecutive failed price downloads.</li>
+        <li><strong>Paper mode:</strong> for the first 8 weeks, proposals go to a "Paper" list with no pushes, and the journal records what would have happened.</li>
+        <li><strong>Journal:</strong> every proposal is stored with its input snapshot and score. Your decision (Accepted, Snoozed, Dismissed with reason, Expired) is recorded. At 30, 90 and 365 days, the realised result is compared with doing nothing, using the same price and tax functions. The journal is append-only.</li>
+        <li><strong>Review screen:</strong> per type, how often it fired, how often you accepted, estimated vs realised rupees. A rule that doesn't earn its keep after a year is a candidate for removal.</li>
+      </ul>
+    </section>
+
+    <section id="llm">
+      <h2>AI narration (optional, Phase 4)</h2>
+      <ul>
+        <li>Opt-in through the existing <code>AiSettingsStore</code> (your key, payload preview). Template text is always the fallback.</li>
+        <li>Input: one <code>Opportunity</code> record as JSON, with account names and identifiers removed (aggregates only, plan.html:432-437).</li>
+        <li>Output: 2–4 sentences on "why this, why now, what could go wrong", as structured output separate from any numbers.</li>
+        <li>Validator: extract every number and percent from the text; reject and fall back to the template if any isn't in the record within rounding.</li>
+        <li>Store the text with model ID and prompt version.</li>
+        <li>Cost: Haiku 5.5 at $0.10/$0.50 per million tokens (claude.com/pricing, 29 Oct 2026). A weekly digest of 10 cards costs cents a year. Don't budget from Haiku 4.5 ($1/$5), which is ten times more.</li>
+        <li>Never: generating ideas, choosing amounts, or seeing raw ledger rows.</li>
+      </ul>
+    </section>
+
+    <section id="ui">
+      <h2>Screens</h2>
+      <div class="cards">
+        <div class="card"><h4>Invest tab: Opportunities module</h4><ul><li>Top of the tab, above In transit</li><li>Up to 3 cards (Deadline first), "N more" row</li><li>"Scanned today" badge; "Paper" tag while in paper mode</li></ul></div>
+        <div class="card"><h4>Opportunity detail</h4><ul><li>What, why, the computation in rupees</li><li>Inputs with as-of dates and price badges</li><li>Rule and IPS clause; cost of doing nothing</li><li>Do it · Snooze · Dismiss (reason) · Do nothing</li></ul></div>
+        <div class="card"><h4>Inbox</h4><ul><li>Open, Snoozed, Muted, Paper, Done</li><li>Filter by family</li></ul></div>
+        <div class="card"><h4>Settings › Investment policy</h4><ul><li>All IPS fields, version history</li><li>Loosening shows the cooling-off date</li></ul></div>
+        <div class="card"><h4>Settings › Advisor</h4><ul><li>Paper mode, kill switch, alert budget, digest day</li><li>Scan log and self-test result</li></ul></div>
+        <div class="card"><h4>Journal review</h4><ul><li>Per-type hit rate, estimated vs realised ₹</li><li>Linked from the weekly review (P19)</li></ul></div>
+      </div>
+      <p>New components go in <code>ui/components</code> first (<code>OpportunityCard</code>, <code>ComputationTable</code>, <code>InputFactRow</code>), using <code>MoneyTheme</code> tokens and the existing price <code>Badges</code>. There is no Invest mockup today, so draw <code>design/mockups/invest-advisor.html</code> before Phase 1c.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="data">
+      <h2>Data model and versioned data</h2>
+      <h3>Room changes</h3>
+      <p>The database is at v12 but exported schemas stop at <code>11.json</code>. Export v12 before the first migration.</p>
+      <div class="table-wrap"><table>
+        <tr><th>Change</th><th>Fields</th><th>For</th><th>Phase</th></tr>
+        <tr><td><code>goal</code> table</td><td>id, kind (Emergency, Wealth, Custom), name, targetPaise, deadline, assumedReturnBps, equityTargetPct, priority, active</td><td>C1, C2, C5, C7, A2</td><td>2 (v13)</td></tr>
+        <tr><td><code>investment_policy</code></td><td>version, signedAt, effectiveFrom, json payload</td><td>IPS</td><td>2</td></tr>
+        <tr><td><code>opportunity</code></td><td>key, type, firstSeen, lastSeen, state, score, deadline, payload json, mutedType</td><td>Inbox, dedupe, mutes</td><td>2</td></tr>
+        <tr><td><code>decision_journal</code> (append-only)</td><td>opportunityKey, decision, reason, decidedAt, inputSnapshot, outcome30/90/365Paise</td><td>Journal</td><td>2</td></tr>
+        <tr><td><code>scan_run</code></td><td>startedAt, finishedAt, versions, count, selfTestOk, error</td><td>D6, liveness</td><td>2 (written in 3)</td></tr>
+        <tr><td><code>investment_reason</code></td><td>transactionId, goalId, thesis, horizon, revisitOn</td><td>D4, T2 tier</td><td>2</td></tr>
+        <tr><td><code>account.institution</code>, <code>institutionKind</code></td><td>bank name, Bank / SFB / NBFC / Corporate</td><td>F3, F5, F6</td><td>2</td></tr>
+        <tr><td><code>sip_plan.mandateCapPaise</code></td><td>nullable</td><td>C4</td><td>2</td></tr>
+        <tr><td><code>holding.schemeCode</code>, <code>instrument</code> table</td><td>schemeCode, isin, name, amc, plan (Direct/Regular), option, category, directTwinCode, sector, terBps, terAsOf</td><td>K1–K3, A4, A6</td><td>4</td></tr>
+        <tr><td><code>price</code> history depth</td><td>daily NAVs for held schemes (and benchmarks)</td><td>Journal outcomes, A6</td><td>4</td></tr>
+        <tr><td><code>gtt</code>, <code>watchlist</code></td><td>instrument, trigger, placedOn, expiresOn / level</td><td>E1, E2</td><td>5</td></tr>
+      </table></div>
+      <p>Every migration ships with a <code>MigrationTest</code>. The journal and scan log are append-only, enforced with SQL triggers as the ledger is.</p>
+
+      <h3>Versioned data files (assets)</h3>
+      <div class="table-wrap"><table>
+        <tr><th>File</th><th>Contents</th><th>Phase</th></tr>
+        <tr><td><code>tax/capital_gains.json</code></td><td>Add a tax year 2026-27 entry under the Income-tax Act 2025, with section labels (s.196, s.198), once verified</td><td>0</td></tr>
+        <tr><td><code>tax/elss.json</code></td><td>Lock-in years per instalment (moves <code>ELSS_LOCK_YEARS</code> out of code), regime availability, s.123 / 80C limit</td><td>0 (lock), 2 (limit)</td></tr>
+        <tr><td><code>tax/tds.json</code></td><td>FD interest TDS thresholds by year</td><td>2</td></tr>
+        <tr><td><code>rules/deposit_insurance.json</code></td><td>DICGC limit per depositor per bank, effective dates</td><td>2</td></tr>
+        <tr><td><code>rules/mandates.json</code></td><td>UPI AutoPay per-debit limit for MF, effective dates</td><td>2</td></tr>
+        <tr><td><code>rates/fd_rates.json</code></td><td>Institution, kind, tenure bucket, general/senior rate, effective date, source</td><td>4</td></tr>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="phases">
+      <h2>Phases and slices</h2>
+      <p>Each slice is its own branch from an up-to-date <code>main</code>, passes <code>./gradlew lint test</code> and a manual check of the affected screens, and merges with <code>--no-ff</code> (AGENTS.md). The engine phases line up with plan.html's phases: Phase 1 can start now; Phase 2 is plan Phase 3 (goals, leeway, tax); Phase 3 is plan Phase 4 (rules engine, alerts).</p>
+
+      <div class="phase">
+        <h3>Phase 0 · Decide and clean up <span class="id">no engine code</span></h3>
+        <ol>
+          <li><code>docs/invest-engine-decisions</code>: record D-1 to D-6 in plan.html (Decisions, Investments, Insights &amp; AI, Open items). Update invest-plan.md §1, which is out of date.</li>
+          <li><code>fix/schema-12-export</code>: export <code>app/schemas/…/12.json</code>.</li>
+          <li><code>feature/invest-policy-prefs</code>: replace <code>DRIFT_ALERT_POINTS</code> and <code>CONCENTRATION_LIMIT_PERCENT</code> with IPS defaults read from prefs (no Room yet); editable in Settings.</li>
+          <li><code>feature/tax-data-2026</code>: move <code>ELSS_LOCK_YEARS</code> into <code>tax/elss.json</code>; add the 2026-27 capital-gains entry <strong>only after</strong> verifying the facts in <a href="#verify">Facts to verify</a>. Tests prove existing results are unchanged.</li>
+        </ol>
+        <p><strong>Exit:</strong> decisions recorded; no thresholds or tax figures left as code constants.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 1 · Advisor v1, no schema change <span class="id">19 opportunities</span></h3>
+        <ol>
+          <li><code>feature/advice-engine</code>: <code>core/invest/advice</code> types, scoring, policy filter, <code>opportunities()</code>. Move <code>maturityLadder</code> and <code>requiredMonthlyContribution</code> into <code>core</code>. Compute valuations and tax previews once per snapshot.</li>
+          <li><code>feature/advice-rules-tax</code>: T1, T2, T3, T4, T6 (as a cost), T7, T8.</li>
+          <li><code>feature/advice-rules-portfolio</code>: C5 (basic), C6, C8, C9, A1, A3, K4.</li>
+          <li><code>feature/advice-rules-deposits-hygiene</code>: F1, F2, D1, D2, D3.</li>
+          <li><code>feature/advice-ui</code>: mockup, then <code>OpportunityCard</code> and others in <code>ui/components</code>; Opportunities module and detail sheet; Snooze/Dismiss kept for the session only (persisted in Phase 2); "Do it" deep-links to the platform and opens the existing buy/sell/order/deposit forms prefilled.</li>
+        </ol>
+        <p><strong>Exit:</strong> every Phase 1 rule has positive and negative fixtures; the Invest tab shows ranked opportunities from real data; no alert is sent yet.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 2 · Memory and goals <span class="id">Room v13 · with plan Phase 3</span></h3>
+        <ol>
+          <li><code>feature/goals-table</code>: <code>goal</code> table and migration; the two profile flags become goal rows; editable assumed return replaces the hard-coded 12%; <code>SipPlanEntity.goalId</code> gets a real target.</li>
+          <li><code>feature/investable-x</code>: C1 from 2–3 months of tagged postings (closes plan.html open item at line 712); C2 gap; C5 with goal rows.</li>
+          <li><code>feature/invest-policy</code>: <code>investment_policy</code> table, signing, cooling-off, version history.</li>
+          <li><code>feature/advice-memory</code>: <code>opportunity</code>, <code>decision_journal</code>, <code>scan_run</code> tables; dedupe by key; persisted snooze, dismiss and mute; paper mode; journal outcome jobs.</li>
+          <li><code>feature/advice-rules-goals</code>: C3, C4, C7 (adds slab rate to profile), A2, T5.</li>
+          <li><code>feature/institutions</code>: institution on accounts and FDs; F3, F5, F6, F7 (bonds on the ladder).</li>
+          <li><code>feature/investment-reasons</code>: reason fields on the trade forms; D4; T2-tier approvals require one.</li>
+        </ol>
+        <p><strong>Exit:</strong> the monthly "invest ₹X, here" answer exists; every proposal and decision is journalled; IPS changes are versioned.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 3 · The daily loop <span class="id">with plan Phase 4</span></h3>
+        <ol>
+          <li><code>feature/advice-worker</code>: daily <code>AdviceWorker</code> (07:00, <em>default</em>), chained after <code>PriceWorker</code>; writes <code>scan_run</code>; runs self-test fixtures; kill switch with auto-trip.</li>
+          <li><code>feature/notifications</code>: channel, <code>POST_NOTIFICATIONS</code> request at first Deadline-class item, budget enforcement, mute after 3 dismissals; D6.</li>
+          <li><code>feature/weekly-digest</code>: Sunday digest (template text), which becomes the rules-only P19 weekly summary.</li>
+          <li><code>feature/invest-widget</code>: Glance widget showing the top opportunity and "Scanned …".</li>
+          <li><code>feature/fresh-price-gate</code>: D3 forced refresh when a sell or rebalance card opens.</li>
+        </ol>
+        <p><strong>Exit:</strong> 8 weeks in paper mode with ≥ 6 scans a week, no alert-budget breaches and the journal populated; then paper mode is switched off by you.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 4 · Universe and narration <span class="id">new data sources, each by decision</span></h3>
+        <ol>
+          <li><code>feature/instrument-master</code>: keep the AMFI scheme rows the price download already parses (scheme code, plan, option, name, ISINs) in an <code>instrument</code> table; add <code>holding.schemeCode</code>; find each Regular plan's Direct twin.</li>
+          <li><code>feature/ter-data</code>: a TER source (AMFI TER disclosure or a curated versioned file), refreshed monthly; K1, K2, K3.</li>
+          <li><code>feature/categories</code>: scheme category and stock sector; A4, A6.</li>
+          <li><code>feature/nav-history</code>: daily NAVs for held schemes (AMFI, or mfapi.in as a fallback) for journal outcomes; optional daily price refresh.</li>
+          <li><code>feature/fd-rates</code>: curated <code>rates/fd_rates.json</code>; F4 and the F1 comparison.</li>
+          <li><code>feature/ai-narration</code>: P19 narration with payload preview and number validator.</li>
+        </ol>
+        <p><strong>Exit:</strong> cost rules run on real TER data; every new source shows failures on the Prices screen, never hiding behind old data.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 5 · Add-ons by explicit decision only</h3>
+        <ul>
+          <li><code>feature/cas-import</code>: CAS PDF parsing on device; D5 (already plan Phase 5).</li>
+          <li><code>feature/broker-read</code>: read-only holdings; E4.</li>
+          <li><code>feature/gtt-watchlist</code>: GTT records and watchlist; E1, E2.</li>
+          <li><code>feature/exchange-events</code>: RSS events for holdings, daily on device first; E3. A personal cron backend with FCM only if intraday timing ever matters (reverses D-6).</li>
+          <li><code>feature/fund-overlap</code>: once a portfolio-disclosure source exists; A5.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="testing">
+      <h2>Testing</h2>
+      <ul>
+        <li><strong>Per rule:</strong> a positive fixture (fires with the exact paise amount), a negative fixture (stays silent), and edge cases: the day before and after the threshold, 31 March, leap years, lots exactly 12 months old, locked ELSS units, unpriced holdings, stale prices.</li>
+        <li><strong>Invariants</strong> (property tests over generated portfolios): no proposal breaches the IPS; every proposed action books as a balanced entry; benefits, costs and amounts are <code>Paise</code>; nothing reads floats except display ratios; the same inputs always give the same output.</li>
+        <li><strong>Tax:</strong> T1, T2 and T8 against hand-worked cases for both 2018 and 2024 rule sets; changing the data file changes the answer without code changes.</li>
+        <li><strong>Persistence:</strong> <code>MigrationTest</code> for each schema step; journal and scan log reject updates and deletes.</li>
+        <li><strong>Worker:</strong> <code>AdviceWorker</code> under the WorkManager test harness: it writes <code>scan_run</code>, respects the kill switch and alert budget, and fires D6 when the self-test fails.</li>
+        <li><strong>UI:</strong> Compose tests for the card, detail sheet and inbox; screenshots in light and dark.</li>
+        <li><strong>Forward test:</strong> the 8-week paper period is the acceptance test for Phase 3.</li>
+      </ul>
+    </section>
+
+    <section id="verify">
+      <h2>Facts to verify before they reach code</h2>
+      <p>Much of the research came from search summaries because direct fetches were blocked. These need checking against primary texts:</p>
+      <div class="table-wrap"><table>
+        <tr><th>Fact</th><th>Used by</th><th>Primary source</th></tr>
+        <tr><td>Income-tax Act 2025 section numbers (s.196, s.198, s.123, s.76(5)(b))</td><td>T1–T6, tax data</td><td>The Act text</td></tr>
+        <tr><td>Home of the 31 Jan 2018 grandfathering rule under the new Act</td><td>T7</td><td>The Act text</td></tr>
+        <tr><td>Specified-MF (debt fund) definition effective date: 1 Apr 2025 or 1 Apr 2026</td><td>T6</td><td>Finance Acts</td></tr>
+        <tr><td>Capital-loss set-off and carry-forward rules; anti-sham position on harvesting</td><td>T2, T8</td><td>Act, CBDT</td></tr>
+        <tr><td>Delivery STT and stamp duty rates</td><td>Costs in A1, K1, T1</td><td>Finance Act, Stamp Act</td></tr>
+        <tr><td>DICGC limit ₹5L per depositor per bank</td><td>F3</td><td>dicgc.org.in</td></tr>
+        <tr><td>UPI AutoPay ₹1L per MF debit</td><td>C4</td><td>NPCI circular</td></tr>
+        <tr><td>FD TDS threshold for the current year</td><td>F6</td><td>Act / Budget</td></tr>
+        <tr><td>NSE terms for the archive host used by the bhavcopy download</td><td>Existing price download</td><td>nseindia.com terms</td></tr>
+        <tr><td>AMFI NAVAll.txt and TER data reuse terms</td><td>Phase 4</td><td>amfiindia.com</td></tr>
+        <tr><td>SPIVA persistence tables; ELSS and mid/small 3–10 year figures</td><td>K2 copy</td><td>S&amp;P DJI</td></tr>
+        <tr><td>Kite Connect data price (₹500 vs ₹2,000/month), if broker prices are ever used</td><td>Phase 5</td><td>Zerodha charges page</td></tr>
+        <tr><td>SEBI algo threshold wording (≥10 or &gt;10 orders/s)</td><td>Only if orders are ever placed</td><td>NSE circular</td></tr>
+      </table></div>
+    </section>
+
+    <section id="risks">
+      <h2>Risks</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Risk</th><th>Mitigation</th></tr>
+        <tr><td>Wrong tax figure produces a confident but wrong rupee number</td><td>Versioned data, the verification list, hand-worked tests, "estimate" labels, no cess or surcharge claims</td></tr>
+        <tr><td>Silent no-op scanner (Betterment)</td><td><code>scan_run</code>, self-test fixtures, D6, liveness badge</td></tr>
+        <tr><td>Engine drives over-trading</td><td>Turnover cap, minimum holding, materiality floor, alert budget, X6</td></tr>
+        <tr><td>Acting on stale or suspicious prices</td><td>D3 gate; badges on every input</td></tr>
+        <tr><td>Alert fatigue makes deadline alerts ignored</td><td>Three classes, budget, mute after 3 dismissals, digest-first</td></tr>
+        <tr><td>Android kills the daily job</td><td>Widget exemption; the engine also runs when the Invest tab opens; D6 when a run is missed</td></tr>
+        <tr><td>NSE terms on automated download</td><td>Keep the existing weekly cadence; never increase it; never share NSE-derived data; verify terms</td></tr>
+        <tr><td>A data source changes format</td><td>Failures shown on the Prices screen; source URLs as settings; parsers covered by tests</td></tr>
+        <tr><td>Scope creep into advising others</td><td>D-1; no sharing or export of proposals as recommendations</td></tr>
+        <tr><td>Contribution gap dwarfs every optimisation</td><td>Phase 2 prioritises C1/C2; the digest leads with them</td></tr>
+      </table></div>
+    </section>
+
+    <section id="open">
+      <h2>Open questions for you</h2>
+      <ol>
+        <li><strong>Scope:</strong> accept D-1 (suggest-and-record, no order placement)? Recommended: yes.</li>
+        <li><strong>Slab rate:</strong> add your marginal slab to the profile (needed for C7, T6, F4)?</li>
+        <li><strong>Network:</strong> which Phase 4 sources to allow (AMFI scheme master, TER data, FD rates)? Recommended: AMFI scheme master first, because the file is already downloaded.</li>
+        <li><strong>Stock prices:</strong> keep the NSE bhavcopy download, or move to a broker data feed (about ₹500/month at Zerodha, unverified)?</li>
+        <li><strong>AI narration:</strong> want it at all, or keep template text only?</li>
+        <li><strong>Defaults:</strong> are the proposed defaults (semi-annual check, ₹500 floor, 20% turnover cap, 25% sector cap, 8 weeks paper) right for you?</li>
+        <li><strong>Order:</strong> start Phase 1 now, before plan Phase 3 (goals, leeway), or build goals first? Recommended: Phase 1 now; it needs no schema change and proves the engine.</li>
+      </ol>
+    </section>
+  </main>
+</div>
+</body>
+</html>

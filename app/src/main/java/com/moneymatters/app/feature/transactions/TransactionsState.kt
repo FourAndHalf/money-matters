@@ -39,7 +39,7 @@ data class TransactionSummary(
 )
 
 @Immutable
-data class DayGroup(val dateLabel: String, val items: List<TransactionSummary>) {
+data class DayGroup(val dateLabel: String, val items: List<TransactionSummary>, val date: java.time.LocalDate? = null) {
     val total: Paise get() = items.filterNot { it.isTransfer }.fold(Paise.Zero) { acc, t -> acc + t.amount }
 }
 
