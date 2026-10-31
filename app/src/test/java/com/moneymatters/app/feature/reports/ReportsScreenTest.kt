@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.moneymatters.app.core.budget.DateRange
 import com.moneymatters.app.core.ledger.AccountEntity
@@ -89,6 +90,28 @@ class ReportsScreenTest {
         compose.onNodeWithText("Tax year").performClick()
         compose.onNodeWithText("Tax year 2026–27").assertIsDisplayed()
         compose.onNodeWithText("Total income").assertIsDisplayed()
+    }
+
+    @Test fun `the cash flow statement shows opening, the categories and closing`() {
+        show()
+        compose.onNodeWithText("Cash flow").performClick()
+        compose.onNodeWithText("Cash at the start").assertIsDisplayed()
+        compose.onNodeWithText("Net change in cash").assertIsDisplayed()
+        compose.onNodeWithText("Cash at the end").assertIsDisplayed()
+    }
+
+    @Test fun `the spending view ranks categories and shows the trend`() {
+        show()
+        compose.onNodeWithText("Spending").performScrollTo().performClick() // the last pill sits past the edge of a narrow phone
+        compose.onNodeWithText("By category").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Last 6 months").performScrollTo().assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/reports_spending.png")
+    }
+
+    @Test fun `export offers a CSV of the report and a Beancount of the ledger`() {
+        show()
+        compose.onNodeWithText("This report as CSV").assertIsDisplayed()
+        compose.onNodeWithText("Whole ledger as Beancount").assertIsDisplayed()
     }
 
     @Test fun `the range label reads naturally`() {
