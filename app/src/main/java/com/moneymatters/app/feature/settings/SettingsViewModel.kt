@@ -234,6 +234,14 @@ class SettingsViewModel(
         viewModelScope.launch { repo.setInNetWorth(id, inNetWorth) }
     }
 
+    fun setLiquidityTier(id: String, tier: com.moneymatters.app.core.ledger.LiquidityTier?) {
+        viewModelScope.launch { repo.setLiquidityTier(id, tier) }
+    }
+
+    fun setGoal(id: String, goal: com.moneymatters.app.core.ledger.AccountGoal?) {
+        viewModelScope.launch { repo.setGoal(id, goal) }
+    }
+
     fun setPinned(id: String, pinned: Boolean) {
         viewModelScope.launch { repo.setPinned(id, pinned) }
     }

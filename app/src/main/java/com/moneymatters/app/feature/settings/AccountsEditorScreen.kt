@@ -22,7 +22,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymatters.app.core.ledger.AccountEntity
+import com.moneymatters.app.core.ledger.AccountGoal
 import com.moneymatters.app.core.ledger.AccountType
+import com.moneymatters.app.core.ledger.LiquidityTier
+import com.moneymatters.app.core.ledger.effectiveTier
+import com.moneymatters.app.core.ledger.label
+import com.moneymatters.app.core.ledger.moneyMap
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.moneymatters.app.core.money.formatInr
+import com.moneymatters.app.ui.components.KeyValueRow
 import com.moneymatters.app.feature.books.displayName
 import com.moneymatters.app.ui.components.ConfirmDialog
 import com.moneymatters.app.ui.components.DetailTopBar
@@ -104,6 +113,9 @@ fun AccountsEditorScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             deleteError?.let { message ->
                 item("delete-error") { Text(message, style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.negative) }
             }
+            snapshot?.let { snap ->
+                item("sits") { MoneySitsModule(moneyMap(snap)) }
+            }
             item("list") {
                 Module {
                     ModuleHeader("Every account and category")
@@ -135,7 +147,8 @@ private fun AccountRow(
     onDelete: () -> Unit,
 ) {
     if (isEditing) {
-        CategoryEditor(account, viewModel, divider, onClose = { onEdit(false) })
+        if (account.type == AccountType.Asset) AssetEditor(account, viewModel, divider, onClose = { onEdit(false) })
+        else CategoryEditor(account, viewModel, divider, onClose = { onEdit(false) })
         return
     }
     Column {
@@ -144,7 +157,9 @@ private fun AccountRow(
             subtitle = account.type.name +
                 (if (isEssential) " · essential" else "") +
                 (if (account.isArchived) " · archived" else "") +
-                (if (!account.inNetWorth) " · not in net worth" else ""),
+                (if (!account.inNetWorth) " · not in net worth" else "") +
+                (effectiveTier(account)?.let { " · ${it.label()}" } ?: "") +
+                (account.goal?.let { " · ${it.label()}" } ?: ""),
             divider = false,
             trailing = {
                 if (account.type == AccountType.Expense) {
@@ -168,6 +183,9 @@ private fun AccountRow(
         ) {
             if (account.type == AccountType.Expense) {
                 Pill("Edit", onClick = { onEdit(true) }, height = 28.dp)
+            }
+            if (account.type == AccountType.Asset) {
+                Pill("Liquidity & goal", onClick = { onEdit(true) }, height = 28.dp)
             }
             Pill(
                 if (account.isArchived) "Unarchive" else "Archive",
@@ -197,5 +215,45 @@ private fun CategoryEditor(account: AccountEntity, viewModel: SettingsViewModel,
             Pill("Cancel", onClick = onClose, height = 28.dp)
         }
         if (divider) RowDivider()
+    }
+}
+
+/** Chooses how liquid an asset is and which goal its balance counts towards. */
+@Composable
+private fun AssetEditor(account: AccountEntity, viewModel: SettingsViewModel, divider: Boolean, onClose: () -> Unit) {
+    Column(Modifier.padding(top = 10.dp)) {
+        Text(account.displayName(), style = MoneyTheme.type.bodyLg, color = MoneyTheme.colors.ink)
+        Text("Liquidity", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 10.dp))
+        Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Automatic", { viewModel.setLiquidityTier(account.id, null) }, style = if (account.liquidityTier == null) PillStyle.Primary else PillStyle.Secondary, height = 28.dp)
+            LiquidityTier.entries.forEach { t ->
+                Pill(t.label(), { viewModel.setLiquidityTier(account.id, t) }, style = if (account.liquidityTier == t) PillStyle.Primary else PillStyle.Secondary, height = 28.dp)
+            }
+        }
+        Text(
+            "Automatic is ${effectiveTier(account)?.label()} for this kind of account. Cash is spendable now, Deposits can be broken, Markets can be sold, Locked can't be reached soon (like EPF).",
+            style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 6.dp),
+        )
+        Text("Counts towards", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 10.dp))
+        Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("No goal", { viewModel.setGoal(account.id, null) }, style = if (account.goal == null) PillStyle.Primary else PillStyle.Secondary, height = 28.dp)
+            AccountGoal.entries.forEach { g ->
+                Pill(g.label(), { viewModel.setGoal(account.id, g) }, style = if (account.goal == g) PillStyle.Primary else PillStyle.Secondary, height = 28.dp)
+            }
+        }
+        Pill("Done", onClose, style = PillStyle.Primary, height = 28.dp, modifier = Modifier.padding(vertical = 10.dp))
+        if (divider) RowDivider()
+    }
+}
+
+/** Your assets by how liquid they are and by goal, at book value. */
+@Composable
+internal fun MoneySitsModule(map: com.moneymatters.app.core.ledger.MoneyMap) {
+    Module {
+        ModuleHeader("Where your money sits", subtitle = "At book value")
+        LiquidityTier.entries.forEachIndexed { i, t -> KeyValueRow(t.label(), (map.byTier[t] ?: com.moneymatters.app.core.money.Paise.Zero).formatInr(), divider = i < LiquidityTier.entries.lastIndex) }
+        Text("Towards goals", style = MoneyTheme.type.labelUppercase, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 14.dp))
+        AccountGoal.entries.forEach { g -> KeyValueRow(g.label(), (map.byGoal[g] ?: com.moneymatters.app.core.money.Paise.Zero).formatInr()) }
+        KeyValueRow("Not counted towards a goal", map.unassigned.formatInr(), divider = false)
     }
 }

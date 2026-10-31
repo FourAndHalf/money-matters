@@ -8,6 +8,14 @@ import com.moneymatters.app.core.invest.depositValuation
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.ClosedPeriodEntity
 import com.moneymatters.app.core.ledger.LedgerSnapshot
+import com.moneymatters.app.core.ledger.SUSPENSE_ACCOUNT
+import com.moneymatters.app.core.loan.LoanEntity
+import com.moneymatters.app.core.loan.LoanPaymentEntity
+import com.moneymatters.app.core.loan.livePayments
+import com.moneymatters.app.core.loan.nextDue
+import com.moneymatters.app.core.loan.owedOn
+import com.moneymatters.app.core.recurring.RecurringRuleEntity
+import com.moneymatters.app.core.recurring.dueDates
 import com.moneymatters.app.core.ledger.TransactionStatus
 import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.core.money.formatInr
@@ -53,13 +61,27 @@ fun nextPeriodToClose(ledger: LedgerSnapshot, today: LocalDate, monthStartDay: I
 }
 
 /** What to do about a failing checklist item; the screen turns each into a button or a link. */
-enum class CheckFix { None, Prices, Interest, Drafts, Confirm, Reconcile }
+enum class CheckFix { None, Prices, Interest, Drafts, Confirm, Reconcile, Recurring, Units }
 
 data class CheckItem(val title: String, val ok: Boolean, val detail: String, val fix: CheckFix = CheckFix.None)
 
 data class Checklist(val items: List<CheckItem>) {
     val canClose: Boolean get() = items.all { it.ok }
 }
+
+/**
+ * What the newer checklist items need beyond the ledger and holdings. Every field defaults to "nothing there", so a book
+ * with no recurring rules, loans or pending orders passes those items, and [unitsConfirmed] is true unless the screen says otherwise.
+ */
+data class ChecklistExtras(
+    val recurringRules: List<RecurringRuleEntity> = emptyList(),
+    val loans: List<LoanEntity> = emptyList(),
+    val loanPayments: List<LoanPaymentEntity> = emptyList(),
+    val unitsConfirmed: Boolean = true,
+)
+
+/** How long an order may wait In Transit at the end of a month before it counts as stale. */
+const val STALE_IN_TRANSIT_DAYS = 7L
 
 /** A real-world account the investor confirms against their statement before the month closes. */
 data class BalanceLine(val accountId: String, val name: String, val balance: Paise)
@@ -115,7 +137,7 @@ private fun isUsable(price: com.moneymatters.app.core.invest.PriceEntity?, end: 
  * The close checklist for [period], live from the same snapshots as the rest of the app (plan.html → P17).
  * [confirmed] holds the accounts whose balance the investor has confirmed in this session.
  */
-fun buildChecklist(ledger: LedgerSnapshot, invest: InvestSnapshot, period: Period, today: LocalDate, confirmed: Set<String>): Checklist {
+fun buildChecklist(ledger: LedgerSnapshot, invest: InvestSnapshot, period: Period, today: LocalDate, confirmed: Set<String>, extras: ChecklistExtras = ChecklistExtras()): Checklist {
     val items = mutableListOf<CheckItem>()
     items += CheckItem("Month has ended", today.isAfter(period.end), if (today.isAfter(period.end)) "${period.label} is over" else "Closes after ${period.end}")
 
@@ -125,7 +147,39 @@ fun buildChecklist(ledger: LedgerSnapshot, invest: InvestSnapshot, period: Perio
     val drafts = ledger.transactions.count { it.status == TransactionStatus.Draft && LocalDate.parse(it.date) in period }
     items += CheckItem("No drafts", drafts == 0, if (drafts == 0) "Every entry is booked" else "$drafts drafts to post or delete", if (drafts == 0) CheckFix.None else CheckFix.Drafts)
 
+    val suspense = ledger.accounts.filter { it.name == SUSPENSE_ACCOUNT }.map { it.id }.toSet()
+    val inSuspense = bookedIn(ledger, period).count { t -> ledger.postings.any { it.transactionId == t.id && it.accountId in suspense } }
+    items += CheckItem(
+        "Nothing in suspense", inSuspense == 0,
+        if (inSuspense == 0) "Every entry has a category" else "$inSuspense ${if (inSuspense == 1) "entry is" else "entries are"} uncategorized: give them a category in Transactions",
+    )
+
+    val recurringDue = extras.recurringRules.filter { it.isActive }.sumOf { it.dueDates(minOf(period.end, today)).size }
+    items += CheckItem(
+        "Recurring entries booked", recurringDue == 0,
+        if (recurringDue == 0) "Everything due this month is in the books" else "$recurringDue recurring ${if (recurringDue == 1) "entry is" else "entries are"} due and not booked yet",
+        if (recurringDue == 0) CheckFix.None else CheckFix.Recurring,
+    )
+
+    val liveByLoan = extras.loanPayments.let { all -> livePayments(all, ledger.transactions.map { it.id }.toSet()).groupBy { it.loanAccountId } }
+    val unpaidLoans = extras.loans.filter { owedOn(ledger, it.accountId).value > 0 && nextDue(it, liveByLoan[it.accountId].orEmpty()) <= period.end }
+    items += CheckItem(
+        "Loan EMIs paid", unpaidLoans.isEmpty(),
+        if (unpaidLoans.isEmpty()) "No EMI is waiting" else "${unpaidLoans.size} ${if (unpaidLoans.size == 1) "loan has an EMI" else "loans have EMIs"} due: pay in More > Loans",
+    )
+
+    val staleOrders = invest.pending.filter { it.isOpen && !LocalDate.parse(it.orderDate).isAfter(period.end.minusDays(STALE_IN_TRANSIT_DAYS)) }
+    items += CheckItem(
+        "In Transit is clear", staleOrders.isEmpty(),
+        if (staleOrders.isEmpty()) "No order is waiting too long for its units" else "${staleOrders.size} ${if (staleOrders.size == 1) "order has" else "orders have"} waited over $STALE_IN_TRANSIT_DAYS days: allot or cancel on the Invest tab",
+    )
+
     val held = heldWithPrice(ledger, invest, period.end)
+    if (held.isNotEmpty()) items += CheckItem(
+        "Holding units checked", extras.unitsConfirmed,
+        if (extras.unitsConfirmed) "Units checked against your broker or CAS statement" else "Check ${held.size} ${if (held.size == 1) "holding's" else "holdings'"} units against your broker or CAS statement",
+        if (extras.unitsConfirmed) CheckFix.None else CheckFix.Units,
+    )
     val unpriced = held.filter { !isUsable(it.third, period.end) }
     items += CheckItem(
         "Holdings priced", unpriced.isEmpty(),

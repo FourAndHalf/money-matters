@@ -33,8 +33,12 @@ import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.core.invest.PriceSourcePrefs
 import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.PriceWorker
+import com.moneymatters.app.core.budget.BudgetRepository
 import com.moneymatters.app.core.ledger.LedgerDatabaseProvider
+import com.moneymatters.app.core.loan.LoanRepository
 import com.moneymatters.app.core.ledger.LedgerRepository
+import com.moneymatters.app.core.reconcile.ReconcileRepository
+import com.moneymatters.app.core.recurring.RecurringRepository
 import com.moneymatters.app.core.profile.ProfileStore
 import com.moneymatters.app.core.security.BiometricUnlock
 import com.moneymatters.app.core.security.PasscodeStore
@@ -51,8 +55,13 @@ import com.moneymatters.app.feature.lock.LockScreen
 import com.moneymatters.app.feature.onboarding.OnboardingSaver
 import com.moneymatters.app.feature.onboarding.OnboardingScreen
 import com.moneymatters.app.feature.onboarding.OnboardingWizard
+import com.moneymatters.app.feature.budgets.BudgetsViewModel
 import com.moneymatters.app.feature.quickadd.QuickAddPrefs
 import com.moneymatters.app.feature.quickadd.QuickAddViewModel
+import com.moneymatters.app.feature.reconcile.ReconcileViewModel
+import com.moneymatters.app.feature.loans.LoansViewModel
+import com.moneymatters.app.feature.recurring.RecurringViewModel
+import com.moneymatters.app.feature.reports.ReportsViewModel
 import com.moneymatters.app.feature.settings.AiSettingsStore
 import com.moneymatters.app.feature.settings.SettingsPrefs
 import com.moneymatters.app.feature.settings.SettingsViewModel
@@ -62,6 +71,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -97,9 +108,28 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private val recurringRepo by lazy { RecurringRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo) }
+    private val recurringModel: RecurringViewModel by viewModels {
+        viewModelFactory { initializer { RecurringViewModel(recurringRepo, ledgerRepo) } }
+    }
+    private val budgetsModel: BudgetsViewModel by viewModels {
+        viewModelFactory { initializer { BudgetsViewModel(BudgetRepository(LedgerDatabaseProvider.get(applicationContext)), ledgerRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) } }
+    }
+    private val reconcileModel: ReconcileViewModel by viewModels {
+        viewModelFactory { initializer { ReconcileViewModel(ledgerRepo, ReconcileRepository(ledgerRepo)) } }
+    }
+    private val reportsModel: ReportsViewModel by viewModels {
+        viewModelFactory { initializer { ReportsViewModel(ledgerRepo, monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) } }
+    }
+    private val loansModel: LoansViewModel by viewModels {
+        viewModelFactory { initializer { LoansViewModel(LoanRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), ledgerRepo) } }
+    }
     private val closeModel: CloseViewModel by viewModels {
         viewModelFactory {
-            initializer { CloseViewModel(ledgerRepo, investRepo, CloseRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) }
+            initializer { CloseViewModel(
+                    ledgerRepo, investRepo, CloseRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 },
+                    recurring = recurringRepo, loans = LoanRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), budgets = BudgetRepository(LedgerDatabaseProvider.get(applicationContext)),
+                ) }
         }
     }
     private val appLock: AppLock by viewModels {
@@ -135,6 +165,20 @@ class MainActivity : ComponentActivity() {
 
         // A widget button's intent; a recreation after rotation must not replay it.
         if (savedInstanceState == null) launchTarget = LaunchTarget.from(intent)
+        // Books recurring entries that have come due each time the app comes to the front, once the books exist.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // A failure here must never stop the app opening; the rollback leaves the books untouched and the next open tries again.
+                if (profiles.isSetupComplete()) {
+                    try {
+                        recurringRepo.generateDue(LocalDate.now())
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
         // Keeps the home-screen widget's figures current while the app is open.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -201,7 +245,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel, budgets = budgetsModel, reconcile = reconcileModel, reports = reportsModel, loans = loansModel) }
                     }
                 }
             }

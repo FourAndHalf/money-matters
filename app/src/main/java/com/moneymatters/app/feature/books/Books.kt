@@ -9,6 +9,7 @@ import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.AuditLogEntity
 import com.moneymatters.app.core.ledger.LedgerSnapshot
+import com.moneymatters.app.core.ledger.SUSPENSE_ACCOUNT
 import com.moneymatters.app.core.ledger.PaymentMethod
 import com.moneymatters.app.core.ledger.PostingEntity
 import com.moneymatters.app.core.ledger.TransactionEntity
@@ -230,7 +231,7 @@ fun buildBooks(
         compareByDescending<TransactionEntity> { it.date }.thenByDescending { firstAuditMillis(auditByTxn[it.id]) },
     )
     val dayGroups = newestFirst.groupBy { it.date }.map { (date, txns) ->
-        DayGroup(dateLabel(LocalDate.parse(date)), txns.map { summaries.getValue(it.id) })
+        DayGroup(dateLabel(LocalDate.parse(date)), txns.map { summaries.getValue(it.id) }, LocalDate.parse(date))
     }
     val transactionsState = TransactionsState(dayGroups, accounts = realAccounts.map { it.name }.sorted())
 
@@ -325,9 +326,6 @@ private fun summarize(t: TransactionEntity, postings: List<PostingEntity>, accou
         isTransfer = isTransfer,
     )
 }
-
-/** Where uncategorized money waits (P06's suspense inbox). */
-const val SUSPENSE_ACCOUNT = "Suspense"
 
 private fun chipFor(payee: String) = payee.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "·"
 

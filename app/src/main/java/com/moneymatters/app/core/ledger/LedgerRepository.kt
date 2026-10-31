@@ -116,6 +116,20 @@ class LedgerRepository(
         dao.updateAccount(account.copy(isPinned = pinned))
     }
 
+    /** Sets how liquid an asset is, or null to go back to working it out from its kind. */
+    suspend fun setLiquidityTier(id: String, tier: LiquidityTier?) {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        require(account.type == AccountType.Asset) { "Only an asset has a liquidity tier" }
+        dao.updateAccount(account.copy(liquidityTier = tier))
+    }
+
+    /** Counts an asset's balance towards a goal, or towards none. */
+    suspend fun setGoal(id: String, goal: AccountGoal?) {
+        val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
+        require(account.type == AccountType.Asset) { "Only an asset can count towards a goal" }
+        dao.updateAccount(account.copy(goal = goal))
+    }
+
     suspend fun unarchiveAccount(id: String) {
         val account = dao.getAccount(id) ?: throw NoSuchElementException("No account with id $id")
         dao.updateAccount(account.copy(isArchived = false))
@@ -137,6 +151,12 @@ class LedgerRepository(
     suspend fun accountIdsIn(transactionId: String): Set<String> = dao.getPostingsForTransaction(transactionId).map { it.accountId }.toSet()
 
     suspend fun transaction(id: String): TransactionEntity? = dao.getTransaction(id)
+
+    /** Every transaction id, for checking that records pointing at entries still point at something. */
+    suspend fun allTransactionIds(): Set<String> = dao.getAllTransactions().map { it.id }.toSet()
+
+    /** An account's name, for labelling the entries made on its behalf. */
+    suspend fun accountName(id: String): String = requireNotNull(dao.getAccount(id)) { "No such account" }.name
 
     /**
      * Removes an account that has nothing posted to it any more, e.g. a deposit or holding whose entries were just deleted.

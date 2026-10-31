@@ -17,15 +17,32 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymatters.app.feature.budgets.BudgetsScreen
+import com.moneymatters.app.feature.budgets.BudgetsViewModel
+import com.moneymatters.app.feature.loans.LoansScreen
+import com.moneymatters.app.feature.loans.LoansViewModel
+import com.moneymatters.app.feature.recurring.RecurringScreen
+import com.moneymatters.app.feature.reports.ReportsScreen
+import com.moneymatters.app.feature.reports.ReportsViewModel
+import com.moneymatters.app.feature.recurring.RecurringViewModel
 import com.moneymatters.app.ui.components.DetailTopBar
 import com.moneymatters.app.ui.components.Module
 import com.moneymatters.app.ui.theme.MoneyTheme
 
-private enum class MoreSection { Backup, AuditLog }
+private enum class MoreSection { Backup, AuditLog, Recurring, Budgets, Reports, Loans }
 
 /** The More tab: things you do with your books (close a month, back up, inspect the log), as opposed to Settings' preferences. */
 @Composable
-fun MoreScreen(viewModel: SettingsViewModel, onClose: () -> Unit, onOpenClose: () -> Unit, modifier: Modifier = Modifier) {
+fun MoreScreen(
+    viewModel: SettingsViewModel,
+    onClose: () -> Unit,
+    onOpenClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    recurring: RecurringViewModel? = null,
+    budgets: BudgetsViewModel? = null,
+    reports: ReportsViewModel? = null,
+    loans: LoansViewModel? = null,
+) {
     var section by rememberSaveable { mutableStateOf<MoreSection?>(null) }
 
     section?.let {
@@ -33,6 +50,10 @@ fun MoreScreen(viewModel: SettingsViewModel, onClose: () -> Unit, onOpenClose: (
         when (it) {
             MoreSection.Backup -> BackupRestoreScreen(viewModel, onBack = { section = null })
             MoreSection.AuditLog -> AuditLogScreen(viewModel, onBack = { section = null })
+            MoreSection.Loans -> if (loans != null) LoansScreen(loans, onBack = { section = null }) else section = null
+            MoreSection.Reports -> if (reports != null) ReportsScreen(reports, onBack = { section = null }) else section = null
+            MoreSection.Budgets -> if (budgets != null) BudgetsScreen(budgets, onBack = { section = null }) else section = null
+            MoreSection.Recurring -> if (recurring != null) RecurringScreen(recurring, onBack = { section = null }) else section = null
         }
         return
     }
@@ -50,6 +71,26 @@ fun MoreScreen(viewModel: SettingsViewModel, onClose: () -> Unit, onOpenClose: (
             item("close") {
                 Module {
                     SettingsRow("Month-end close", "Reconcile, confirm balances and lock a finished month", divider = false, onClick = onOpenClose)
+                }
+            }
+            if (loans != null) item("loans") {
+                Module {
+                    SettingsRow("Loans", "EMI schedules, interest paid, paying an EMI or prepaying", divider = false) { section = MoreSection.Loans }
+                }
+            }
+            if (reports != null) item("reports") {
+                Module {
+                    SettingsRow("Reports", "Income statement, balance sheet and trial balance", divider = false) { section = MoreSection.Reports }
+                }
+            }
+            if (budgets != null) item("budgets") {
+                Module {
+                    SettingsRow("Budgets", "Spending against each category's budget, with pace", divider = false) { section = MoreSection.Budgets }
+                }
+            }
+            if (recurring != null) item("recurring") {
+                Module {
+                    SettingsRow("Recurring entries", "Salary, rent, EMIs and subscriptions, booked on their dates", divider = false) { section = MoreSection.Recurring }
                 }
             }
             item("backup") {
