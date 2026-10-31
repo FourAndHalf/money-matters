@@ -43,6 +43,8 @@ fun CloseScreen(
     onOpenPrices: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onBookRecurring: () -> Unit = {},
+    onConfirmUnits: () -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -73,6 +75,8 @@ fun CloseScreen(
                                             CheckFix.Interest -> Pill("Post", onPostInterest, height = 26.dp)
                                             CheckFix.Reconcile -> Pill("Reconcile", onReconcile, height = 26.dp)
                                             CheckFix.Confirm -> Pill("Confirm all", onConfirmAll, height = 26.dp)
+                                            CheckFix.Recurring -> Pill("Book now", onBookRecurring, height = 26.dp)
+                                            CheckFix.Units -> Pill("Confirm", onConfirmUnits, height = 26.dp)
                                             CheckFix.Drafts, CheckFix.None -> Unit
                                         }
                                         if (item.ok) StatusBadge("✓ Done", Tone.Positive) else StatusBadge("✕ To do", Tone.Warning)
@@ -82,6 +86,7 @@ fun CloseScreen(
                         }
                     }
                 }
+                state.report?.let { report -> item("report") { MonthEndReportModule(report) } }
                 if (state.balances.isNotEmpty()) {
                     item("balances") {
                         Module {

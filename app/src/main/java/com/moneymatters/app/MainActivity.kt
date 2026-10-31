@@ -126,7 +126,10 @@ class MainActivity : ComponentActivity() {
     }
     private val closeModel: CloseViewModel by viewModels {
         viewModelFactory {
-            initializer { CloseViewModel(ledgerRepo, investRepo, CloseRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 }) }
+            initializer { CloseViewModel(
+                    ledgerRepo, investRepo, CloseRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), monthStartDay = { profiles.profile()?.monthStartDay ?: 1 },
+                    recurring = recurringRepo, loans = LoanRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), budgets = BudgetRepository(LedgerDatabaseProvider.get(applicationContext)),
+                ) }
         }
     }
     private val appLock: AppLock by viewModels {

@@ -9,6 +9,7 @@ import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.AuditLogEntity
 import com.moneymatters.app.core.ledger.LedgerSnapshot
+import com.moneymatters.app.core.ledger.SUSPENSE_ACCOUNT
 import com.moneymatters.app.core.ledger.PaymentMethod
 import com.moneymatters.app.core.ledger.PostingEntity
 import com.moneymatters.app.core.ledger.TransactionEntity
@@ -325,9 +326,6 @@ private fun summarize(t: TransactionEntity, postings: List<PostingEntity>, accou
         isTransfer = isTransfer,
     )
 }
-
-/** Where uncategorized money waits (P06's suspense inbox). */
-const val SUSPENSE_ACCOUNT = "Suspense"
 
 private fun chipFor(payee: String) = payee.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "·"
 

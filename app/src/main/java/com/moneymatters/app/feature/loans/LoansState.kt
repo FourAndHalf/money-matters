@@ -1,11 +1,11 @@
 package com.moneymatters.app.feature.loans
 
 import com.moneymatters.app.core.ledger.LedgerSnapshot
-import com.moneymatters.app.core.ledger.TransactionStatus
 import com.moneymatters.app.core.loan.Instalment
 import com.moneymatters.app.core.loan.LoanEntity
 import com.moneymatters.app.core.loan.LoanPaymentEntity
 import com.moneymatters.app.core.loan.livePayments
+import com.moneymatters.app.core.loan.owedOn
 import com.moneymatters.app.core.loan.nextDue
 import com.moneymatters.app.core.loan.payoff
 import com.moneymatters.app.core.loan.schedule
@@ -43,12 +43,6 @@ data class LoanDetail(val row: LoanRow, val schedule: List<Instalment>, val hist
 data class LoansState(val rows: List<LoanRow>, val details: Map<String, LoanDetail>) {
     val totalOutstanding: Paise get() = Paise(rows.sumOf { it.outstanding.value })
     val totalEmi: Paise get() = Paise(rows.filter { !it.isCleared }.sumOf { it.emi.value })
-}
-
-/** What is owed on a liability account now: credits less debits of booked entries. */
-fun owedOn(ledger: LedgerSnapshot, accountId: String): Paise {
-    val booked = ledger.transactions.filter { it.status != TransactionStatus.Draft }.map { it.id }.toSet()
-    return Paise(ledger.postings.filter { it.accountId == accountId && it.transactionId in booked }.sumOf { (it.creditPaise ?: 0L) - (it.debitPaise ?: 0L) })
 }
 
 fun buildLoans(loans: List<LoanEntity>, payments: List<LoanPaymentEntity>, ledger: LedgerSnapshot): LoansState {

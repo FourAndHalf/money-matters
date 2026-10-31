@@ -304,6 +304,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         onPostInterest = closeModel::postInterest,
                         onOpenPrices = { showClose = false; showMore = false; showSettings = false; tab = INVEST_TAB; showPrices = true },
                         onClose = closeModel::closeMonth,
+                        onBookRecurring = closeModel::bookRecurring,
+                        onConfirmUnits = closeModel::confirmUnits,
                     )
                 }
             }

@@ -11,7 +11,9 @@ import com.moneymatters.app.core.ledger.AccountKind
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.IllegalLifecycleTransitionException
 import com.moneymatters.app.core.ledger.LedgerRepository
+import com.moneymatters.app.core.ledger.LedgerSnapshot
 import com.moneymatters.app.core.ledger.MoneyMattersDatabase
+import com.moneymatters.app.core.ledger.TransactionStatus
 import com.moneymatters.app.core.ledger.PostingLine
 import com.moneymatters.app.core.money.Paise
 import java.time.LocalDate
@@ -69,6 +71,12 @@ interface LoanDao {
     @Query("DELETE FROM loan_payments WHERE loanAccountId = :accountId") suspend fun deletePayments(accountId: String)
 
     @Insert suspend fun insertPayment(payment: LoanPaymentEntity)
+}
+
+/** What is owed on a liability account now: credits less debits of booked entries. */
+fun owedOn(ledger: LedgerSnapshot, accountId: String): Paise {
+    val booked = ledger.transactions.filter { it.status != TransactionStatus.Draft }.map { it.id }.toSet()
+    return Paise(ledger.postings.filter { it.accountId == accountId && it.transactionId in booked }.sumOf { (it.creditPaise ?: 0L) - (it.debitPaise ?: 0L) })
 }
 
 const val INTEREST_ACCOUNT = "Expenses:Interest"
