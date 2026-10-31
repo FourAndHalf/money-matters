@@ -138,6 +138,12 @@ class LedgerRepository(
 
     suspend fun transaction(id: String): TransactionEntity? = dao.getTransaction(id)
 
+    /** Every transaction id, for checking that records pointing at entries still point at something. */
+    suspend fun allTransactionIds(): Set<String> = dao.getAllTransactions().map { it.id }.toSet()
+
+    /** An account's name, for labelling the entries made on its behalf. */
+    suspend fun accountName(id: String): String = requireNotNull(dao.getAccount(id)) { "No such account" }.name
+
     /**
      * Removes an account that has nothing posted to it any more, e.g. a deposit or holding whose entries were just deleted.
      * An account with postings is refused: its history has to stay.

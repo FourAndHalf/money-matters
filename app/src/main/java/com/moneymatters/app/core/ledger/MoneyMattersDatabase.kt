@@ -24,6 +24,9 @@ import com.moneymatters.app.core.invest.PriceStatus
 import com.moneymatters.app.core.invest.SipPlanEntity
 import com.moneymatters.app.core.invest.SipSkipEntity
 import com.moneymatters.app.core.budget.BudgetDao
+import com.moneymatters.app.core.loan.LoanDao
+import com.moneymatters.app.core.loan.LoanEntity
+import com.moneymatters.app.core.loan.LoanPaymentEntity
 import com.moneymatters.app.core.budget.BudgetEntity
 import com.moneymatters.app.core.budget.BudgetPeriod
 import com.moneymatters.app.core.recurring.Frequency
@@ -80,9 +83,9 @@ class CorporateActionsV4 : AutoMigrationSpec
         AccountEntity::class, TransactionEntity::class, PostingEntity::class, AuditLogEntity::class,
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
-        ClosedPeriodEntity::class, CreditCardEntity::class, RecurringRuleEntity::class, BudgetEntity::class,
+        ClosedPeriodEntity::class, CreditCardEntity::class, RecurringRuleEntity::class, BudgetEntity::class, LoanEntity::class, LoanPaymentEntity::class,
     ],
-    version = 14,
+    version = 15,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -110,6 +113,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 12, to = 13),
         // v14: category budgets.
         AutoMigration(from = 13, to = 14),
+        // v15: loan terms and the EMIs paid through the app.
+        AutoMigration(from = 14, to = 15),
     ],
 )
 @TypeConverters(LedgerConverters::class)
@@ -118,4 +123,5 @@ abstract class MoneyMattersDatabase : RoomDatabase() {
     abstract fun investDao(): InvestDao
     abstract fun recurringDao(): RecurringDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun loanDao(): LoanDao
 }
