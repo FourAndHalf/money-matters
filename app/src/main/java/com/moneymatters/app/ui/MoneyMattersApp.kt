@@ -340,6 +340,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                         transactions,
                         onOpenTransaction = { id -> openTransactionId = id },
                         contentPadding = PaddingValues(bottom = 132.dp),
+                        accountantMode = settings.prefs.accountantMode,
                     )
                     ACCOUNTS_TAB -> AccountsScreen(
                         accounts,

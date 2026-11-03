@@ -1,6 +1,9 @@
 package com.moneymatters.app.feature.settings
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 enum class NumberFormat { Full, Compact }
 
@@ -13,13 +16,27 @@ enum class NumberFormat { Full, Compact }
 class SettingsPrefs(context: Context) {
     private val prefs = context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
 
+    // Held as Compose state so the switch in Settings, and the Transactions page that follows it, update the moment it flips.
+    private var accountantState by mutableStateOf(prefs.getBoolean(KEY_ACCOUNTANT_MODE, false))
+
+    /** Shows the Dr/Cr view on Transactions by default. */
     var accountantMode: Boolean
-        get() = prefs.getBoolean(KEY_ACCOUNTANT_MODE, false)
-        set(value) = prefs.edit().putBoolean(KEY_ACCOUNTANT_MODE, value).apply()
+        get() = accountantState
+        set(value) {
+            accountantState = value
+            prefs.edit().putBoolean(KEY_ACCOUNTANT_MODE, value).apply()
+        }
+
+    private var numberFormatState by mutableStateOf(
+        NumberFormat.entries.firstOrNull { it.name == prefs.getString(KEY_NUMBER_FORMAT, null) } ?: NumberFormat.Full,
+    )
 
     var numberFormat: NumberFormat
-        get() = NumberFormat.entries.firstOrNull { it.name == prefs.getString(KEY_NUMBER_FORMAT, null) } ?: NumberFormat.Full
-        set(value) = prefs.edit().putString(KEY_NUMBER_FORMAT, value.name).apply()
+        get() = numberFormatState
+        set(value) {
+            numberFormatState = value
+            prefs.edit().putString(KEY_NUMBER_FORMAT, value.name).apply()
+        }
 
     var impactThresholdPercent: Int
         get() = prefs.getInt(KEY_IMPACT_THRESHOLD, 50)
