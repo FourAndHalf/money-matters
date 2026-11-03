@@ -33,6 +33,20 @@ class QuickAddTest {
         assertFalse(EntryKind.Expense.matchesFrom(dining))
     }
 
+    @Test fun `payment accounts are only bank accounts, cash in hand and credit cards`() {
+        val cash = AccountEntity("cash", "Wallet", AccountType.Asset, kind = AccountKind.Cash)
+        val loan = AccountEntity("loan", "Home loan", AccountType.Liability, kind = AccountKind.Loan)
+        val fd = AccountEntity("fd", "SBI FD", AccountType.Asset, kind = AccountKind.FixedDeposit)
+        val plain = AccountEntity("epf", "EPF", AccountType.Asset)
+        assertTrue(EntryKind.Expense.matchesFrom(cash))
+        listOf(loan, fd, holding, plain).forEach { assertFalse(it.name, EntryKind.Expense.matchesFrom(it)) }
+        assertTrue(EntryKind.CardPayment.matchesFrom(cash))
+        assertFalse("a card can't pay its own bill", EntryKind.CardPayment.matchesFrom(card))
+        assertFalse(EntryKind.InvestBuy.matchesFrom(loan))
+        // Transfers still move between any of your own accounts.
+        assertTrue(EntryKind.Transfer.matchesFrom(fd))
+    }
+
     @Test fun `Card payment only offers a credit card to-side and a real account from-side`() {
         assertTrue(EntryKind.CardPayment.matchesTo(card))
         assertFalse(EntryKind.CardPayment.matchesTo(bank))

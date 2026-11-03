@@ -36,10 +36,14 @@ fun EntryKind.matchesTo(account: AccountEntity): Boolean = when (this) {
     EntryKind.InvestBuy -> account.type == AccountType.Asset && account.kind == AccountKind.Investment
 }
 
+private val PAYMENT_KINDS = setOf(AccountKind.Bank, AccountKind.Cash, AccountKind.CreditCard)
+
 /** Which accounts the "from" (credited) side may pick from, archived accounts always excluded. */
 fun EntryKind.matchesFrom(account: AccountEntity): Boolean = when (this) {
-    EntryKind.Expense, EntryKind.CardPayment, EntryKind.InvestBuy, EntryKind.Transfer ->
-        account.type == AccountType.Asset || account.type == AccountType.Liability
+    // What you pay with: a bank account, cash in hand, or (for an expense) a credit card. Loans, deposits and holdings aren't wallets.
+    EntryKind.Expense -> account.kind in PAYMENT_KINDS
+    EntryKind.CardPayment, EntryKind.InvestBuy -> account.kind == AccountKind.Bank || account.kind == AccountKind.Cash
+    EntryKind.Transfer -> account.type == AccountType.Asset || account.type == AccountType.Liability
     EntryKind.Income, EntryKind.Dividend -> account.type == AccountType.Income
     EntryKind.InvestSell -> account.type == AccountType.Asset && account.kind == AccountKind.Investment
 }
