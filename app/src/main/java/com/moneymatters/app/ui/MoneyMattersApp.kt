@@ -99,6 +99,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showMore by rememberSaveable { mutableStateOf(false) }
+    var moreOnRecurring by rememberSaveable { mutableStateOf(false) }
     var openHoldingId by rememberSaveable { mutableStateOf<String?>(null) }
     var openDepositId by rememberSaveable { mutableStateOf<String?>(null) }
     var openSipId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -284,7 +285,11 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             }
             openTransaction != null -> {
                 BackHandler { openTransactionId = null }
-                TransactionDetailScreen(openTransaction, onBack = { openTransactionId = null }, onEdit = { quickAdd.startEdit(openTransaction.id) })
+                TransactionDetailScreen(openTransaction, onBack = { openTransactionId = null }, onEdit = { quickAdd.startEdit(openTransaction.id) },
+                    onMakeRecurring = recurring?.let { r ->
+                        { r.startFromTransaction(openTransaction.id) { ok -> if (ok) { openTransactionId = null; moreOnRecurring = true; showMore = true } } }
+                    },
+                )
             }
             showQuickAdd -> {
                 BackHandler { showQuickAdd = false }
@@ -314,8 +319,8 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                 SettingsScreen(settings, onClose = { showSettings = false })
             }
             showMore -> {
-                BackHandler { showMore = false }
-                MoreScreen(settings, onClose = { showMore = false }, onOpenClose = { showClose = true }, recurring = recurring, budgets = budgets, reports = reports, loans = loans)
+                BackHandler { showMore = false; moreOnRecurring = false }
+                MoreScreen(settings, onClose = { showMore = false; moreOnRecurring = false }, startOnRecurring = moreOnRecurring, onOpenClose = { showClose = true }, recurring = recurring, budgets = budgets, reports = reports, loans = loans)
             }
             else -> {
                 when (tab) {

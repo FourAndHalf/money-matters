@@ -3,6 +3,7 @@ package com.moneymatters.app.feature.recurring
 import com.moneymatters.app.core.ledger.AccountEntity
 import com.moneymatters.app.core.ledger.AccountType
 import com.moneymatters.app.core.ledger.DecisionKind
+import com.moneymatters.app.core.ledger.LedgerSnapshot
 import com.moneymatters.app.core.ledger.PaymentMethod
 import com.moneymatters.app.core.ledger.PlanKind
 import com.moneymatters.app.core.money.Paise
@@ -64,6 +65,8 @@ data class RecurringForm(
     val decision: DecisionKind? = null,
     val plan: PlanKind? = null,
     val paymentMethod: PaymentMethod? = null,
+    /** Set when the form was started from a posted entry, so the screen can say why the first date is not that entry's date. */
+    val sourceDate: LocalDate? = null,
 ) {
     val amount: Paise? get() = parseRupees(amountText)?.takeIf { it.value > 0 }
     private val endOk: Boolean get() = !hasEnd || (end != null && !end.isBefore(start))
@@ -92,4 +95,24 @@ internal fun Paise.toPlainRupees(): String {
     val rupees = value / 100
     val paise = value % 100
     return if (paise == 0L) "$rupees" else "$rupees.${paise.toString().padStart(2, '0')}"
+}
+
+/**
+ * A new-rule form filled from an entry already in the books: its payee, amount, both accounts and tags. Only an entry
+ * of one amount moving between two accounts can repeat that way; a split or investment entry returns null.
+ * The entry itself is already booked, so the first date is a month after it rather than on it (no double booking).
+ */
+fun recurringFormFor(snapshot: LedgerSnapshot, transactionId: String): RecurringForm? {
+    val txn = snapshot.transactions.firstOrNull { it.id == transactionId } ?: return null
+    val lines = snapshot.postings.filter { it.transactionId == transactionId }
+    val debit = lines.singleOrNull { it.debitPaise != null } ?: return null
+    val credit = lines.singleOrNull { it.creditPaise != null } ?: return null
+    if (lines.size != 2 || lines.any { it.units != null } || debit.debitPaise != credit.creditPaise) return null
+    val date = runCatching { LocalDate.parse(txn.date) }.getOrNull() ?: return null
+    val from = snapshot.accounts.firstOrNull { it.id == credit.accountId }?.takeIf { it in fromChoices(snapshot.accounts) }
+    val to = snapshot.accounts.firstOrNull { it.id == debit.accountId }?.takeIf { it in toChoices(snapshot.accounts) }
+    return RecurringForm(
+        start = date.plusMonths(1), name = txn.payee, amountText = Paise(requireNotNull(debit.debitPaise)).toPlainRupees(),
+        fromId = from?.id, toId = to?.id, decision = txn.decision, plan = txn.plan, paymentMethod = txn.paymentMethod, sourceDate = date,
+    )
 }
