@@ -68,6 +68,7 @@ fun TransactionsScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     today: LocalDate = LocalDate.now(),
+    accountantMode: Boolean = false,
 ) {
     val margin = MoneyTheme.spacing.margin
     val status = WindowInsets.statusBars.asPaddingValues()
@@ -75,7 +76,8 @@ fun TransactionsScreen(
     var query by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf<TxnStatus?>(null) }
     var accountFilter by remember { mutableStateOf<String?>(null) }
-    var mode by remember { mutableStateOf(JournalMode.Everyday) }
+    // Accountant mode (Settings) opens the Dr/Cr view and shows the selector; turning it off removes both.
+    var mode by remember(accountantMode) { mutableStateOf(if (accountantMode) JournalMode.Accountant else JournalMode.Everyday) }
 
     val visibleGroups = remember(state, query, statusFilter, accountFilter) {
         state.filtered(TransactionFilters(query, statusFilter, accountFilter))
@@ -110,7 +112,8 @@ fun TransactionsScreen(
                 StatusFilterRow(statusFilter) { statusFilter = it }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     AccountFilterPill(state.accounts, accountFilter) { accountFilter = it }
-                    SegmentedControl(
+                    // The Dr/Cr view only exists while Accountant mode is on in Settings; off, the list is the everyday one.
+                    if (accountantMode) SegmentedControl(
                         options = listOf(JournalMode.Everyday, JournalMode.Accountant),
                         selectedOption = mode,
                         onSelect = { mode = it },

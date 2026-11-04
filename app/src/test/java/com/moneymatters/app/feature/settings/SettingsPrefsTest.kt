@@ -23,6 +23,14 @@ class SettingsPrefsTest {
         prefs = SettingsPrefs(context)
     }
 
+    @Test fun `accountant mode survives a restart and can be switched back off`() {
+        prefs.accountantMode = true
+        assertTrue(SettingsPrefs(ApplicationProvider.getApplicationContext<Context>()).accountantMode)
+        prefs.accountantMode = false
+        assertFalse(prefs.accountantMode)
+        assertFalse(SettingsPrefs(ApplicationProvider.getApplicationContext<Context>()).accountantMode)
+    }
+
     @Test fun `every preference defaults sensibly and round-trips`() {
         assertFalse(prefs.accountantMode)
         assertEquals(NumberFormat.Full, prefs.numberFormat)

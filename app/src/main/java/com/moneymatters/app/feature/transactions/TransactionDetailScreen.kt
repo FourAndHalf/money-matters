@@ -53,6 +53,7 @@ fun TransactionDetailScreen(
     onEdit: () -> Unit = {},
     onReverse: () -> Unit = {},
     onPriorPeriodAdjustment: () -> Unit = {},
+    onMakeRecurring: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val margin = MoneyTheme.spacing.margin
@@ -74,11 +75,15 @@ fun TransactionDetailScreen(
             item("journal") { Column(Modifier.padding(horizontal = margin)) { JournalModule(detail) } }
             item("audit") { Column(Modifier.padding(horizontal = margin)) { AuditModule(detail.audit) } }
         }
-        Row(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = margin, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (onMakeRecurring != null && detail.status != TxnStatus.Draft) {
+                Pill("Make recurring", onMakeRecurring, style = PillStyle.Secondary, modifier = Modifier.fillMaxWidth(), height = 44.dp)
+            }
             when (detail.status.primaryAction()) {
                 TxnAction.Edit -> Pill("Edit", onEdit, style = PillStyle.Primary, modifier = Modifier.fillMaxWidth(), height = 48.dp)
                 TxnAction.Reverse -> Pill("Reverse", { confirmingReverse = true }, style = PillStyle.Destructive, modifier = Modifier.fillMaxWidth(), height = 48.dp)

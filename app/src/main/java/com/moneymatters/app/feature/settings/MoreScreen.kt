@@ -42,8 +42,9 @@ fun MoreScreen(
     budgets: BudgetsViewModel? = null,
     reports: ReportsViewModel? = null,
     loans: LoansViewModel? = null,
+    startOnRecurring: Boolean = false,
 ) {
-    var section by rememberSaveable { mutableStateOf<MoreSection?>(null) }
+    var section by rememberSaveable { mutableStateOf<MoreSection?>(if (startOnRecurring && recurring != null) MoreSection.Recurring else null) }
 
     section?.let {
         BackHandler { section = null }

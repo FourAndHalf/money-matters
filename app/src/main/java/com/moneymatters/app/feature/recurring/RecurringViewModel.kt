@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -41,6 +42,16 @@ class RecurringViewModel(
     fun startNew() {
         error = null
         form = RecurringForm(start = today())
+    }
+
+    /** Opens the new-rule form filled from a posted entry; false when that entry can't repeat (a split or investment entry). */
+    fun startFromTransaction(transactionId: String, onReady: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            error = null
+            val filled = recurringFormFor(ledger.snapshot().first(), transactionId)
+            if (filled != null) form = filled
+            onReady(filled != null)
+        }
     }
 
     fun startEdit(id: String) {

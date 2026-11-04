@@ -68,11 +68,37 @@ class TransactionsScreenTest {
         compose.onNodeWithTag("status-filter-Prior-period").performScrollTo().assertIsDisplayed()
     }
 
-    @Test fun `accountant mode shows Dr and Cr postings`() {
+    @Test fun `with accountant mode off there is no Accountant view to pick`() {
         compose.setContent { MoneyMattersTheme { TransactionsScreen(SampleTransactions.state, onOpenTransaction = {}) } }
+        compose.onAllNodesWithText("Accountant").assertCountEquals(0)
+        compose.onAllNodesWithText("✓ Balanced").assertCountEquals(0)
+    }
+
+    @Test fun `accountant mode shows Dr and Cr postings and can flip back to everyday`() {
+        compose.setContent { MoneyMattersTheme { TransactionsScreen(SampleTransactions.state, onOpenTransaction = {}, accountantMode = true) } }
+        compose.onNodeWithText("Everyday").performClick()
+        compose.onAllNodesWithText("✓ Balanced").assertCountEquals(0)
         compose.onNodeWithText("Accountant").performClick()
         compose.onNodeWithText("Expenses:Dining").assertIsDisplayed()
         // Every day's journal panel shows its own balanced footer.
         compose.onAllNodesWithText("✓ Balanced").onFirst().assertIsDisplayed()
+    }
+
+    @Test fun `the Settings accountant switch opens Transactions in the Dr and Cr view`() {
+        compose.setContent { MoneyMattersTheme { TransactionsScreen(SampleTransactions.state, onOpenTransaction = {}, accountantMode = true) } }
+        compose.onNodeWithText("Expenses:Dining").assertIsDisplayed()
+        compose.onAllNodesWithText("✓ Balanced").onFirst().assertIsDisplayed()
+    }
+
+    @Test fun `turning the switch off and on moves the view with it`() {
+        val on = androidx.compose.runtime.mutableStateOf(true)
+        compose.setContent { MoneyMattersTheme { TransactionsScreen(SampleTransactions.state, onOpenTransaction = {}, accountantMode = on.value) } }
+        compose.onNodeWithText("Expenses:Dining").assertIsDisplayed()
+        on.value = false
+        compose.waitForIdle()
+        compose.onAllNodesWithText("✓ Balanced").assertCountEquals(0)
+        on.value = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Expenses:Dining").assertIsDisplayed()
     }
 }

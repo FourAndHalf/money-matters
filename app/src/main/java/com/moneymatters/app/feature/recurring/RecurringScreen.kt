@@ -187,7 +187,11 @@ internal fun RecurringFormContent(
                     Column(Modifier.padding(top = 12.dp)) {
                         DateField("First date", form.start, { onChange(form.copy(start = it)) })
                     }
-                    Text("Dates already past are booked as soon as you save.", style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 6.dp))
+                    val source = form.sourceDate
+                    Text(
+                        if (source != null) "Based on the entry of ${source.format(DayMonthYear)}, already in your books, so the first date is the next one."
+                        else "Dates already past are booked as soon as you save.",
+                        style = MoneyTheme.type.bodySm, color = MoneyTheme.colors.muted, modifier = Modifier.padding(top = 6.dp))
                     ListRow("Ends on a date", divider = false, trailing = { Toggle(form.hasEnd, { onChange(form.copy(hasEnd = it, end = if (it) form.end ?: form.start.plusYears(1) else null)) }) })
                     if (form.hasEnd) DateField("Last date", form.end, { onChange(form.copy(end = it)) }, error = form.endError)
                 }
