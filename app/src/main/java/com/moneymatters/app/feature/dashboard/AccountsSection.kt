@@ -36,6 +36,7 @@ import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.StackDots
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
+import com.moneymatters.app.ui.components.amountColor
 import com.moneymatters.app.ui.theme.MoneyTheme
 
 /** Accounts header, swipeable card stack, position dots and the context panel for the front card. */
@@ -82,8 +83,8 @@ private fun AccountContext(card: AccountCard, onAction: () -> Unit) {
         ModuleHeader(d.title, subtitle = d.subtitle, action = { Pill(d.action, onAction) })
         when (d) {
             is AccountDetail.Bank -> {
-                KeyValueRow("Money in", "▲ ${d.moneyIn.formatInr()}")
-                KeyValueRow("Money out", "▼ ${d.moneyOut.formatInr()}")
+                KeyValueRow("Money in", "▲ ${d.moneyIn.formatInr()}", valueColor = c.positive)
+                KeyValueRow("Money out", "▼ ${d.moneyOut.formatInr()}", valueColor = c.negative)
                 d.recent.forEachIndexed { i, txn ->
                     ListRow(
                         title = txn.payee,
@@ -91,9 +92,7 @@ private fun AccountContext(card: AccountCard, onAction: () -> Unit) {
                         divider = i < d.recent.lastIndex,
                         leading = { GlyphChip(text = txn.chip) },
                         trailing = {
-                            AmountWithBadge(txn.amount.formatInr(signed = true)) {
-                                StatusBadge(txn.badge, txn.tone)
-                            }
+                            AmountWithBadge(txn.amount.formatInr(signed = true), color = amountColor(txn.amount)) { StatusBadge(txn.badge, txn.tone) }
                         },
                     )
                 }
@@ -102,8 +101,8 @@ private fun AccountContext(card: AccountCard, onAction: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Gauge(d.utilisation, "of ${d.limit.formatInr()}")
                     Column(Modifier.weight(1f)) {
-                        KeyValueRow("Statement", d.statement.formatInr())
-                        KeyValueRow("Unbilled", d.unbilled.formatInr())
+                        KeyValueRow("Statement", d.statement.formatInr(), valueColor = if (d.statement.value > 0) c.negative else c.ink)
+                        KeyValueRow("Unbilled", d.unbilled.formatInr(), valueColor = if (d.unbilled.value > 0) c.negative else c.ink)
                         KeyValueRow("Due", d.dueLabel, divider = false)
                     }
                 }
