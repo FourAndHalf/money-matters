@@ -41,7 +41,8 @@ fun AccountRow(
         divider = divider,
         modifier = modifier.clickable(role = Role.Button, onClickLabel = "Open $name ledger", onClick = onClick),
         leading = { GlyphChip(icon = kind.icon(), text = kind.glyph()) },
-        trailing = { AmountWithBadge(amountText, badge) },
+        // Money you owe reads red; money you hold stays ink.
+        trailing = { AmountWithBadge(amountText, badge = badge, color = if (isLiability && balance.value > 0) MoneyTheme.colors.negative else MoneyTheme.colors.ink) },
     )
 }
 

@@ -37,6 +37,7 @@ import com.moneymatters.app.ui.components.Pill
 import com.moneymatters.app.ui.components.PillStyle
 import com.moneymatters.app.ui.components.StatusBadge
 import com.moneymatters.app.ui.components.Tone
+import com.moneymatters.app.core.money.Paise
 import com.moneymatters.app.ui.components.amountColor
 import com.moneymatters.app.ui.components.amountText
 import com.moneymatters.app.ui.icons.MoneyIcons
@@ -80,7 +81,7 @@ fun AccountLedgerScreen(
             state.sections.forEachIndexed { index, section ->
                 item(section.title ?: "section-$index") {
                     Column(Modifier.padding(horizontal = margin)) {
-                        SectionModule(section, state.periodLabel)
+                        SectionModule(section, state.periodLabel, state.isLiability)
                     }
                 }
             }
@@ -97,7 +98,7 @@ private fun BalanceHero(state: AccountLedgerState) {
 
     Module(shape = MoneyTheme.shapes.xl) {
         Text(if (state.isLiability) "Outstanding" else "Current balance", style = MoneyTheme.type.bodySm, color = c.muted)
-        MoneyText(displayAmount, style = MoneyTheme.type.metricHero, showPaise = false, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
+        MoneyText(displayAmount, style = MoneyTheme.type.metricHero, showPaise = false, color = if (state.isLiability && displayAmount.value > 0) c.negative else c.ink, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Box {
                 Pill(selectedPeriod, { periodExpanded = true }, trailingIcon = MoneyIcons.ChevronDown)
@@ -117,7 +118,7 @@ private fun BalanceHero(state: AccountLedgerState) {
 }
 
 @Composable
-private fun SectionModule(section: LedgerSection, periodLabel: String) {
+private fun SectionModule(section: LedgerSection, periodLabel: String, isLiability: Boolean) {
     Module {
         if (section.title != null) {
             ModuleHeader(section.title, subtitle = section.subtotal?.let { "Charges ${it.formatInr()}" })
@@ -130,17 +131,23 @@ private fun SectionModule(section: LedgerSection, periodLabel: String) {
                 subtitle = "${entry.dateLabel} · ${entry.meta}",
                 divider = i < section.entries.lastIndex,
                 leading = { GlyphChip(text = entry.chip) },
-                trailing = { EntryTrailing(entry) },
+                trailing = { EntryTrailing(entry, isLiability) },
             )
         }
     }
 }
 
+/**
+ * The entry's effect on you, for colouring: a liability's amounts are signed by what is *owed*, so a card charge
+ * (owed goes up) is money out and reads red, and a payment towards it (owed goes down) reads green.
+ */
+internal fun LedgerEntry.effectOnYou(isLiability: Boolean): Paise = if (isLiability) -amount else amount
+
 @Composable
-private fun EntryTrailing(entry: LedgerEntry) {
+private fun EntryTrailing(entry: LedgerEntry, isLiability: Boolean) {
     val c = MoneyTheme.colors
     Column(horizontalAlignment = Alignment.End) {
-        Text(amountText(entry.amount), style = MoneyTheme.type.metricTable, color = amountColor(entry.amount, entry.isTransfer), textAlign = TextAlign.End, softWrap = false)
+        Text(amountText(entry.amount), style = MoneyTheme.type.metricTable, color = amountColor(entry.effectOnYou(isLiability), entry.isTransfer), textAlign = TextAlign.End, softWrap = false)
         entry.status?.let { status ->
             val (text, tone, icon) = status.badge()
             StatusBadge(text, tone, icon = icon, modifier = Modifier.padding(top = 4.dp))

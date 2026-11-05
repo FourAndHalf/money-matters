@@ -119,9 +119,9 @@ fun ListRow(
 
 /** Right-aligned amount with an optional badge beneath (transaction and bill rows). */
 @Composable
-fun AmountWithBadge(amount: String, badge: (@Composable () -> Unit)? = null) {
+fun AmountWithBadge(amount: String, color: Color = MoneyTheme.colors.ink, badge: (@Composable () -> Unit)? = null) {
     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(amount, style = MoneyTheme.type.ledgerMono.copy(fontWeight = MoneyTheme.type.metricTable.fontWeight), color = MoneyTheme.colors.ink, softWrap = false)
+        Text(amount, style = MoneyTheme.type.ledgerMono.copy(fontWeight = MoneyTheme.type.metricTable.fontWeight), color = color, softWrap = false)
         badge?.invoke()
     }
 }
