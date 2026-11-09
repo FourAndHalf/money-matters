@@ -124,6 +124,7 @@
     <a href="#accountability">Accountability</a>
     <a href="#investments">Investments</a>
     <a href="#prices">Prices</a>
+    <a href="#markets">Markets</a>
     <a href="#goals">Goals</a>
     <a href="#tax">Tax</a>
     <a href="#insights">Insights &amp; AI</a>
@@ -372,6 +373,21 @@ Day 1   Dr  Assets:MF:PPFAS Flexi  (123.456 u @ ₹81.00)   10,000
         <tr><td>🟣 Suspicious</td><td>Moved more than 20% in a week; possibly an unrecorded split or bonus. A zero or negative price is never stored: it is skipped and reported in the download log</td><td>No, until confirmed or the corporate action is recorded</td></tr>
       </table></div>
       <div class="callout warn">A status bar at the top of the Prices screen always shows the health of each source, e.g. <em>"NSE: 🔴 failing since 12 Oct · last success 5 Oct · reason: file not found (404)"</em>. A failure is never hidden behind an old price.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="markets">
+      <h2>Markets: watchlist, screener, mood, alerts</h2>
+      <p>Inspired by Tickertape's six headline tools, built only from data the app can get for free. Nothing is mocked: a measure without enough history says so, and the missing feeds are named.</p>
+      <ul>
+        <li><strong>Price history:</strong> the same NSE end-of-day file as the weekly price download, but kept for every EQ/BE/BZ stock (open, high, low, close, previous close, volume) for about a year. "Update" fetches missing days; "Fill gaps (a year)" backfills. A 404 day is a holiday and is skipped; any other failure stops the run and keeps what was stored. A nightly job (19:00) tops it up and runs alerts once there are rules or history.</li>
+        <li><strong>Watchlist and alerts:</strong> stocks you follow without owning. Rules: price above/below, one-day move, 50-day average cross, 52-week high/low, RSI over 70 or under 30, volume over twice the 1-month average. A rule fires only when its condition turns from false to true, and a new rule remembers whether it already holds, so nothing fires on creation. Fired alerts are always listed in the app; a notification is sent too if the permission is granted.</li>
+        <li><strong>Screener:</strong> 13 price and volume measures, conditions combined with AND, five preset screens, and saved screens.</li>
+        <li><strong>Scorecard:</strong> 0 to 10 for performance, trend, entry point and liquidity, ranked against <em>all</em> NSE stocks (no sector data offline, so the peer group is the whole market). Red flags come from the NSE series (BE/BZ), a sharp one-day fall, distance below the 200-day average or the 52-week high, and thin trading.</li>
+        <li><strong>Market mood:</strong> breadth (volume in rising stocks), price strength (near 52-week highs vs lows) and momentum (above the 50-day average), each as a z-score against its last 45 trading days, rescaled to 0 to 100 and averaged. Zones: under 30 extreme fear, 30 to 50 fear, 50 to 70 greed, over 70 extreme greed. FII activity, volatility (VIX) and gold demand need licensed feeds and are shown as missing.</li>
+        <li><strong>Portfolio checks:</strong> spread score (100 when value is even over ten or more holdings), largest and top-three share, holdings over 25% flagged, and the price red flags above for stocks held. The spread formula is our own.</li>
+        <li><strong>Not built:</strong> fundamentals-based screening and scorecards (P/E, ROE, growth), analyst forecasts, promoter pledging and surveillance lists, and a mutual fund screener (Sharpe, alpha, expense ratio). They need a data source the app does not have; revisit if one is chosen.</li>
+      </ul>
     </section>
 
     <!-- ============================================================ -->

@@ -90,3 +90,40 @@ class NseIndex(rows: List<NseRow>) {
     fun byIsin(isin: String): NseRow? = byIsin[isin]
     fun bySymbol(symbol: String): NseRow? = bySymbol[symbol.uppercase()]
 }
+
+/** The series kept for the market module: plain equity and the two stricter ones, whose flags matter to a holder. */
+val MARKET_SERIES = listOf("EQ", "BE", "BZ")
+
+/** One stock's full day from NSE's file, in [UnitPrice]-style 1/10,000 rupee units. */
+data class NseBar(
+    val symbol: String, val name: String, val series: String, val date: LocalDate,
+    val open: Long, val high: Long, val low: Long, val close: Long, val prevClose: Long, val volume: Long,
+)
+
+/**
+ * Reads open, high, low, close, previous close and volume from the same file [parseNse] reads, by header name. Rows
+ * without a usable close are skipped, and a missing open/high/low falls back to the close so one odd row never
+ * drops a stock. Where a symbol is listed in several series on a day, EQ wins.
+ */
+fun parseNseBars(csv: String): List<NseBar> {
+    val lines = csv.lines().filter { it.isNotBlank() }
+    if (lines.isEmpty()) return emptyList()
+    val col = lines.first().split(',').map { it.trim() }.withIndex().associate { (i, n) -> n to i }
+    if (listOf("TradDt", "TckrSymb", "SctySrs", "ClsPric").any { it !in col }) return emptyList()
+    val bars = lines.drop(1).mapNotNull { line ->
+        val cells = line.split(',')
+        fun cell(name: String) = col[name]?.let { cells.getOrNull(it) }?.trim().orEmpty()
+        val series = cell("SctySrs")
+        if (series !in MARKET_SERIES) return@mapNotNull null
+        val close = parsePriceText(cell("ClsPric"))?.tenThousandths?.takeIf { it > 0 } ?: return@mapNotNull null
+        val date = try { LocalDate.parse(cell("TradDt")) } catch (_: DateTimeParseException) { return@mapNotNull null }
+        val symbol = cell("TckrSymb").uppercase().ifEmpty { return@mapNotNull null }
+        fun price(name: String) = parsePriceText(cell(name))?.tenThousandths?.takeIf { it > 0 }
+        NseBar(
+            symbol, cell("FinInstrmNm"), series, date,
+            open = price("OpnPric") ?: close, high = price("HghPric") ?: close, low = price("LwPric") ?: close,
+            close = close, prevClose = price("PrvsClsgPric") ?: close, volume = cell("TtlTradgVol").toLongOrNull() ?: 0L,
+        )
+    }
+    return bars.groupBy { it.symbol }.map { (_, v) -> v.minBy { MARKET_SERIES.indexOf(it.series) } }
+}

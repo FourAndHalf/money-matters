@@ -1,6 +1,12 @@
 package com.moneymatters.app.core.ledger
 
 import androidx.room.AutoMigration
+import com.moneymatters.app.core.market.AlertEventEntity
+import com.moneymatters.app.core.market.AlertRuleEntity
+import com.moneymatters.app.core.market.MarketBarEntity
+import com.moneymatters.app.core.market.MarketDao
+import com.moneymatters.app.core.market.SavedScreenEntity
+import com.moneymatters.app.core.market.WatchlistEntity
 import androidx.room.DeleteColumn
 import androidx.room.migration.AutoMigrationSpec
 import androidx.room.Database
@@ -90,8 +96,9 @@ class CorporateActionsV4 : AutoMigrationSpec
         HoldingEntity::class, LotEntity::class, LotConsumptionEntity::class, PriceEntity::class,
         FixedDepositEntity::class, SipPlanEntity::class, CorporateActionEntity::class, PendingAllotmentEntity::class, SipSkipEntity::class, PriceFetchLogEntity::class,
         ClosedPeriodEntity::class, CreditCardEntity::class, RecurringRuleEntity::class, BudgetEntity::class, LoanEntity::class, LoanPaymentEntity::class,
+        MarketBarEntity::class, WatchlistEntity::class, AlertRuleEntity::class, AlertEventEntity::class, SavedScreenEntity::class,
     ],
-    version = 16,
+    version = 17,
     autoMigrations = [
         // v2: account kind; decision, plan and payment-method tags on transactions. All nullable.
         AutoMigration(from = 1, to = 2),
@@ -123,6 +130,8 @@ class CorporateActionsV4 : AutoMigrationSpec
         AutoMigration(from = 14, to = 15),
         // v16: accounts carry a liquidity tier and a goal, both optional.
         AutoMigration(from = 15, to = 16),
+        // v17: daily market prices, watchlist, alert rules and events, saved screens. New tables only.
+        AutoMigration(from = 16, to = 17),
     ],
 )
 @TypeConverters(LedgerConverters::class)
@@ -132,4 +141,5 @@ abstract class MoneyMattersDatabase : RoomDatabase() {
     abstract fun recurringDao(): RecurringDao
     abstract fun budgetDao(): BudgetDao
     abstract fun loanDao(): LoanDao
+    abstract fun marketDao(): MarketDao
 }
