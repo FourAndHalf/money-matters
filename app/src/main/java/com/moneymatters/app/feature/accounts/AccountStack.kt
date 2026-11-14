@@ -140,13 +140,13 @@ private fun AccountPanel(account: AccountSummary, onOpen: () -> Unit, onEditCard
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Gauge(util, "of ${account.cardLimit.formatInr()}")
                 Column(Modifier.weight(1f)) {
-                    KeyValueRow("Owed", account.balance.formatInr())
+                    KeyValueRow("Owed", account.balance.formatInr(), valueColor = if (account.balance.value > 0) MoneyTheme.colors.negative else MoneyTheme.colors.ink)
                     KeyValueRow("Available", (account.cardLimit - account.balance).coerceAtLeast(Paise.Zero).formatInr())
                     account.statementDay?.let { KeyValueRow("Statement", "${ordinal(it)} of the month", divider = false) }
                 }
             }
         } else {
-            KeyValueRow(if (account.isLiability) "Owed" else "Balance", account.balance.formatInr())
+            KeyValueRow(if (account.isLiability) "Owed" else "Balance", account.balance.formatInr(), valueColor = if (account.isLiability && account.balance.value > 0) MoneyTheme.colors.negative else MoneyTheme.colors.ink)
             KeyValueRow("Entries", account.entryCount.toString(), divider = false)
         }
     }

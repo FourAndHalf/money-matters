@@ -33,6 +33,10 @@ import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.core.invest.PriceSourcePrefs
 import com.moneymatters.app.core.invest.PriceUpdater
 import com.moneymatters.app.core.invest.PriceWorker
+import com.moneymatters.app.core.market.MarketRepository
+import com.moneymatters.app.core.market.MarketUpdater
+import com.moneymatters.app.core.market.MarketWorker
+import com.moneymatters.app.feature.market.MarketViewModel
 import com.moneymatters.app.core.budget.BudgetRepository
 import com.moneymatters.app.core.ledger.LedgerDatabaseProvider
 import com.moneymatters.app.core.loan.LoanRepository
@@ -124,6 +128,14 @@ class MainActivity : ComponentActivity() {
     private val loansModel: LoansViewModel by viewModels {
         viewModelFactory { initializer { LoansViewModel(LoanRepository(LedgerDatabaseProvider.get(applicationContext), ledgerRepo), ledgerRepo) } }
     }
+    private val marketModel: MarketViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                val market = MarketRepository(LedgerDatabaseProvider.get(applicationContext))
+                MarketViewModel(market, MarketUpdater(market, HttpPriceFetcher(), priceSourcePrefs::sources))
+            }
+        }
+    }
     private val closeModel: CloseViewModel by viewModels {
         viewModelFactory {
             initializer { CloseViewModel(
@@ -160,6 +172,7 @@ class MainActivity : ComponentActivity() {
         // Only runs on a cold process start; a warm resume from the background skips this entirely.
         val splashScreen = installSplashScreen()
         PriceWorker.schedule(applicationContext)
+        MarketWorker.schedule(applicationContext)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
@@ -245,7 +258,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     saveableState.SaveableStateProvider("app") {
                         // Null only for the moment before the first ledger read lands.
-                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel, budgets = budgetsModel, reconcile = reconcileModel, reports = reportsModel, loans = loansModel) }
+                        booksModel.books.collectAsState().value?.let { MoneyMattersApp(it, quickAddModel, quickAddPrefs, settingsModel, investModel, closeModel, launchTarget, onLaunchHandled = { launchTarget = null }, recurring = recurringModel, budgets = budgetsModel, reconcile = reconcileModel, reports = reportsModel, loans = loansModel, market = marketModel) }
                     }
                 }
             }

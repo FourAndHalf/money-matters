@@ -46,6 +46,9 @@ import com.moneymatters.app.feature.invest.AddInvestmentScreen
 import com.moneymatters.app.feature.close.CloseViewModel
 import com.moneymatters.app.feature.invest.GainsScreen
 import com.moneymatters.app.feature.invest.PricesScreen
+import com.moneymatters.app.feature.market.MarketScreen
+import com.moneymatters.app.feature.market.MarketViewModel
+import com.moneymatters.app.feature.market.rememberNotificationPermissionRequest
 import com.moneymatters.app.feature.invest.SipDetailScreen
 import com.moneymatters.app.feature.invest.SipFormScreen
 import com.moneymatters.app.feature.invest.TradeScreen
@@ -88,7 +91,7 @@ private enum class InvestOverlay { Trade, Price, Dividend, Action, Allot, NewDep
 
 /** App shell: canvas, current tab, Quick Add and the floating bottom bar. */
 @Composable
-fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null, budgets: BudgetsViewModel? = null, reconcile: ReconcileViewModel? = null, reports: ReportsViewModel? = null, loans: LoansViewModel? = null) {
+fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPrefs: QuickAddPrefs, settings: SettingsViewModel, invest: InvestViewModel, closeModel: CloseViewModel, launchTarget: LaunchTarget? = null, onLaunchHandled: () -> Unit = {}, recurring: RecurringViewModel? = null, budgets: BudgetsViewModel? = null, reconcile: ReconcileViewModel? = null, reports: ReportsViewModel? = null, loans: LoansViewModel? = null, market: MarketViewModel? = null) {
     val accounts = books.accounts
     val ledgers = books.ledgers
     val transactions = books.transactions
@@ -105,6 +108,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     var openSipId by rememberSaveable { mutableStateOf<String?>(null) }
     var showPrices by rememberSaveable { mutableStateOf(false) }
     var showGains by rememberSaveable { mutableStateOf(false) }
+    var showMarkets by rememberSaveable { mutableStateOf(false) }
     var showClose by rememberSaveable { mutableStateOf(false) }
     var showReconcile by rememberSaveable { mutableStateOf(false) }
     var showAddAccount by rememberSaveable { mutableStateOf(false) }
@@ -114,7 +118,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
     LaunchedEffect(launchTarget) {
         val target = launchTarget ?: return@LaunchedEffect
         openAccountId = null; openTransactionId = null; openHoldingId = null; openDepositId = null; openSipId = null
-        showSettings = false; showMore = false; showClose = false; showPrices = false; showGains = false; showAddAccount = false
+        showSettings = false; showMore = false; showClose = false; showPrices = false; showGains = false; showMarkets = false; showAddAccount = false
         investOverlay = null
         when (target) {
             LaunchTarget.AddEntry -> showQuickAdd = true
@@ -186,6 +190,11 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
             investOverlay == InvestOverlay.EditSip -> {
                 BackHandler { investOverlay = null; invest.sipForm = null }
                 SipFormScreen(invest, funds = emptyList(), onClose = { investOverlay = null })
+            }
+            showMarkets && market != null && openHolding == null -> {
+                BackHandler { showMarkets = false }
+                val askPermission = rememberNotificationPermissionRequest()
+                MarketScreen(market, held = investState?.holdings.orEmpty(), onBack = { showMarkets = false }, onNeedNotificationPermission = askPermission)
             }
             showGains && investState != null && openHolding == null -> {
                 BackHandler { showGains = false }
@@ -357,6 +366,7 @@ fun MoneyMattersApp(books: BooksState, quickAdd: QuickAddViewModel, quickAddPref
                             onNewSip = { invest.startSip(); investOverlay = InvestOverlay.NewSip },
                             onOpenPrices = { showPrices = true },
                             onOpenGains = { showGains = true },
+                            onOpenMarkets = { showMarkets = true },
                             onNudgeTarget = invest::nudgeTarget,
                             onOpenSip = { id -> openSipId = id },
                             onOpenDeposit = { id -> openDepositId = id },

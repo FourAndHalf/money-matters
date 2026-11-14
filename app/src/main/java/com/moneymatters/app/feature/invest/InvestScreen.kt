@@ -58,6 +58,7 @@ fun InvestScreen(
     onOpenSip: (planId: String) -> Unit = {},
     onOpenPrices: () -> Unit = {},
     onOpenGains: () -> Unit = {},
+    onOpenMarkets: () -> Unit = {},
     onNudgeTarget: (delta: Int) -> Unit = {},
 ) {
     val margin = MoneyTheme.spacing.margin
@@ -188,6 +189,16 @@ fun InvestScreen(
                             modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open capital gains", onClick = onOpenGains),
                         )
                     }
+                }
+            }
+            item("markets") {
+                Module(Modifier.padding(horizontal = margin)) {
+                    ListRow(
+                        title = "Markets",
+                        subtitle = "Watchlist, screener, market mood and price alerts",
+                        divider = false,
+                        modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Open markets", onClick = onOpenMarkets),
+                    )
                 }
             }
             if (state.holdings.isNotEmpty()) {
